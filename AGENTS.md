@@ -8,7 +8,7 @@ evidence with tests, screenshots, traces, compiler receipts, or inspection.
 
 - This is a standalone experimental product, not a Lineage package or Canvas
   feature.
-- Do not modify `mean-weasel/lineage`, its databases, profiles, services,
+- Do not modify `lineagehq/lineage`, its databases, profiles, services,
   release process, or plugin from this repository.
 - Treat future Lineage integration as a versioned adapter and receipt boundary.
 - Keep one task aligned to one feature, branch/worktree, and pull request.
