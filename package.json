@@ -1,0 +1,11 @@
+{
+  "name": "lineage-motion",
+  "version": "0.0.0-private",
+  "private": true,
+  "description": "Shared human-and-agent authoring for browser-native product-demo motion",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.22.0"
+  }
+}

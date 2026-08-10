@@ -1,0 +1,21 @@
+node_modules/
+dist/
+build/
+coverage/
+.cache/
+.DS_Store
+*.log
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
+.env
+.env.*
+!.env.example
+
+# Private/local acceptance material and generated proof artifacts
+.private-corpus/
+.motion/
+artifacts/
+screenshots/
+test-results/
+playwright-report/
