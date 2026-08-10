@@ -1,7 +1,7 @@
 # Relationship to Lineage
 
 Lineage Motion is inspired by and may later integrate with
-[mean-weasel/lineage](https://github.com/mean-weasel/lineage), a local-first
+[lineagehq/lineage](https://github.com/lineagehq/lineage), a local-first
 creative lineage workspace.
 
 ## Shared concepts

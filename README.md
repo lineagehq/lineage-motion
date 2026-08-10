@@ -15,7 +15,7 @@ expressed in CSS.
 ## Status
 
 This repository is in standalone incubation. It is intentionally separate from
-[mean-weasel/lineage](https://github.com/mean-weasel/lineage) while the motion
+[lineagehq/lineage](https://github.com/lineagehq/lineage) while the motion
 document, importer, preview, compiler, and shared human/agent workflow are
 proven against real synchronized walkthroughs.
 
