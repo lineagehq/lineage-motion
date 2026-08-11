@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <style>
+      :root { --surface: rgb(245 245 245); --cycle: 1000ms; }
+      body { margin: 0; background: var(--surface); }
+      .synthetic-canvas { position: relative; width: 320px; height: 180px; }
+      .synthetic-block { width: 40px; height: 40px; color: rgb(20 20 20); animation: glide var(--cycle) ease 100ms 1 normal both running, pulse 600ms steps(3, end) 50ms 2 normal both running; }
+      .synthetic-block:nth-of-type(2) { animation-delay: 250ms, 75ms; }
+      .synthetic-caption { opacity: 0; animation: blink 800ms steps(2, start) 1 normal both running; animation-delay: 200ms; }
+      @keyframes glide {
+        0% { transform: translateX(0); opacity: 0; }
+        100% { transform: translateX(80px); opacity: 1; }
+      }
+      @keyframes pulse {
+        from { background-color: rgb(30 80 120); }
+        to { background-color: rgb(80 120 30); }
+      }
+      @keyframes blink {
+        0% { color: rgb(10 10 10); opacity: 0; }
+        100% { color: rgb(220 220 220); opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="synthetic-canvas">
+      <div class="synthetic-block"></div>
+      <div class="synthetic-block"></div>
+      <p class="synthetic-caption">Synthetic label</p>
+    </main>
+  </body>
+</html>
