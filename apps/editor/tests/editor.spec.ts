@@ -1,11 +1,36 @@
 import { expect, test } from '@playwright/test';
+import { spawn, type ChildProcess } from 'node:child_process';
+import { resolve } from 'node:path';
+
+const editorUrl = 'http://127.0.0.1:41738';
+let fallbackServer: ChildProcess | undefined;
+
+test.beforeAll(async () => {
+  if (await serverReady()) return;
+  const root = resolve(import.meta.dirname, '../../..');
+  fallbackServer = spawn(process.execPath, [
+    resolve(root, 'node_modules/vite/bin/vite.js'), '--config',
+    resolve(root, 'apps/editor/vite.config.ts'), '--host', '127.0.0.1', '--port', '41738',
+  ], { cwd: root, stdio: 'ignore' });
+  for (let attempt = 0; attempt < 80; attempt += 1) {
+    if (await serverReady()) return;
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+  }
+  throw new Error('EDITOR_TEST_SERVER_TIMEOUT');
+});
+
+test.afterAll(() => fallbackServer?.kill('SIGTERM'));
+
+async function serverReady(): Promise<boolean> {
+  try { return (await fetch(editorUrl)).ok; } catch { return false; }
+}
 
 test('renders exact compiled output and controls native animations without mutation', async ({ page }) => {
   const consoleErrors: string[] = [];
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
-  await page.goto('/');
+  await page.goto(editorUrl);
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
 
   const proof = await page.evaluate(() => {
@@ -107,6 +132,84 @@ test('renders exact compiled output and controls native animations without mutat
   await page.getByRole('button', { name: 'Inspect reduced motion' }).click();
   await expect(page.locator('[data-reduced-motion-panel]')).toBeVisible();
   await expect(page.locator('[data-reduced-motion-panel]')).toContainText('source-snapshot');
-  expect(await page.locator('input:not([type="range"]), textarea, [contenteditable="true"]').count()).toBe(0);
+  expect(await page.locator('input:not([type="range"])').count()).toBe(2);
   expect(consoleErrors).toEqual([]);
+});
+
+test('authors value and time through canonical operations with atomic history and native remounts', async ({ page }) => {
+  const consoleErrors: string[] = [];
+  const failedRequests: string[] = [];
+  page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
+  page.on('requestfailed', (request) => failedRequests.push(request.failure()?.errorText ?? 'failed'));
+  await page.goto(editorUrl);
+  await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+
+  const editable = page.locator('.keyframe:not(:disabled)');
+  await expect(editable).toHaveCount(2);
+  await editable.first().click();
+  const s0 = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  await page.locator('input[data-value]').fill('0.25');
+  await page.getByRole('button', { name: 'Set value' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 1');
+  const s1 = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  expect(s1.revision).toBe(1);
+  expect(s1.contentDigest).not.toBe(s0.contentDigest);
+  expect(s1.compiledHtml).not.toBe(s0.compiledHtml);
+
+  await editable.last().focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('input[data-value]')).toBeFocused();
+  await page.locator('[data-time]').fill('2180');
+  await page.getByRole('button', { name: 'Set time' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 2');
+  const s2 = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  expect(s2.revision).toBe(2);
+  expect(s2.contentDigest).not.toBe(s1.contentDigest);
+  expect(await editable.last().getAttribute('data-time-ms')).toBe('2180');
+
+  const rejected = await page.evaluate(async () => {
+    const before = window.__motionEditor.inspectAuthoring();
+    const keyframe = document.querySelector<HTMLElement>('.keyframe:not(:disabled)')!;
+    const row = keyframe.closest<HTMLElement>('[data-track-id]')!;
+    const result = await window.__motionEditor.dispatch({
+      schemaVersion: 'motion.operation.v1', operationId: 'browser:stale', documentId: before.documentId,
+      expectedRevision: 1, kind: 'motion.keyframe-value.set', elementId: row.dataset.elementId!,
+      trackId: row.dataset.trackId!, keyframeId: keyframe.dataset.keyframeId!, payload: { value: 0.5 },
+    });
+    return { result, before, after: window.__motionEditor.inspectAuthoring(), srcdoc: (document.querySelector('[data-preview]') as HTMLIFrameElement).srcdoc };
+  });
+  expect(rejected.result).toEqual({ ok: false, code: 'AUTHORING_STALE_REVISION' });
+  expect(rejected.after).toEqual(rejected.before);
+  expect(rejected.srcdoc).toBe(s2.compiledHtml);
+
+  const expected = [s1, s0, s1, s2];
+  for (const [index, name] of ['Undo', 'Undo', 'Redo', 'Redo'].entries()) {
+    await page.getByRole('button', { name }).click();
+    const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    expect(current.revision).toBe(index + 3);
+    expect(current.contentDigest).toBe(expected[index]!.contentDigest);
+    expect(current.exportDigest).toBe(expected[index]!.exportDigest);
+    expect(current.compiledHtml).toBe(expected[index]!.compiledHtml);
+  }
+
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await editable.first().click();
+  await page.locator('input[data-value]').fill('0.5');
+  await page.getByRole('button', { name: 'Set value' }).click();
+  expect((await page.evaluate(() => window.__motionEditor.inspectAuthoring())).redoCount).toBe(0);
+  await page.getByRole('button', { name: 'Redo' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText('AUTHORING_HISTORY_EMPTY');
+
+  await page.locator('[data-scrub]').fill('2181');
+  expect(await page.evaluate(() => {
+    const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    return iframe.srcdoc === window.__motionEditor.compiledHtml
+      && iframe.contentDocument!.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
+  })).toBe(true);
+  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: 'Pause' }).click();
+  await page.getByRole('button', { name: 'Inspect reduced motion' }).click();
+  await expect(page.locator('[data-reduced-motion-panel]')).toBeVisible();
+  expect(consoleErrors).toEqual([]);
+  expect(failedRequests).toEqual([]);
 });

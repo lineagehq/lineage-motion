@@ -1,0 +1,3005 @@
+{
+  "schemaVersion": "motion.phase2-authoring-proof.v1",
+  "passed": true,
+  "environment": {
+    "browser": {
+      "name": "Playwright Chromium",
+      "version": "151.0.7922.34"
+    },
+    "playwrightVersion": "1.62.1",
+    "processAttestation": {
+      "method": "cdp-system-process-info+os-process-table",
+      "osFamily": "darwin",
+      "browserProcessRecordCount": 1,
+      "flagOccurrenceCount": 1,
+      "pidStable": true,
+      "pinnedRevision": "1234",
+      "browserVersionMatch": true,
+      "executableRevisionMatch": true,
+      "passed": true
+    },
+    "viewport": {
+      "width": 900,
+      "height": 700
+    },
+    "deviceScaleFactor": 1,
+    "colorScheme": "light",
+    "locale": "en-US",
+    "timezone": "UTC",
+    "reducedMotion": "no-preference",
+    "serviceWorkers": "block",
+    "network": "blocked"
+  },
+  "readiness": {
+    "requiredLayoutConsecutiveCount": 3,
+    "requiredSemanticConsecutiveCount": 3,
+    "maximumAnimationFrames": 120,
+    "requiredRasterConsecutiveCount": 2,
+    "maximumRasterAttempts": 5
+  },
+  "repeatability": {
+    "consecutiveFocusedPasses": 6
+  },
+  "independentContextCount": 7,
+  "stateSequence": [
+    {
+      "label": "S0",
+      "revision": 0,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "layoutConsecutiveCount": 3,
+      "sampleCount": 23,
+      "rasterCaptureCount": 46
+    },
+    {
+      "label": "S1",
+      "revision": 1,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "layoutConsecutiveCount": 3,
+      "sampleCount": 23,
+      "rasterCaptureCount": 46
+    },
+    {
+      "label": "S2",
+      "revision": 2,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "layoutConsecutiveCount": 3,
+      "sampleCount": 23,
+      "rasterCaptureCount": 46
+    },
+    {
+      "label": "U1",
+      "revision": 3,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "layoutConsecutiveCount": 3,
+      "sampleCount": 23,
+      "rasterCaptureCount": 46
+    },
+    {
+      "label": "U2",
+      "revision": 4,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "layoutConsecutiveCount": 3,
+      "sampleCount": 23,
+      "rasterCaptureCount": 46
+    },
+    {
+      "label": "R1",
+      "revision": 5,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "layoutConsecutiveCount": 3,
+      "sampleCount": 23,
+      "rasterCaptureCount": 46
+    },
+    {
+      "label": "R2",
+      "revision": 6,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "layoutConsecutiveCount": 3,
+      "sampleCount": 23,
+      "rasterCaptureCount": 46
+    }
+  ],
+  "staleReject": {
+    "code": "AUTHORING_STALE_REVISION",
+    "stateUnchanged": true
+  },
+  "deterministic": {
+    "S0": true,
+    "S1": true,
+    "S2": true
+  },
+  "sampleTimesMs": [
+    0,
+    609,
+    611,
+    819,
+    820,
+    821,
+    1509,
+    1511,
+    1834,
+    1836,
+    2179,
+    2181,
+    2409,
+    2411,
+    2519,
+    2521,
+    3309,
+    3311,
+    3719,
+    3721,
+    4209,
+    4211,
+    4660
+  ],
+  "unaffectedBoundaryCount": 8,
+  "endpointHandling": [
+    {
+      "boundaryTimeMs": 610,
+      "before": {
+        "status": "sampled",
+        "timeMs": 609
+      },
+      "after": {
+        "status": "sampled",
+        "timeMs": 611
+      }
+    },
+    {
+      "boundaryTimeMs": 820,
+      "before": {
+        "status": "sampled",
+        "timeMs": 819
+      },
+      "after": {
+        "status": "sampled",
+        "timeMs": 821
+      }
+    },
+    {
+      "boundaryTimeMs": 1510,
+      "before": {
+        "status": "sampled",
+        "timeMs": 1509
+      },
+      "after": {
+        "status": "sampled",
+        "timeMs": 1511
+      }
+    },
+    {
+      "boundaryTimeMs": 1835,
+      "before": {
+        "status": "sampled",
+        "timeMs": 1834
+      },
+      "after": {
+        "status": "sampled",
+        "timeMs": 1836
+      }
+    },
+    {
+      "boundaryTimeMs": 2410,
+      "before": {
+        "status": "sampled",
+        "timeMs": 2409
+      },
+      "after": {
+        "status": "sampled",
+        "timeMs": 2411
+      }
+    },
+    {
+      "boundaryTimeMs": 3310,
+      "before": {
+        "status": "sampled",
+        "timeMs": 3309
+      },
+      "after": {
+        "status": "sampled",
+        "timeMs": 3311
+      }
+    },
+    {
+      "boundaryTimeMs": 3720,
+      "before": {
+        "status": "sampled",
+        "timeMs": 3719
+      },
+      "after": {
+        "status": "sampled",
+        "timeMs": 3721
+      }
+    },
+    {
+      "boundaryTimeMs": 4210,
+      "before": {
+        "status": "sampled",
+        "timeMs": 4209
+      },
+      "after": {
+        "status": "sampled",
+        "timeMs": 4211
+      }
+    }
+  ],
+  "containment": {
+    "marginPx": 2,
+    "outsideChangedPixels": 0,
+    "nonTargetPropertiesEqual": true
+  },
+  "equalityChecks": {
+    "U1_S1": true,
+    "U2_S0": true,
+    "R1_S1": true,
+    "R2_S2": true
+  },
+  "network": {
+    "liveRequestCount": 0
+  },
+  "nativeAnimation": {
+    "minimumCount": 5,
+    "allCssAnimation": true,
+    "allPaused": true,
+    "allCurrentTimesExact": true
+  },
+  "priorUnflaggedDiagnosis": {
+    "changedPixelCount": 681,
+    "locus": "two neutral fractionally transformed circles",
+    "genericGpuBackendFlagsRemovedTwoPhaseResult": false
+  },
+  "diagnosticMatrix": [
+    {
+      "state": "S0",
+      "sampleIndex": 0,
+      "sampleTimeMs": 0,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185"
+      ],
+      "chosenConvergedHash": "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 1,
+      "sampleTimeMs": 609,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8"
+      ],
+      "chosenConvergedHash": "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 2,
+      "sampleTimeMs": 611,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea"
+      ],
+      "chosenConvergedHash": "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 3,
+      "sampleTimeMs": 819,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f"
+      ],
+      "chosenConvergedHash": "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 4,
+      "sampleTimeMs": 820,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34"
+      ],
+      "chosenConvergedHash": "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 5,
+      "sampleTimeMs": 821,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "b6d701ac1b14ee80ffbddbccd563774a9102bd2d6d0e420169c4a57f13fa6a9c",
+        "b6d701ac1b14ee80ffbddbccd563774a9102bd2d6d0e420169c4a57f13fa6a9c"
+      ],
+      "chosenConvergedHash": "b6d701ac1b14ee80ffbddbccd563774a9102bd2d6d0e420169c4a57f13fa6a9c",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 6,
+      "sampleTimeMs": 1509,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "1223cae5c62902d7312faba7f03bd0674513e6a7dd11b73f5e02ac882679717b",
+        "1223cae5c62902d7312faba7f03bd0674513e6a7dd11b73f5e02ac882679717b"
+      ],
+      "chosenConvergedHash": "1223cae5c62902d7312faba7f03bd0674513e6a7dd11b73f5e02ac882679717b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 7,
+      "sampleTimeMs": 1511,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "8e2884a76607ad1f36dcbb518fc203e6dfe5c4b6966cf44b033c199acf0a5ff2",
+        "8e2884a76607ad1f36dcbb518fc203e6dfe5c4b6966cf44b033c199acf0a5ff2"
+      ],
+      "chosenConvergedHash": "8e2884a76607ad1f36dcbb518fc203e6dfe5c4b6966cf44b033c199acf0a5ff2",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 8,
+      "sampleTimeMs": 1834,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "4faaedc4e2df1b1415c88bea5fdd1cc327c77bd678877811f25e1e8fcc97c492",
+        "4faaedc4e2df1b1415c88bea5fdd1cc327c77bd678877811f25e1e8fcc97c492"
+      ],
+      "chosenConvergedHash": "4faaedc4e2df1b1415c88bea5fdd1cc327c77bd678877811f25e1e8fcc97c492",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 9,
+      "sampleTimeMs": 1836,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "afddab52e7f87fbd82f4e2856989676d4ea571273f9f171f7f620c5186d51894",
+        "afddab52e7f87fbd82f4e2856989676d4ea571273f9f171f7f620c5186d51894"
+      ],
+      "chosenConvergedHash": "afddab52e7f87fbd82f4e2856989676d4ea571273f9f171f7f620c5186d51894",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 10,
+      "sampleTimeMs": 2179,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "0346627311c4b5a3fdac1f35e338fe37c7cd140ab8acd8401c358d87d9681ea9",
+        "0346627311c4b5a3fdac1f35e338fe37c7cd140ab8acd8401c358d87d9681ea9"
+      ],
+      "chosenConvergedHash": "0346627311c4b5a3fdac1f35e338fe37c7cd140ab8acd8401c358d87d9681ea9",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 11,
+      "sampleTimeMs": 2181,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a16f1d281dd8d8291a7ab24da52727058d9bed83b58f46760795780cda0a58f8",
+        "a16f1d281dd8d8291a7ab24da52727058d9bed83b58f46760795780cda0a58f8"
+      ],
+      "chosenConvergedHash": "a16f1d281dd8d8291a7ab24da52727058d9bed83b58f46760795780cda0a58f8",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 12,
+      "sampleTimeMs": 2409,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "545f5b54c3bcc1d3b99792754e7f3777614f280e263bf4a653b1867b2d8fbdcb",
+        "545f5b54c3bcc1d3b99792754e7f3777614f280e263bf4a653b1867b2d8fbdcb"
+      ],
+      "chosenConvergedHash": "545f5b54c3bcc1d3b99792754e7f3777614f280e263bf4a653b1867b2d8fbdcb",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 13,
+      "sampleTimeMs": 2411,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "bb6b54861a033f79689e3bf4cde47ec9064f34ab3ba51538a40b655fcf929b5e",
+        "bb6b54861a033f79689e3bf4cde47ec9064f34ab3ba51538a40b655fcf929b5e"
+      ],
+      "chosenConvergedHash": "bb6b54861a033f79689e3bf4cde47ec9064f34ab3ba51538a40b655fcf929b5e",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 14,
+      "sampleTimeMs": 2519,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145"
+      ],
+      "chosenConvergedHash": "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 15,
+      "sampleTimeMs": 2521,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43"
+      ],
+      "chosenConvergedHash": "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 16,
+      "sampleTimeMs": 3309,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b"
+      ],
+      "chosenConvergedHash": "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 17,
+      "sampleTimeMs": 3311,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92"
+      ],
+      "chosenConvergedHash": "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 18,
+      "sampleTimeMs": 3719,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7"
+      ],
+      "chosenConvergedHash": "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 19,
+      "sampleTimeMs": 3721,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076"
+      ],
+      "chosenConvergedHash": "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 20,
+      "sampleTimeMs": 4209,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068"
+      ],
+      "chosenConvergedHash": "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 21,
+      "sampleTimeMs": 4211,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75"
+      ],
+      "chosenConvergedHash": "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S0",
+      "sampleIndex": 22,
+      "sampleTimeMs": 4660,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3"
+      ],
+      "chosenConvergedHash": "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 0,
+      "sampleTimeMs": 0,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185"
+      ],
+      "chosenConvergedHash": "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 1,
+      "sampleTimeMs": 609,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8"
+      ],
+      "chosenConvergedHash": "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 2,
+      "sampleTimeMs": 611,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea"
+      ],
+      "chosenConvergedHash": "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 3,
+      "sampleTimeMs": 819,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f"
+      ],
+      "chosenConvergedHash": "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 4,
+      "sampleTimeMs": 820,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34"
+      ],
+      "chosenConvergedHash": "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 5,
+      "sampleTimeMs": 821,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f"
+      ],
+      "chosenConvergedHash": "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 6,
+      "sampleTimeMs": 1509,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "cce0e2a9077c63a6c04838a2f55bcb83685c506e9c13933075a75b3ab000d749",
+        "cce0e2a9077c63a6c04838a2f55bcb83685c506e9c13933075a75b3ab000d749"
+      ],
+      "chosenConvergedHash": "cce0e2a9077c63a6c04838a2f55bcb83685c506e9c13933075a75b3ab000d749",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 7,
+      "sampleTimeMs": 1511,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "b29a57319a7b7eb5fb7e0761914c7133035077ac78bba89b3030a3bdc4ae2c60",
+        "b29a57319a7b7eb5fb7e0761914c7133035077ac78bba89b3030a3bdc4ae2c60"
+      ],
+      "chosenConvergedHash": "b29a57319a7b7eb5fb7e0761914c7133035077ac78bba89b3030a3bdc4ae2c60",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 8,
+      "sampleTimeMs": 1834,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "085a49aa22155ae3cc241eb71c29bd4fd1d51dcf8c3262c8be61050239e42825",
+        "085a49aa22155ae3cc241eb71c29bd4fd1d51dcf8c3262c8be61050239e42825"
+      ],
+      "chosenConvergedHash": "085a49aa22155ae3cc241eb71c29bd4fd1d51dcf8c3262c8be61050239e42825",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 9,
+      "sampleTimeMs": 1836,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "eacf05f7759dbb874ba83933d203f87140bcbc6d81a4980c58919f536707f2cd",
+        "eacf05f7759dbb874ba83933d203f87140bcbc6d81a4980c58919f536707f2cd"
+      ],
+      "chosenConvergedHash": "eacf05f7759dbb874ba83933d203f87140bcbc6d81a4980c58919f536707f2cd",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 10,
+      "sampleTimeMs": 2179,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "2258387930f5cd3943bfb7311d0ef5c7a775843e3d1a060fd1635f295ce34c40",
+        "2258387930f5cd3943bfb7311d0ef5c7a775843e3d1a060fd1635f295ce34c40"
+      ],
+      "chosenConvergedHash": "2258387930f5cd3943bfb7311d0ef5c7a775843e3d1a060fd1635f295ce34c40",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 11,
+      "sampleTimeMs": 2181,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "68507ed75fb9b80bc374f446fbc18284cec0cf2eebf95652e859304c9976f26e",
+        "68507ed75fb9b80bc374f446fbc18284cec0cf2eebf95652e859304c9976f26e"
+      ],
+      "chosenConvergedHash": "68507ed75fb9b80bc374f446fbc18284cec0cf2eebf95652e859304c9976f26e",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 12,
+      "sampleTimeMs": 2409,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "803e3765510059adcd3256dfd9f9b021cc324f85ed9b96703a9df67f438f6404",
+        "803e3765510059adcd3256dfd9f9b021cc324f85ed9b96703a9df67f438f6404"
+      ],
+      "chosenConvergedHash": "803e3765510059adcd3256dfd9f9b021cc324f85ed9b96703a9df67f438f6404",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 13,
+      "sampleTimeMs": 2411,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "f1dea0159a31ff66633c438bc7af0bce05aa8e5a927cdf83b5b73e8a07715df7",
+        "f1dea0159a31ff66633c438bc7af0bce05aa8e5a927cdf83b5b73e8a07715df7"
+      ],
+      "chosenConvergedHash": "f1dea0159a31ff66633c438bc7af0bce05aa8e5a927cdf83b5b73e8a07715df7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 14,
+      "sampleTimeMs": 2519,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145"
+      ],
+      "chosenConvergedHash": "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 15,
+      "sampleTimeMs": 2521,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43"
+      ],
+      "chosenConvergedHash": "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 16,
+      "sampleTimeMs": 3309,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b"
+      ],
+      "chosenConvergedHash": "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 17,
+      "sampleTimeMs": 3311,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92"
+      ],
+      "chosenConvergedHash": "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 18,
+      "sampleTimeMs": 3719,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7"
+      ],
+      "chosenConvergedHash": "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 19,
+      "sampleTimeMs": 3721,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076"
+      ],
+      "chosenConvergedHash": "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 20,
+      "sampleTimeMs": 4209,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068"
+      ],
+      "chosenConvergedHash": "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 21,
+      "sampleTimeMs": 4211,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75"
+      ],
+      "chosenConvergedHash": "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S1",
+      "sampleIndex": 22,
+      "sampleTimeMs": 4660,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3"
+      ],
+      "chosenConvergedHash": "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 0,
+      "sampleTimeMs": 0,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185"
+      ],
+      "chosenConvergedHash": "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 1,
+      "sampleTimeMs": 609,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8"
+      ],
+      "chosenConvergedHash": "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 2,
+      "sampleTimeMs": 611,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea"
+      ],
+      "chosenConvergedHash": "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 3,
+      "sampleTimeMs": 819,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f"
+      ],
+      "chosenConvergedHash": "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 4,
+      "sampleTimeMs": 820,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34"
+      ],
+      "chosenConvergedHash": "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 5,
+      "sampleTimeMs": 821,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f"
+      ],
+      "chosenConvergedHash": "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 6,
+      "sampleTimeMs": 1509,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "79d2a73ae8e96fb4fadee7a6cd5893d3edadb993ab1bdd604d7525735105482a",
+        "79d2a73ae8e96fb4fadee7a6cd5893d3edadb993ab1bdd604d7525735105482a"
+      ],
+      "chosenConvergedHash": "79d2a73ae8e96fb4fadee7a6cd5893d3edadb993ab1bdd604d7525735105482a",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 7,
+      "sampleTimeMs": 1511,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "28e4fbabbaf9c55f03b818c262b80c6d4e9573ec274bfcf007547077d16a8cb6",
+        "28e4fbabbaf9c55f03b818c262b80c6d4e9573ec274bfcf007547077d16a8cb6"
+      ],
+      "chosenConvergedHash": "28e4fbabbaf9c55f03b818c262b80c6d4e9573ec274bfcf007547077d16a8cb6",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 8,
+      "sampleTimeMs": 1834,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ffef1437f85191d60fd0091bfd3b841fac6c3dc93a3f4caa8a1bbd3d7fa20727",
+        "ffef1437f85191d60fd0091bfd3b841fac6c3dc93a3f4caa8a1bbd3d7fa20727"
+      ],
+      "chosenConvergedHash": "ffef1437f85191d60fd0091bfd3b841fac6c3dc93a3f4caa8a1bbd3d7fa20727",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 9,
+      "sampleTimeMs": 1836,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "abdeedb4981abcf9f273ab7d95013cf39dd809563f4ba46d21533b4c4f5bb65b",
+        "abdeedb4981abcf9f273ab7d95013cf39dd809563f4ba46d21533b4c4f5bb65b"
+      ],
+      "chosenConvergedHash": "abdeedb4981abcf9f273ab7d95013cf39dd809563f4ba46d21533b4c4f5bb65b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 10,
+      "sampleTimeMs": 2179,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "6561211ada57e4203721e96390448df609b326173724e2a27e692b190244e888",
+        "6561211ada57e4203721e96390448df609b326173724e2a27e692b190244e888"
+      ],
+      "chosenConvergedHash": "6561211ada57e4203721e96390448df609b326173724e2a27e692b190244e888",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 11,
+      "sampleTimeMs": 2181,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "f605c548b3cf72557fbce823b0f2c7537f56b60b615c76de9d7137d264567167",
+        "f605c548b3cf72557fbce823b0f2c7537f56b60b615c76de9d7137d264567167"
+      ],
+      "chosenConvergedHash": "f605c548b3cf72557fbce823b0f2c7537f56b60b615c76de9d7137d264567167",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 12,
+      "sampleTimeMs": 2409,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a503c1d5c595b5af9b518b94275b81835e6e6ebcbb9aaa7e26923d9ed5c9877a",
+        "a503c1d5c595b5af9b518b94275b81835e6e6ebcbb9aaa7e26923d9ed5c9877a"
+      ],
+      "chosenConvergedHash": "a503c1d5c595b5af9b518b94275b81835e6e6ebcbb9aaa7e26923d9ed5c9877a",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 13,
+      "sampleTimeMs": 2411,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "9f7decd6c8b1f97f75f27a681444a599eaf7465d2203a0ea9fa1f1763fffc0d9",
+        "9f7decd6c8b1f97f75f27a681444a599eaf7465d2203a0ea9fa1f1763fffc0d9"
+      ],
+      "chosenConvergedHash": "9f7decd6c8b1f97f75f27a681444a599eaf7465d2203a0ea9fa1f1763fffc0d9",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 14,
+      "sampleTimeMs": 2519,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a00c1b1d236081cf93b0862626fc7ece0a397673c486b1bd1e2aa16bee614c9d",
+        "a00c1b1d236081cf93b0862626fc7ece0a397673c486b1bd1e2aa16bee614c9d"
+      ],
+      "chosenConvergedHash": "a00c1b1d236081cf93b0862626fc7ece0a397673c486b1bd1e2aa16bee614c9d",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 15,
+      "sampleTimeMs": 2521,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43"
+      ],
+      "chosenConvergedHash": "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 16,
+      "sampleTimeMs": 3309,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b"
+      ],
+      "chosenConvergedHash": "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 17,
+      "sampleTimeMs": 3311,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92"
+      ],
+      "chosenConvergedHash": "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 18,
+      "sampleTimeMs": 3719,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7"
+      ],
+      "chosenConvergedHash": "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 19,
+      "sampleTimeMs": 3721,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076"
+      ],
+      "chosenConvergedHash": "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 20,
+      "sampleTimeMs": 4209,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068"
+      ],
+      "chosenConvergedHash": "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 21,
+      "sampleTimeMs": 4211,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75"
+      ],
+      "chosenConvergedHash": "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "S2",
+      "sampleIndex": 22,
+      "sampleTimeMs": 4660,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3"
+      ],
+      "chosenConvergedHash": "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 0,
+      "sampleTimeMs": 0,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185"
+      ],
+      "chosenConvergedHash": "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 1,
+      "sampleTimeMs": 609,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8"
+      ],
+      "chosenConvergedHash": "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 2,
+      "sampleTimeMs": 611,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea"
+      ],
+      "chosenConvergedHash": "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 3,
+      "sampleTimeMs": 819,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f"
+      ],
+      "chosenConvergedHash": "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 4,
+      "sampleTimeMs": 820,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34"
+      ],
+      "chosenConvergedHash": "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 5,
+      "sampleTimeMs": 821,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f"
+      ],
+      "chosenConvergedHash": "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 6,
+      "sampleTimeMs": 1509,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "cce0e2a9077c63a6c04838a2f55bcb83685c506e9c13933075a75b3ab000d749",
+        "cce0e2a9077c63a6c04838a2f55bcb83685c506e9c13933075a75b3ab000d749"
+      ],
+      "chosenConvergedHash": "cce0e2a9077c63a6c04838a2f55bcb83685c506e9c13933075a75b3ab000d749",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 7,
+      "sampleTimeMs": 1511,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "b29a57319a7b7eb5fb7e0761914c7133035077ac78bba89b3030a3bdc4ae2c60",
+        "b29a57319a7b7eb5fb7e0761914c7133035077ac78bba89b3030a3bdc4ae2c60"
+      ],
+      "chosenConvergedHash": "b29a57319a7b7eb5fb7e0761914c7133035077ac78bba89b3030a3bdc4ae2c60",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 8,
+      "sampleTimeMs": 1834,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "085a49aa22155ae3cc241eb71c29bd4fd1d51dcf8c3262c8be61050239e42825",
+        "085a49aa22155ae3cc241eb71c29bd4fd1d51dcf8c3262c8be61050239e42825"
+      ],
+      "chosenConvergedHash": "085a49aa22155ae3cc241eb71c29bd4fd1d51dcf8c3262c8be61050239e42825",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 9,
+      "sampleTimeMs": 1836,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "eacf05f7759dbb874ba83933d203f87140bcbc6d81a4980c58919f536707f2cd",
+        "eacf05f7759dbb874ba83933d203f87140bcbc6d81a4980c58919f536707f2cd"
+      ],
+      "chosenConvergedHash": "eacf05f7759dbb874ba83933d203f87140bcbc6d81a4980c58919f536707f2cd",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 10,
+      "sampleTimeMs": 2179,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "2258387930f5cd3943bfb7311d0ef5c7a775843e3d1a060fd1635f295ce34c40",
+        "2258387930f5cd3943bfb7311d0ef5c7a775843e3d1a060fd1635f295ce34c40"
+      ],
+      "chosenConvergedHash": "2258387930f5cd3943bfb7311d0ef5c7a775843e3d1a060fd1635f295ce34c40",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 11,
+      "sampleTimeMs": 2181,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "68507ed75fb9b80bc374f446fbc18284cec0cf2eebf95652e859304c9976f26e",
+        "68507ed75fb9b80bc374f446fbc18284cec0cf2eebf95652e859304c9976f26e"
+      ],
+      "chosenConvergedHash": "68507ed75fb9b80bc374f446fbc18284cec0cf2eebf95652e859304c9976f26e",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 12,
+      "sampleTimeMs": 2409,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "803e3765510059adcd3256dfd9f9b021cc324f85ed9b96703a9df67f438f6404",
+        "803e3765510059adcd3256dfd9f9b021cc324f85ed9b96703a9df67f438f6404"
+      ],
+      "chosenConvergedHash": "803e3765510059adcd3256dfd9f9b021cc324f85ed9b96703a9df67f438f6404",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 13,
+      "sampleTimeMs": 2411,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "f1dea0159a31ff66633c438bc7af0bce05aa8e5a927cdf83b5b73e8a07715df7",
+        "f1dea0159a31ff66633c438bc7af0bce05aa8e5a927cdf83b5b73e8a07715df7"
+      ],
+      "chosenConvergedHash": "f1dea0159a31ff66633c438bc7af0bce05aa8e5a927cdf83b5b73e8a07715df7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 14,
+      "sampleTimeMs": 2519,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145"
+      ],
+      "chosenConvergedHash": "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 15,
+      "sampleTimeMs": 2521,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43"
+      ],
+      "chosenConvergedHash": "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 16,
+      "sampleTimeMs": 3309,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b"
+      ],
+      "chosenConvergedHash": "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 17,
+      "sampleTimeMs": 3311,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92"
+      ],
+      "chosenConvergedHash": "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 18,
+      "sampleTimeMs": 3719,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7"
+      ],
+      "chosenConvergedHash": "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 19,
+      "sampleTimeMs": 3721,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076"
+      ],
+      "chosenConvergedHash": "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 20,
+      "sampleTimeMs": 4209,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068"
+      ],
+      "chosenConvergedHash": "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 21,
+      "sampleTimeMs": 4211,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75"
+      ],
+      "chosenConvergedHash": "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U1",
+      "sampleIndex": 22,
+      "sampleTimeMs": 4660,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3"
+      ],
+      "chosenConvergedHash": "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 0,
+      "sampleTimeMs": 0,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185"
+      ],
+      "chosenConvergedHash": "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 1,
+      "sampleTimeMs": 609,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8"
+      ],
+      "chosenConvergedHash": "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 2,
+      "sampleTimeMs": 611,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea"
+      ],
+      "chosenConvergedHash": "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 3,
+      "sampleTimeMs": 819,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f"
+      ],
+      "chosenConvergedHash": "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 4,
+      "sampleTimeMs": 820,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34"
+      ],
+      "chosenConvergedHash": "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 5,
+      "sampleTimeMs": 821,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "b6d701ac1b14ee80ffbddbccd563774a9102bd2d6d0e420169c4a57f13fa6a9c",
+        "b6d701ac1b14ee80ffbddbccd563774a9102bd2d6d0e420169c4a57f13fa6a9c"
+      ],
+      "chosenConvergedHash": "b6d701ac1b14ee80ffbddbccd563774a9102bd2d6d0e420169c4a57f13fa6a9c",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 6,
+      "sampleTimeMs": 1509,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "1223cae5c62902d7312faba7f03bd0674513e6a7dd11b73f5e02ac882679717b",
+        "1223cae5c62902d7312faba7f03bd0674513e6a7dd11b73f5e02ac882679717b"
+      ],
+      "chosenConvergedHash": "1223cae5c62902d7312faba7f03bd0674513e6a7dd11b73f5e02ac882679717b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 7,
+      "sampleTimeMs": 1511,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "8e2884a76607ad1f36dcbb518fc203e6dfe5c4b6966cf44b033c199acf0a5ff2",
+        "8e2884a76607ad1f36dcbb518fc203e6dfe5c4b6966cf44b033c199acf0a5ff2"
+      ],
+      "chosenConvergedHash": "8e2884a76607ad1f36dcbb518fc203e6dfe5c4b6966cf44b033c199acf0a5ff2",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 8,
+      "sampleTimeMs": 1834,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "4faaedc4e2df1b1415c88bea5fdd1cc327c77bd678877811f25e1e8fcc97c492",
+        "4faaedc4e2df1b1415c88bea5fdd1cc327c77bd678877811f25e1e8fcc97c492"
+      ],
+      "chosenConvergedHash": "4faaedc4e2df1b1415c88bea5fdd1cc327c77bd678877811f25e1e8fcc97c492",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 9,
+      "sampleTimeMs": 1836,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "afddab52e7f87fbd82f4e2856989676d4ea571273f9f171f7f620c5186d51894",
+        "afddab52e7f87fbd82f4e2856989676d4ea571273f9f171f7f620c5186d51894"
+      ],
+      "chosenConvergedHash": "afddab52e7f87fbd82f4e2856989676d4ea571273f9f171f7f620c5186d51894",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 10,
+      "sampleTimeMs": 2179,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "0346627311c4b5a3fdac1f35e338fe37c7cd140ab8acd8401c358d87d9681ea9",
+        "0346627311c4b5a3fdac1f35e338fe37c7cd140ab8acd8401c358d87d9681ea9"
+      ],
+      "chosenConvergedHash": "0346627311c4b5a3fdac1f35e338fe37c7cd140ab8acd8401c358d87d9681ea9",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 11,
+      "sampleTimeMs": 2181,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a16f1d281dd8d8291a7ab24da52727058d9bed83b58f46760795780cda0a58f8",
+        "a16f1d281dd8d8291a7ab24da52727058d9bed83b58f46760795780cda0a58f8"
+      ],
+      "chosenConvergedHash": "a16f1d281dd8d8291a7ab24da52727058d9bed83b58f46760795780cda0a58f8",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 12,
+      "sampleTimeMs": 2409,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "545f5b54c3bcc1d3b99792754e7f3777614f280e263bf4a653b1867b2d8fbdcb",
+        "545f5b54c3bcc1d3b99792754e7f3777614f280e263bf4a653b1867b2d8fbdcb"
+      ],
+      "chosenConvergedHash": "545f5b54c3bcc1d3b99792754e7f3777614f280e263bf4a653b1867b2d8fbdcb",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 13,
+      "sampleTimeMs": 2411,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "bb6b54861a033f79689e3bf4cde47ec9064f34ab3ba51538a40b655fcf929b5e",
+        "bb6b54861a033f79689e3bf4cde47ec9064f34ab3ba51538a40b655fcf929b5e"
+      ],
+      "chosenConvergedHash": "bb6b54861a033f79689e3bf4cde47ec9064f34ab3ba51538a40b655fcf929b5e",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 14,
+      "sampleTimeMs": 2519,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145"
+      ],
+      "chosenConvergedHash": "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 15,
+      "sampleTimeMs": 2521,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43"
+      ],
+      "chosenConvergedHash": "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 16,
+      "sampleTimeMs": 3309,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b"
+      ],
+      "chosenConvergedHash": "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 17,
+      "sampleTimeMs": 3311,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92"
+      ],
+      "chosenConvergedHash": "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 18,
+      "sampleTimeMs": 3719,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7"
+      ],
+      "chosenConvergedHash": "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 19,
+      "sampleTimeMs": 3721,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076"
+      ],
+      "chosenConvergedHash": "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 20,
+      "sampleTimeMs": 4209,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068"
+      ],
+      "chosenConvergedHash": "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 21,
+      "sampleTimeMs": 4211,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75"
+      ],
+      "chosenConvergedHash": "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "U2",
+      "sampleIndex": 22,
+      "sampleTimeMs": 4660,
+      "contentDigest": "78bad735e90e07cd6b5b9306bd1f737446494fc8d2084ca36e9950f8a39ec0f2",
+      "compiledDigest": "48002c08bea0e8a9d4dbbbbd9c265b6a7ffcc0f07add972e01beba6e3840669c",
+      "exportDigest": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3"
+      ],
+      "chosenConvergedHash": "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 0,
+      "sampleTimeMs": 0,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185"
+      ],
+      "chosenConvergedHash": "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 1,
+      "sampleTimeMs": 609,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8"
+      ],
+      "chosenConvergedHash": "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 2,
+      "sampleTimeMs": 611,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea"
+      ],
+      "chosenConvergedHash": "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 3,
+      "sampleTimeMs": 819,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f"
+      ],
+      "chosenConvergedHash": "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 4,
+      "sampleTimeMs": 820,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34"
+      ],
+      "chosenConvergedHash": "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 5,
+      "sampleTimeMs": 821,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f"
+      ],
+      "chosenConvergedHash": "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 6,
+      "sampleTimeMs": 1509,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "cce0e2a9077c63a6c04838a2f55bcb83685c506e9c13933075a75b3ab000d749",
+        "cce0e2a9077c63a6c04838a2f55bcb83685c506e9c13933075a75b3ab000d749"
+      ],
+      "chosenConvergedHash": "cce0e2a9077c63a6c04838a2f55bcb83685c506e9c13933075a75b3ab000d749",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 7,
+      "sampleTimeMs": 1511,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "b29a57319a7b7eb5fb7e0761914c7133035077ac78bba89b3030a3bdc4ae2c60",
+        "b29a57319a7b7eb5fb7e0761914c7133035077ac78bba89b3030a3bdc4ae2c60"
+      ],
+      "chosenConvergedHash": "b29a57319a7b7eb5fb7e0761914c7133035077ac78bba89b3030a3bdc4ae2c60",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 8,
+      "sampleTimeMs": 1834,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "085a49aa22155ae3cc241eb71c29bd4fd1d51dcf8c3262c8be61050239e42825",
+        "085a49aa22155ae3cc241eb71c29bd4fd1d51dcf8c3262c8be61050239e42825"
+      ],
+      "chosenConvergedHash": "085a49aa22155ae3cc241eb71c29bd4fd1d51dcf8c3262c8be61050239e42825",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 9,
+      "sampleTimeMs": 1836,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "eacf05f7759dbb874ba83933d203f87140bcbc6d81a4980c58919f536707f2cd",
+        "eacf05f7759dbb874ba83933d203f87140bcbc6d81a4980c58919f536707f2cd"
+      ],
+      "chosenConvergedHash": "eacf05f7759dbb874ba83933d203f87140bcbc6d81a4980c58919f536707f2cd",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 10,
+      "sampleTimeMs": 2179,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "2258387930f5cd3943bfb7311d0ef5c7a775843e3d1a060fd1635f295ce34c40",
+        "2258387930f5cd3943bfb7311d0ef5c7a775843e3d1a060fd1635f295ce34c40"
+      ],
+      "chosenConvergedHash": "2258387930f5cd3943bfb7311d0ef5c7a775843e3d1a060fd1635f295ce34c40",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 11,
+      "sampleTimeMs": 2181,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "68507ed75fb9b80bc374f446fbc18284cec0cf2eebf95652e859304c9976f26e",
+        "68507ed75fb9b80bc374f446fbc18284cec0cf2eebf95652e859304c9976f26e"
+      ],
+      "chosenConvergedHash": "68507ed75fb9b80bc374f446fbc18284cec0cf2eebf95652e859304c9976f26e",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 12,
+      "sampleTimeMs": 2409,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "803e3765510059adcd3256dfd9f9b021cc324f85ed9b96703a9df67f438f6404",
+        "803e3765510059adcd3256dfd9f9b021cc324f85ed9b96703a9df67f438f6404"
+      ],
+      "chosenConvergedHash": "803e3765510059adcd3256dfd9f9b021cc324f85ed9b96703a9df67f438f6404",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 13,
+      "sampleTimeMs": 2411,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "f1dea0159a31ff66633c438bc7af0bce05aa8e5a927cdf83b5b73e8a07715df7",
+        "f1dea0159a31ff66633c438bc7af0bce05aa8e5a927cdf83b5b73e8a07715df7"
+      ],
+      "chosenConvergedHash": "f1dea0159a31ff66633c438bc7af0bce05aa8e5a927cdf83b5b73e8a07715df7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 14,
+      "sampleTimeMs": 2519,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+        "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145"
+      ],
+      "chosenConvergedHash": "586dcc8a3254da63a3a4c68fff10a08cbf158254961343a2087cd5e976bfe145",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 15,
+      "sampleTimeMs": 2521,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43"
+      ],
+      "chosenConvergedHash": "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 16,
+      "sampleTimeMs": 3309,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b"
+      ],
+      "chosenConvergedHash": "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 17,
+      "sampleTimeMs": 3311,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92"
+      ],
+      "chosenConvergedHash": "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 18,
+      "sampleTimeMs": 3719,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7"
+      ],
+      "chosenConvergedHash": "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 19,
+      "sampleTimeMs": 3721,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076"
+      ],
+      "chosenConvergedHash": "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 20,
+      "sampleTimeMs": 4209,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068"
+      ],
+      "chosenConvergedHash": "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 21,
+      "sampleTimeMs": 4211,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75"
+      ],
+      "chosenConvergedHash": "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R1",
+      "sampleIndex": 22,
+      "sampleTimeMs": 4660,
+      "contentDigest": "268518af6acbc50e85fc81186374fffa0f369a1fe705499aa2d120b43192e229",
+      "compiledDigest": "135443bdc3fdb70591e621e99ef2c04885e6bd2ff61ef48ba14a8ea073f3d149",
+      "exportDigest": "1c6e0edb3dd1b95de3412f6914fbb32fbd105bc6ebb2c7bebec4fa22050f5a05",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3"
+      ],
+      "chosenConvergedHash": "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 0,
+      "sampleTimeMs": 0,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+        "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185"
+      ],
+      "chosenConvergedHash": "86f3dd502ed7a6cbc78df3ac47ee06d3f37524598b503129d3ad5f1dd9c41185",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 1,
+      "sampleTimeMs": 609,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+        "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8"
+      ],
+      "chosenConvergedHash": "46a697abceb1b9247f332af648bb96af1aa62831cc21cee5a9aa1b95fd73d3e8",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 2,
+      "sampleTimeMs": 611,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+        "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea"
+      ],
+      "chosenConvergedHash": "4b8133bd5821c90c3f49c762eadd670e20909351b1dae635fb94d5b71c840fea",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 3,
+      "sampleTimeMs": 819,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+        "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f"
+      ],
+      "chosenConvergedHash": "af1e371d2f63b508a5671d051b856130d61a69b8f758782b4f16c001a15e780f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 4,
+      "sampleTimeMs": 820,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+        "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34"
+      ],
+      "chosenConvergedHash": "e764fa74a96c8f3c2101a379f5fb223e93a2f80c7a90dc1c9efcf1b1a305de34",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 5,
+      "sampleTimeMs": 821,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+        "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f"
+      ],
+      "chosenConvergedHash": "ea2e91f6f37ba927acf7eb3c123bd73b0ebf36d8f0fd84229aa48c6ef3d8b64f",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 6,
+      "sampleTimeMs": 1509,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "79d2a73ae8e96fb4fadee7a6cd5893d3edadb993ab1bdd604d7525735105482a",
+        "79d2a73ae8e96fb4fadee7a6cd5893d3edadb993ab1bdd604d7525735105482a"
+      ],
+      "chosenConvergedHash": "79d2a73ae8e96fb4fadee7a6cd5893d3edadb993ab1bdd604d7525735105482a",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 7,
+      "sampleTimeMs": 1511,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "28e4fbabbaf9c55f03b818c262b80c6d4e9573ec274bfcf007547077d16a8cb6",
+        "28e4fbabbaf9c55f03b818c262b80c6d4e9573ec274bfcf007547077d16a8cb6"
+      ],
+      "chosenConvergedHash": "28e4fbabbaf9c55f03b818c262b80c6d4e9573ec274bfcf007547077d16a8cb6",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 8,
+      "sampleTimeMs": 1834,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ffef1437f85191d60fd0091bfd3b841fac6c3dc93a3f4caa8a1bbd3d7fa20727",
+        "ffef1437f85191d60fd0091bfd3b841fac6c3dc93a3f4caa8a1bbd3d7fa20727"
+      ],
+      "chosenConvergedHash": "ffef1437f85191d60fd0091bfd3b841fac6c3dc93a3f4caa8a1bbd3d7fa20727",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 9,
+      "sampleTimeMs": 1836,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "abdeedb4981abcf9f273ab7d95013cf39dd809563f4ba46d21533b4c4f5bb65b",
+        "abdeedb4981abcf9f273ab7d95013cf39dd809563f4ba46d21533b4c4f5bb65b"
+      ],
+      "chosenConvergedHash": "abdeedb4981abcf9f273ab7d95013cf39dd809563f4ba46d21533b4c4f5bb65b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 10,
+      "sampleTimeMs": 2179,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "6561211ada57e4203721e96390448df609b326173724e2a27e692b190244e888",
+        "6561211ada57e4203721e96390448df609b326173724e2a27e692b190244e888"
+      ],
+      "chosenConvergedHash": "6561211ada57e4203721e96390448df609b326173724e2a27e692b190244e888",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 11,
+      "sampleTimeMs": 2181,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "f605c548b3cf72557fbce823b0f2c7537f56b60b615c76de9d7137d264567167",
+        "f605c548b3cf72557fbce823b0f2c7537f56b60b615c76de9d7137d264567167"
+      ],
+      "chosenConvergedHash": "f605c548b3cf72557fbce823b0f2c7537f56b60b615c76de9d7137d264567167",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 12,
+      "sampleTimeMs": 2409,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a503c1d5c595b5af9b518b94275b81835e6e6ebcbb9aaa7e26923d9ed5c9877a",
+        "a503c1d5c595b5af9b518b94275b81835e6e6ebcbb9aaa7e26923d9ed5c9877a"
+      ],
+      "chosenConvergedHash": "a503c1d5c595b5af9b518b94275b81835e6e6ebcbb9aaa7e26923d9ed5c9877a",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 13,
+      "sampleTimeMs": 2411,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "9f7decd6c8b1f97f75f27a681444a599eaf7465d2203a0ea9fa1f1763fffc0d9",
+        "9f7decd6c8b1f97f75f27a681444a599eaf7465d2203a0ea9fa1f1763fffc0d9"
+      ],
+      "chosenConvergedHash": "9f7decd6c8b1f97f75f27a681444a599eaf7465d2203a0ea9fa1f1763fffc0d9",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 14,
+      "sampleTimeMs": 2519,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a00c1b1d236081cf93b0862626fc7ece0a397673c486b1bd1e2aa16bee614c9d",
+        "a00c1b1d236081cf93b0862626fc7ece0a397673c486b1bd1e2aa16bee614c9d"
+      ],
+      "chosenConvergedHash": "a00c1b1d236081cf93b0862626fc7ece0a397673c486b1bd1e2aa16bee614c9d",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 15,
+      "sampleTimeMs": 2521,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+        "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43"
+      ],
+      "chosenConvergedHash": "3aa5b3e8d15d28d49aeac3bd7de9bfd45df18d33b7a12676e2bd2cf7714aaa43",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 16,
+      "sampleTimeMs": 3309,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+        "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b"
+      ],
+      "chosenConvergedHash": "ddab5a34be3cd2819c85e5d0a05da6af3bd69cbc6b881605fc49ec79acea6c2b",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 17,
+      "sampleTimeMs": 3311,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+        "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92"
+      ],
+      "chosenConvergedHash": "410fec004a36ae90e94823da82c60ea0056ebde9b67a9db2f80aee1e84bc6c92",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 18,
+      "sampleTimeMs": 3719,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+        "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7"
+      ],
+      "chosenConvergedHash": "20a6de015dbe472afa8686f795f3f201c7ce9674401928f27cd11255584071b7",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 19,
+      "sampleTimeMs": 3721,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+        "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076"
+      ],
+      "chosenConvergedHash": "a3f3f3603fb4ddb216882d134dcbf7e6fdda8781569169360c7f4005ae712076",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 20,
+      "sampleTimeMs": 4209,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+        "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068"
+      ],
+      "chosenConvergedHash": "02fa546aa6efda49d317c7bf94b1a779b91ef9f4dd4275d78a431fc19d058068",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 21,
+      "sampleTimeMs": 4211,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+        "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75"
+      ],
+      "chosenConvergedHash": "6fe41c04946cacf929181bf2f2be0fd8ad85d5b6a066e405214113584fb2ed75",
+      "equivalentStateHashEqual": true
+    },
+    {
+      "state": "R2",
+      "sampleIndex": 22,
+      "sampleTimeMs": 4660,
+      "contentDigest": "c1d3b8fc89b002e5b7751a30e21b24306114ed5f37d8fceb153a10c0fc35a7ab",
+      "compiledDigest": "3c09596d3e7fb5836e669ceba49b9b0ffc61bb3f68dee4bdd15b1f4382894297",
+      "exportDigest": "f4a241ae32ffd7635f6bfb00fd9569396f583d7eac078df241e63eed20748814",
+      "animationReady": true,
+      "layoutConsecutiveCount": 3,
+      "semanticConsecutiveCount": 3,
+      "rasterAttemptHashes": [
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+        "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3"
+      ],
+      "chosenConvergedHash": "1b1d77abb33c2f3a2660cc35a5b6f8b0279b811e289e0847f38ccfc3b200d6d3",
+      "equivalentStateHashEqual": true
+    }
+  ]
+}

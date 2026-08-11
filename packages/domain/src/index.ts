@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { z } from 'zod';
 
 export type Diagnostic = {
@@ -46,7 +45,7 @@ export type MotionCue = {
 export type MotionDocument = {
   schemaVersion: 'motion.document.v1';
   documentId: string;
-  revision: 0;
+  revision: number;
   durationMs: number;
   presentation: { html: string; css: string };
   elements: Array<{
@@ -145,7 +144,7 @@ const cueSchema = z.object({
 const motionDocumentSchema = z.object({
   schemaVersion: z.literal('motion.document.v1'),
   documentId: identifier,
-  revision: z.literal(0),
+  revision: z.number().int().nonnegative().safe(),
   durationMs: z.number().int().nonnegative(),
   presentation: z.object({ html: z.string(), css: z.string() }),
   elements: z.array(z.object({
@@ -432,6 +431,240 @@ export function canonicalBytes(document: MotionDocument): Uint8Array {
   return new TextEncoder().encode(`${stableStringify(document)}\n`);
 }
 
+/** Revision-neutral bytes for comparing canonical content across undo/redo revisions. */
+export function canonicalContentBytes(document: MotionDocument): Uint8Array {
+  const { revision: _revision, ...content } = document;
+  return new TextEncoder().encode(`${stableStringify(content)}\n`);
+}
+
+type OperationEnvelope = {
+  schemaVersion: 'motion.operation.v1';
+  operationId: string;
+  documentId: string;
+  expectedRevision: number;
+};
+
+type EditTarget = { elementId: string; trackId: string; keyframeId: string };
+export type KeyframeValueOperation = OperationEnvelope & EditTarget & {
+  kind: 'motion.keyframe-value.set'; payload: { value: number };
+};
+export type KeyframeTimeOperation = OperationEnvelope & EditTarget & {
+  kind: 'motion.keyframe-time.set'; payload: { timeMs: number };
+};
+export type HistoryOperation = OperationEnvelope & {
+  kind: 'motion.history.undo' | 'motion.history.redo';
+};
+export type AuthoringOperation = KeyframeValueOperation | KeyframeTimeOperation | HistoryOperation;
+type EditOperation = KeyframeValueOperation | KeyframeTimeOperation;
+
+type EditRecord = {
+  forward: EditOperation;
+  inverse: EditOperation;
+};
+
+export type AuthoringState = {
+  document: MotionDocument;
+  consumedOperationIds: string[];
+  undo: EditRecord[];
+  redo: EditRecord[];
+};
+
+export type AuthoringResult =
+  | { ok: true; state: AuthoringState }
+  | { ok: false; state: AuthoringState; diagnostic: Diagnostic };
+
+export function createAuthoringState(document: MotionDocument): AuthoringState {
+  return { document: structuredClone(document), consumedOperationIds: [], undo: [], redo: [] };
+}
+
+export function dispatchAuthoringOperation(
+  state: AuthoringState,
+  input: unknown,
+): AuthoringResult {
+  const operation = parseOperation(input);
+  if (!operation) return authoringFailure(state, 'AUTHORING_ENVELOPE_INVALID');
+  if (operation.documentId !== state.document.documentId) {
+    return authoringFailure(state, 'AUTHORING_DOCUMENT_MISMATCH');
+  }
+  if (state.consumedOperationIds.includes(operation.operationId)) {
+    return authoringFailure(state, 'AUTHORING_OPERATION_ID_REUSED');
+  }
+  if (operation.expectedRevision !== state.document.revision) {
+    return authoringFailure(state, 'AUTHORING_STALE_REVISION');
+  }
+  if (state.document.revision === Number.MAX_SAFE_INTEGER) {
+    return authoringFailure(state, 'AUTHORING_REVISION_EXHAUSTED');
+  }
+
+  if (operation.kind === 'motion.history.undo' || operation.kind === 'motion.history.redo') {
+    const source = operation.kind === 'motion.history.undo' ? state.undo : state.redo;
+    if (source.length === 0) return authoringFailure(state, 'AUTHORING_HISTORY_EMPTY');
+    const record = source.at(-1)!;
+    const replay = operation.kind === 'motion.history.undo' ? record.inverse : record.forward;
+    const applied = applyEdit(state.document, replay);
+    if (!applied.ok) return authoringFailure(state, 'AUTHORING_HISTORY_REPLAY_INVALID');
+    const revision = state.document.revision + 1;
+    const nextRecord = cloneRecord(record);
+    return {
+      ok: true,
+      state: {
+        document: { ...applied.document, revision },
+        consumedOperationIds: [...state.consumedOperationIds, operation.operationId],
+        undo: operation.kind === 'motion.history.undo'
+          ? state.undo.slice(0, -1).map(cloneRecord)
+          : [...state.undo.map(cloneRecord), nextRecord],
+        redo: operation.kind === 'motion.history.undo'
+          ? [...state.redo.map(cloneRecord), nextRecord]
+          : state.redo.slice(0, -1).map(cloneRecord),
+      },
+    };
+  }
+
+  const editOperation = operation as EditOperation;
+  const applied = applyEdit(state.document, editOperation);
+  if (!applied.ok) return authoringFailure(state, applied.code);
+  return {
+    ok: true,
+    state: {
+      document: { ...applied.document, revision: state.document.revision + 1 },
+      consumedOperationIds: [...state.consumedOperationIds, operation.operationId],
+      undo: [...state.undo.map(cloneRecord), { forward: structuredClone(editOperation), inverse: applied.inverse }],
+      redo: [],
+    },
+  };
+}
+
+function applyEdit(
+  document: MotionDocument,
+  operation: EditOperation,
+): { ok: true; document: MotionDocument; inverse: EditOperation } | { ok: false; code: string } {
+  const element = document.elements.find((candidate) => candidate.id === operation.elementId);
+  if (!element) return { ok: false, code: 'AUTHORING_ELEMENT_NOT_FOUND' };
+  const expandedTrack = document.tracks.find((candidate) => candidate.id === operation.trackId);
+  if (!expandedTrack) return { ok: false, code: 'AUTHORING_TRACK_NOT_FOUND' };
+  if (expandedTrack.elementId !== element.id) {
+    return { ok: false, code: 'AUTHORING_TRACK_ELEMENT_MISMATCH' };
+  }
+  const keyframeExists = document.rules.some((rule) => rule.tracks.some((track) =>
+    track.keyframes.some((keyframe) => keyframe.id === operation.keyframeId)));
+  if (!keyframeExists) return { ok: false, code: 'AUTHORING_KEYFRAME_NOT_FOUND' };
+  if (!expandedTrack.keyframeIds.includes(operation.keyframeId)) {
+    return { ok: false, code: 'AUTHORING_KEYFRAME_TRACK_MISMATCH' };
+  }
+  const matchingExpanded = document.tracks.filter((candidate) =>
+    candidate.ruleId === expandedTrack.ruleId && candidate.property === expandedTrack.property);
+  if (matchingExpanded.length !== 1) {
+    return { ok: false, code: 'AUTHORING_SHARED_RULE_UNSUPPORTED' };
+  }
+  if (expandedTrack.property !== 'opacity') {
+    return { ok: false, code: 'AUTHORING_PROPERTY_UNSUPPORTED' };
+  }
+  const rule = document.rules.find((candidate) => candidate.id === expandedTrack.ruleId)!;
+  const ruleTrack = rule.tracks.find((candidate) => candidate.property === expandedTrack.property)!;
+  const keyframeIndex = ruleTrack.keyframes.findIndex((candidate) =>
+    candidate.id === operation.keyframeId);
+  const keyframe = ruleTrack.keyframes[keyframeIndex]!;
+
+  let replacement: RuleTrack['keyframes'][number];
+  let inverse: EditOperation;
+  if (operation.kind === 'motion.keyframe-value.set') {
+    const value = operation.payload.value;
+    const scaled = value * 1_000_000;
+    if (!Number.isFinite(value) || value < 0 || value > 1
+      || !Number.isSafeInteger(scaled)) {
+      return { ok: false, code: 'AUTHORING_VALUE_INVALID' };
+    }
+    replacement = { ...keyframe, value: formatCanonicalDecimal(value) };
+    inverse = { ...operation, payload: { value: Number(keyframe.value) } };
+  } else {
+    const targetTime = operation.payload.timeMs;
+    const application = document.applications.find((candidate) =>
+      candidate.slots.some((slot) => slot.id === expandedTrack.slotId)
+      && candidate.bindings.some((binding) => binding.elementId === expandedTrack.elementId));
+    const slotIndex = application?.slots.findIndex((slot) => slot.id === expandedTrack.slotId) ?? -1;
+    const slot = slotIndex >= 0 ? application!.slots[slotIndex] : undefined;
+    const binding = application?.bindings.find((candidate) =>
+      candidate.elementId === expandedTrack.elementId);
+    const delayMs = binding?.delayOverridesMs[slotIndex];
+    if (!slot || delayMs === undefined || slot.durationMs === 0 || slot.iterationCount !== 1) {
+      return { ok: false, code: 'AUTHORING_TIME_UNSUPPORTED' };
+    }
+    if (!Number.isSafeInteger(targetTime)) {
+      return { ok: false, code: 'AUTHORING_TIME_UNSUPPORTED' };
+    }
+    if (targetTime < delayMs || targetTime > delayMs + slot.durationMs) {
+      return { ok: false, code: 'AUTHORING_TIME_OUT_OF_RANGE' };
+    }
+    const numerator = (targetTime - delayMs) * 1_000_000;
+    if (!Number.isSafeInteger(numerator) || numerator % slot.durationMs !== 0) {
+      return { ok: false, code: 'AUTHORING_TIME_PRECISION_UNREPRESENTABLE' };
+    }
+    const offset = (numerator / slot.durationMs) / 1_000_000;
+    const previous = ruleTrack.keyframes[keyframeIndex - 1];
+    const next = ruleTrack.keyframes[keyframeIndex + 1];
+    if (previous?.offset === offset || next?.offset === offset) {
+      return { ok: false, code: 'AUTHORING_TIME_COLLISION' };
+    }
+    if ((previous && offset < previous.offset) || (next && offset > next.offset)) {
+      return { ok: false, code: 'AUTHORING_TIME_ORDER_INVALID' };
+    }
+    const currentTime = delayMs + keyframe.offset * slot.durationMs;
+    if (!Number.isSafeInteger(currentTime)) {
+      return { ok: false, code: 'AUTHORING_TIME_UNSUPPORTED' };
+    }
+    replacement = { ...keyframe, offset };
+    inverse = { ...operation, payload: { timeMs: currentTime } };
+  }
+
+  const nextDocument = structuredClone(document);
+  const nextRule = nextDocument.rules.find((candidate) => candidate.id === rule.id)!;
+  const nextTrack = nextRule.tracks.find((candidate) => candidate.id === ruleTrack.id)!;
+  nextTrack.keyframes[keyframeIndex] = replacement;
+  return { ok: true, document: nextDocument, inverse };
+}
+
+function parseOperation(input: unknown): AuthoringOperation | null {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const value = input as Record<string, unknown>;
+  if (value.schemaVersion !== 'motion.operation.v1'
+    || typeof value.operationId !== 'string'
+    || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.operationId)
+    || typeof value.documentId !== 'string' || value.documentId.length === 0
+    || !Number.isSafeInteger(value.expectedRevision) || (value.expectedRevision as number) < 0
+    || !['motion.keyframe-value.set', 'motion.keyframe-time.set', 'motion.history.undo', 'motion.history.redo'].includes(String(value.kind))) {
+    return null;
+  }
+  const base = value as unknown as AuthoringOperation;
+  if (base.kind === 'motion.history.undo' || base.kind === 'motion.history.redo') return base;
+  if (typeof value.elementId !== 'string' || typeof value.trackId !== 'string'
+    || typeof value.keyframeId !== 'string' || !value.payload
+    || typeof value.payload !== 'object' || Array.isArray(value.payload)) return null;
+  const payload = value.payload as Record<string, unknown>;
+  if (base.kind === 'motion.keyframe-value.set' && typeof payload.value !== 'number') return null;
+  if (base.kind === 'motion.keyframe-time.set' && typeof payload.timeMs !== 'number') return null;
+  return base;
+}
+
+function formatCanonicalDecimal(value: number): string {
+  return String(Math.round(value * 1_000_000) / 1_000_000);
+}
+
+function cloneRecord(record: EditRecord): EditRecord {
+  return structuredClone(record);
+}
+
+function authoringFailure(state: AuthoringState, code: string): AuthoringResult {
+  return {
+    ok: false,
+    state,
+    diagnostic: {
+      code,
+      severity: 'error',
+      summary: 'The authoring operation was rejected without changing state.',
+    },
+  };
+}
+
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') {
     return JSON.stringify(value);
@@ -450,8 +683,63 @@ export function deriveElementId(
   structuralFingerprint: string,
   collisionOrdinal: number,
 ): string {
-  return `el_${createHash('sha256')
-    .update(`${structuralFingerprint}\0${collisionOrdinal}`)
-    .digest('hex')
-    .slice(0, 16)}`;
+  return `el_${sha256Hex(`${structuralFingerprint}\0${collisionOrdinal}`).slice(0, 16)}`;
 }
+
+/** Deterministic browser-safe SHA-256 with byte-for-byte Node crypto parity. */
+export function sha256Hex(input: string | Uint8Array): string {
+  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
+  const bitLength = bytes.length * 8;
+  const paddedLength = Math.ceil((bytes.length + 9) / 64) * 64;
+  const padded = new Uint8Array(paddedLength);
+  padded.set(bytes);
+  padded[bytes.length] = 0x80;
+  const view = new DataView(padded.buffer);
+  view.setUint32(paddedLength - 8, Math.floor(bitLength / 0x1_0000_0000));
+  view.setUint32(paddedLength - 4, bitLength >>> 0);
+  const h = new Uint32Array([
+    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
+    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
+  ]);
+  const k = SHA256_CONSTANTS;
+  const w = new Uint32Array(64);
+  for (let offset = 0; offset < paddedLength; offset += 64) {
+    for (let index = 0; index < 16; index += 1) w[index] = view.getUint32(offset + index * 4);
+    for (let index = 16; index < 64; index += 1) {
+      const x = w[index - 15]!;
+      const y = w[index - 2]!;
+      const s0 = rotateRight(x, 7) ^ rotateRight(x, 18) ^ (x >>> 3);
+      const s1 = rotateRight(y, 17) ^ rotateRight(y, 19) ^ (y >>> 10);
+      w[index] = (w[index - 16]! + s0 + w[index - 7]! + s1) >>> 0;
+    }
+    let [a, b, c, d, e, f, g, hh] = h;
+    for (let index = 0; index < 64; index += 1) {
+      const s1 = rotateRight(e!, 6) ^ rotateRight(e!, 11) ^ rotateRight(e!, 25);
+      const choice = (e! & f!) ^ (~e! & g!);
+      const t1 = (hh! + s1 + choice + k[index]! + w[index]!) >>> 0;
+      const s0 = rotateRight(a!, 2) ^ rotateRight(a!, 13) ^ rotateRight(a!, 22);
+      const majority = (a! & b!) ^ (a! & c!) ^ (b! & c!);
+      const t2 = (s0 + majority) >>> 0;
+      hh = g; g = f; f = e; e = (d! + t1) >>> 0;
+      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
+    }
+    const values = [a!, b!, c!, d!, e!, f!, g!, hh!];
+    for (let index = 0; index < 8; index += 1) h[index] = (h[index]! + values[index]!) >>> 0;
+  }
+  return [...h].map((value) => value.toString(16).padStart(8, '0')).join('');
+}
+
+function rotateRight(value: number, count: number): number {
+  return (value >>> count) | (value << (32 - count));
+}
+
+const SHA256_CONSTANTS = new Uint32Array([
+  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
+  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
+  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
+  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
+  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
+  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
+  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
+  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
+]);

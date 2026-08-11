@@ -1,11 +1,10 @@
-import { createHash } from 'node:crypto';
-
 import postcss from 'postcss';
 import valueParser from 'postcss-value-parser';
 import { parse } from 'parse5';
 
 import {
   canonicalBytes,
+  sha256Hex,
   validateMotionDocument,
   type MotionDocument,
   type TimingFunction,
@@ -291,5 +290,5 @@ function escapeCssString(value: string): string {
 }
 
 function digest(input: string | Uint8Array): string {
-  return createHash('sha256').update(input).digest('hex');
+  return sha256Hex(input);
 }

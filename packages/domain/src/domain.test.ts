@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'vitest';
+import { createHash } from 'node:crypto';
 
 import {
   canonicalBytes,
   deriveElementId,
+  sha256Hex,
   validateMotionDocument,
   type MotionDocument,
 } from './index.js';
@@ -96,6 +98,9 @@ const validDocument = (): MotionDocument => ({
 });
 
 describe('motion.document.v1', () => {
+  test.each(['', 'abc', 'Neutral motion \u2603'])('browser-safe SHA-256 matches Node crypto', (value) => {
+    expect(sha256Hex(value)).toBe(createHash('sha256').update(value).digest('hex'));
+  });
   test('rejects a track that references an unknown canonical element', () => {
     const document = validDocument();
     document.tracks[0]!.elementId = 'el_missing';

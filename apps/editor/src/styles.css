@@ -14,6 +14,15 @@ h1 { margin: 0; font-size: 27px; font-weight: 630; }
 .transport input { width: 210px; accent-color: #81d8c9; }
 .transport output { min-width: 72px; color: #81d8c9; font-variant-numeric: tabular-nums; }
 .workspace { align-items: stretch; gap: 14px; }
+.authoring-panel { display: grid; grid-template-columns: minmax(300px, 1fr) auto auto auto; align-items: end; gap: 12px; margin-bottom: 14px; padding: 13px; border: 1px solid #355062; border-radius: 15px; background: #101821; }
+.authoring-panel form, .history { display: flex; align-items: end; gap: 7px; }
+.authoring-panel label, .selection { display: grid; gap: 5px; color: #aeb8ca; font-size: 11px; }
+.authoring-panel input { width: 132px; border: 1px solid #3c4659; border-radius: 7px; background: #0b0f16; color: #eef2f8; padding: 8px; }
+.selection { grid-template-columns: auto auto; align-items: center; }
+.selection strong, .selection span { grid-column: 1 / -1; }
+.selection code { color: #81d8c9; font-size: 9px; overflow: hidden; text-overflow: ellipsis; }
+.operation-status { grid-column: 1 / -1; min-height: 18px; color: #81d8c9; font-size: 12px; }
+.operation-status[data-kind="error"] { color: #ff9d9d; }
 .preview-panel, .cue-panel, .timeline-panel { border: 1px solid #2b3342; border-radius: 15px; background: rgba(17,21,29,.92); overflow: hidden; }
 .preview-panel { flex: 1; padding-bottom: 12px; }
 .cue-panel { width: 280px; }
@@ -42,7 +51,9 @@ iframe { display: block; width: 100%; height: 360px; border: 0; background: #101
 .slots { display: grid; width: 100%; gap: 3px; }
 .slots code { overflow: hidden; color: #81d8c9; font-size: 8px; text-overflow: ellipsis; }
 .keyframes { display: flex; gap: 6px; overflow-x: auto; }
-.keyframe { display: grid; min-width: 155px; gap: 3px; padding: 7px; border: 1px solid #3b4659; border-radius: 7px; background: #161c27; }
+.keyframe { display: grid; min-width: 155px; gap: 3px; padding: 7px; text-align: left; border: 1px solid #3b4659; border-radius: 7px; background: #161c27; }
+.keyframe[aria-pressed="true"] { border-color: #81d8c9; box-shadow: 0 0 0 2px rgba(129,216,201,.18); }
+.keyframe:disabled { cursor: default; opacity: .78; }
 .keyframe strong { color: #facf74; font-size: 10px; }
 .keyframe code { overflow: hidden; color: #8290a7; font-size: 8px; text-overflow: ellipsis; }
 .keyframe span { color: #b7c0cf; font-size: 9px; }
