@@ -13,6 +13,7 @@ declare global {
         documentId: string; revision: number; contentDigest: string; exportDigest: string; compiledHtml: string;
         undoCount: number; redoCount: number; consumedOperationIds: string[];
         selectedTrackId: string; selectedKeyframeId: string;
+        selectedCreationElementId: string | null;
       };
       dispatch: (operation: AuthoringOperation) => Promise<{ ok: boolean; code?: string }>;
     };

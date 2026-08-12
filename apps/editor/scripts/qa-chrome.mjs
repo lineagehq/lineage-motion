@@ -129,6 +129,20 @@ try {
     && pausedInterval.playStates.every((state) => state === 'paused');
   await page.getByRole('button', { name: 'Inspect reduced motion' }).click();
   const reducedMotionInspectable = await page.locator('[data-reduced-motion-panel]').isVisible();
+  await page.evaluate(() => {
+    const iframe = document.querySelector('[data-preview]');
+    iframe.contentWindow.__selectionSentinel = 'selection-only';
+  });
+  await page.getByRole('radio', { name: /Orb — Opacity/ }).focus();
+  await page.keyboard.press('Space');
+  const selectionOnly = await page.evaluate(() => ({
+    state: window.__motionEditor.inspectAuthoring(),
+    sentinel: document.querySelector('[data-preview]').contentWindow.__selectionSentinel,
+  }));
+  const selectionEphemeral = selectionOnly.state.revision === 0
+    && selectionOnly.state.undoCount === 0 && selectionOnly.state.consumedOperationIds.length === 0
+    && selectionOnly.state.selectedCreationElementId === 'el_2dbee68b1ea318c8'
+    && selectionOnly.sentinel === 'selection-only';
   const workflowStates = [await page.evaluate(() => window.__motionEditor.inspectAuthoring())];
   for (const selector of ['[data-create-track]', '[data-add-midpoint]', '[data-set-duration]', '[data-set-delay]']) {
     await page.locator(selector).click();
@@ -143,13 +157,23 @@ try {
     const before = window.__motionEditor.inspectAuthoring();
     const result = await window.__motionEditor.dispatch({ schemaVersion: 'motion.operation.v1',
       operationId: 'chrome:stale-structural', documentId: before.documentId, expectedRevision: 5,
-      kind: 'motion.slot-duration.set', elementId: 'el_a2849ff826f3e167',
+      kind: 'motion.slot-duration.set', elementId: 'el_2dbee68b1ea318c8',
       trackId: before.selectedTrackId, payload: { durationMs: 1200 } });
     return { result, before, after: window.__motionEditor.inspectAuthoring() };
   });
   const staleAtomic = staleEvidence.result.ok === false
     && staleEvidence.result.code === 'AUTHORING_STALE_REVISION'
     && isDeepStrictEqual(staleEvidence.before, staleEvidence.after);
+  await page.locator('[data-duration]').fill('1400.5');
+  await page.locator('[data-set-duration]').focus();
+  await page.keyboard.press('Enter');
+  const validationEvidence = await page.evaluate(() => ({
+    state: window.__motionEditor.inspectAuthoring(),
+    invalid: document.querySelector('[data-duration]').getAttribute('aria-invalid'),
+    focus: document.activeElement?.getAttribute('data-set-duration') !== null,
+  }));
+  const invalidAtomic = validationEvidence.invalid === 'true' && validationEvidence.focus
+    && isDeepStrictEqual(validationEvidence.state, workflowStates.at(-1));
   let exactHistory = true;
   for (let index = 0; index < 6; index += 1) {
     await page.getByRole('button', { name: 'Undo' }).click();
@@ -170,6 +194,24 @@ try {
     return iframe.srcdoc === window.__motionEditor.compiledHtml
       && iframe.contentDocument.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
   });
+  const cursorPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  await cursorPage.goto(url);
+  await cursorPage.locator('[data-editor-ready="true"]').waitFor();
+  await cursorPage.getByRole('radio', { name: /Cursor — Opacity/ }).click();
+  await cursorPage.getByRole('button', { name: 'Create Cursor opacity track' }).click();
+  const cursorAlternate = await cursorPage.evaluate(() => {
+    const iframe = document.querySelector('[data-preview]');
+    return { state: window.__motionEditor.inspectAuthoring(),
+      exact: iframe.srcdoc === window.__motionEditor.compiledHtml,
+      native: iframe.contentDocument.getAnimations().every((animation) =>
+        animation.constructor.name === 'CSSAnimation') };
+  });
+  await cursorPage.close();
+  const orbTrackId = workflowStates[1].selectedTrackId;
+  const cursorDistinct = cursorAlternate.state.revision === 1
+    && cursorAlternate.state.selectedCreationElementId === 'el_a2849ff826f3e167'
+    && cursorAlternate.state.selectedTrackId !== orbTrackId
+    && cursorAlternate.exact && cursorAlternate.native;
 
   const checks = {
     exactCompilerOutput: initial.exactCompilerOutput,
@@ -187,14 +229,17 @@ try {
     everyCueScrubbed,
     playPauseNative,
     reducedMotionInspectable,
+    selectionEphemeral,
     structuralWorkflow: workflowStates.length === 7 && workflowStates.at(-1).revision === 6,
     staleAtomic,
+    invalidAtomic,
     exactSixStepHistory: exactHistory,
     structuralNative,
+    cursorDistinct,
     noConsoleErrors: consoleErrors.length === 0,
   };
   const receipt = {
-    schemaVersion: 'motion.chrome-qa.v1',
+    schemaVersion: 'motion.target-selection-chrome-qa.v1',
     passed: Object.values(checks).every(Boolean),
     browser: { name: 'Google Chrome', version: browser.version() },
     viewport: { width: 1280, height: 900 },
@@ -216,11 +261,11 @@ try {
     checks,
   };
   await mkdir(resolve(root, 'artifacts'), { recursive: true });
-  await writeFile(
-    resolve(root, 'artifacts/t004-chrome-qa.json'),
-    `${JSON.stringify(receipt, null, 2)}\n`,
-    'utf8',
-  );
+  const receiptText = `${JSON.stringify(receipt, null, 2)}\n`;
+  await Promise.all([
+    writeFile(resolve(root, 'artifacts/t002-target-selection-chrome-qa.json'), receiptText, 'utf8'),
+    writeFile(resolve(root, 'artifacts/t004-chrome-qa.json'), receiptText, 'utf8'),
+  ]);
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
   if (!receipt.passed) process.exitCode = 1;
 } finally {

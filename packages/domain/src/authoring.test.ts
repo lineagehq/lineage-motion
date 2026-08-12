@@ -5,6 +5,7 @@ import {
   canonicalContentBytes,
   createAuthoringState,
   dispatchAuthoringOperation,
+  projectTrackCreationEligibility,
   type AuthoringOperation,
   type AuthoringState,
   type MotionDocument,
@@ -58,7 +59,7 @@ describe('typed authoring operations', () => {
     const imported = importMotionHtml(source);
     expect(imported.document).not.toBeNull();
     let state = createAuthoringState(imported.document!);
-    const elementId = 'el_a2849ff826f3e167' as const;
+    const elementId = 'el_2dbee68b1ea318c8' as const;
     expect(state.document.elements.some((element) => element.id === elementId)).toBe(true);
     const snapshots = [canonicalContentBytes(state.document)];
     const dispatch = (operation: AuthoringOperation) => {
@@ -223,7 +224,8 @@ describe('typed authoring operations', () => {
     if (!probe.ok) throw new Error(probe.diagnostic.code);
     const derivedRuleId = probe.state.document.rules.find((rule) =>
       !colliding.document.rules.some((prior) => prior.id === rule.id))!.id;
-    colliding.document.rules[0]!.id = derivedRuleId;
+    colliding.document.cues.push({ schemaVersion: 'motion.cue.v1', id: derivedRuleId,
+      label: 'Synthetic collision', timeMs: 0 });
     const beforeCollision = structuredClone(colliding);
     expect(dispatchAuthoringOperation(colliding, create)).toMatchObject({ ok: false,
       diagnostic: { code: 'AUTHORING_ID_COLLISION' } });
@@ -237,6 +239,49 @@ describe('typed authoring operations', () => {
       kind: 'motion.history.undo' })).toMatchObject({ ok: false,
       diagnostic: { code: 'AUTHORING_HISTORY_REPLAY_INVALID' } });
     expect(corrupted).toEqual(beforeReplay);
+  });
+
+  test('projects the exact target choices and creates deterministic Orb or Cursor bundles with a one-track cap', async () => {
+    const source = await readFile(new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8');
+    const imported = importMotionHtml(source);
+    const initial = createAuthoringState(imported.document!);
+    const cursor = 'el_a2849ff826f3e167' as const;
+    const orb = 'el_2dbee68b1ea318c8' as const;
+    const statusCopy = 'el_1f3f2908e4fd2401';
+    expect(projectTrackCreationEligibility(initial.document, cursor, 'opacity'))
+      .toMatchObject({ available: true, reason: null });
+    expect(projectTrackCreationEligibility(initial.document, orb, 'opacity'))
+      .toMatchObject({ available: true, reason: null });
+    expect(projectTrackCreationEligibility(initial.document, statusCopy, 'opacity'))
+      .toMatchObject({ available: false, reason: 'TRACK_ALREADY_EXISTS' });
+    expect(projectTrackCreationEligibility(initial.document, orb, 'transform'))
+      .toMatchObject({ available: false, reason: 'TARGET_PROPERTY_UNSUPPORTED' });
+    expect(projectTrackCreationEligibility(initial.document, 'missing', 'opacity'))
+      .toMatchObject({ available: false, reason: 'ELEMENT_NOT_FOUND' });
+
+    const create = (elementId: typeof cursor | typeof orb, operationId: string) => ({
+      ...strictEnvelope(initial, operationId), kind: 'motion.track.create' as const, elementId,
+      payload: { property: 'opacity' as const, durationMs: 1000 as const, delayMs: 610 as const,
+        easing: 'linear' as const, startValue: 0 as const, endValue: 1 as const },
+    });
+    const orbFirst = dispatchAuthoringOperation(initial, create(orb, 'choice:orb'));
+    const cursorFirst = dispatchAuthoringOperation(initial, create(cursor, 'choice:cursor'));
+    expect(orbFirst.ok).toBe(true); expect(cursorFirst.ok).toBe(true);
+    if (!orbFirst.ok || !cursorFirst.ok) throw new Error('choice creation failed');
+    const orbTrack = orbFirst.state.document.tracks.find((track) => track.elementId === orb
+      && track.property === 'opacity')!;
+    const cursorTrack = cursorFirst.state.document.tracks.find((track) => track.elementId === cursor
+      && track.property === 'opacity')!;
+    expect(orbTrack.id).not.toBe(cursorTrack.id);
+    expect(projectTrackCreationEligibility(orbFirst.state.document, cursor, 'opacity'))
+      .toMatchObject({ available: false, reason: 'TRACK_LIMIT_REACHED' });
+    const beforeRejected = structuredClone(orbFirst.state);
+    const rejected = dispatchAuthoringOperation(orbFirst.state, {
+      ...create(cursor, 'choice:second'), expectedRevision: 1,
+    });
+    expect(rejected).toMatchObject({ ok: false,
+      diagnostic: { code: 'AUTHORING_TRACK_LIMIT_REACHED' } });
+    expect(orbFirst.state).toEqual(beforeRejected);
   });
 
   test('keeps deterministic endpoints as immutable anchors and midpoint history exact', async () => {

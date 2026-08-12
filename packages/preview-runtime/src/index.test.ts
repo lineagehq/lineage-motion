@@ -1,6 +1,8 @@
+import { readFile } from 'node:fs/promises';
 import { describe, expect, test } from 'vitest';
 
 import { importMotionHtml } from '../../css-import/src/index.js';
+import { createAuthoringState, dispatchAuthoringOperation } from '../../domain/src/index.js';
 import { buildTimeline } from './index.js';
 
 describe('read-only master timeline', () => {
@@ -53,5 +55,27 @@ describe('read-only master timeline', () => {
     expect(new Set(timeline.rows.map((row) => row.trackId))).toEqual(
       new Set(imported.document!.tracks.map((track) => track.id)),
     );
+  });
+
+  test('projects the selected Orb opacity bundle without losing existing rows', async () => {
+    const imported = importMotionHtml(await readFile(
+      new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8'));
+    const initial = createAuthoringState(imported.document!);
+    const created = dispatchAuthoringOperation(initial, {
+      schemaVersion: 'motion.operation.v1', operationId: 'timeline:orb',
+      documentId: initial.document.documentId, expectedRevision: 0,
+      kind: 'motion.track.create', elementId: 'el_2dbee68b1ea318c8',
+      payload: { property: 'opacity', durationMs: 1000, delayMs: 610,
+        easing: 'linear', startValue: 0, endValue: 1 },
+    });
+    expect(created.ok).toBe(true); if (!created.ok) throw new Error(created.diagnostic.code);
+    const before = buildTimeline(initial.document);
+    const after = buildTimeline(created.state.document);
+    expect(after.rows).toHaveLength(before.rows.length + 1);
+    expect(after.rows.find((row) => row.elementId === 'el_2dbee68b1ea318c8'
+      && row.property === 'opacity')).toMatchObject({ delayMs: 610,
+      keyframes: [{ offset: 0, timeMs: 610 }, { offset: 1, timeMs: 1610 }] });
+    expect(new Set(after.rows.slice(0, before.rows.length).map((row) => row.trackId)))
+      .toEqual(new Set(before.rows.map((row) => row.trackId)));
   });
 });

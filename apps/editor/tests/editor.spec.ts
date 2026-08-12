@@ -133,29 +133,46 @@ test('renders exact compiled output and controls native animations without mutat
   await page.getByRole('button', { name: 'Inspect reduced motion' }).click();
   await expect(page.locator('[data-reduced-motion-panel]')).toBeVisible();
   await expect(page.locator('[data-reduced-motion-panel]')).toContainText('source-snapshot');
-  expect(await page.locator('input:not([type="range"])').count()).toBe(4);
+  expect(await page.locator('input[type="number"]').count()).toBe(4);
   expect(consoleErrors).toEqual([]);
 });
 
-test('creates and reshapes one cursor opacity track with exact six-step history', async ({ page }) => {
+test('selects Orb by keyboard and completes exact creation and six-step history', async ({ page }) => {
   const failedRequests: string[] = [];
   page.on('requestfailed', (request) => failedRequests.push(request.failure()?.errorText ?? 'failed'));
   await page.goto(editorUrl);
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Create opacity track' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Select a target' })).toBeDisabled();
+  const selectionBefore = await page.evaluate(() => {
+    const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    Object.assign(iframe.contentWindow!, { __selectionSentinel: 'unchanged' });
+    return window.__motionEditor.inspectAuthoring();
+  });
+  await page.getByRole('radio', { name: /Orb — Opacity/ }).focus();
+  await page.keyboard.press('Space');
+  await expect(page.getByRole('radio', { name: /Orb — Opacity/ })).toBeChecked();
+  await expect(page.getByRole('button', { name: 'Create Orb opacity track' })).toBeEnabled();
+  const selectionAfter = await page.evaluate(() => ({
+    state: window.__motionEditor.inspectAuthoring(),
+    sentinel: (document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentWindow as unknown as
+      { __selectionSentinel?: string }).__selectionSentinel,
+  }));
+  expect(selectionAfter.sentinel).toBe('unchanged');
+  expect(selectionAfter.state).toEqual({ ...selectionBefore,
+    selectedCreationElementId: 'el_2dbee68b1ea318c8' });
   await expect(page.getByRole('button', { name: 'Add midpoint' })).toBeDisabled();
   await expect(page.locator('[data-duration]')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Remove midpoint' })).toBeDisabled();
   const states = [await page.evaluate(() => window.__motionEditor.inspectAuthoring())];
-  for (const [index, name] of ['Create opacity track', 'Add midpoint', 'Apply', 'Apply'].entries()) {
+  for (const [index, name] of ['Create Orb opacity track', 'Add midpoint', 'Apply', 'Apply'].entries()) {
     const button = name === 'Apply' ? page.locator(index === 2 ? '[data-set-duration]' : '[data-set-delay]')
       : page.getByRole('button', { name });
     await button.focus();
     await page.keyboard.press('Enter');
     await expect(page.locator('[data-operation-status]')).toContainText(`Revision ${states.length}`);
     states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
-    if (index === 0) await expect(page.locator(`[data-element-id="el_a2849ff826f3e167"][data-property="opacity"] .keyframe[data-offset="0"]`)).toBeFocused();
-    if (index === 1) await expect(page.locator(`[data-element-id="el_a2849ff826f3e167"][data-property="opacity"] .keyframe[data-offset="0.5"]`)).toBeFocused();
+    if (index === 0) await expect(page.locator(`[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"] .keyframe[data-offset="0"]`)).toBeFocused();
+    if (index === 1) await expect(page.locator(`[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"] .keyframe[data-offset="0.5"]`)).toBeFocused();
   }
   await page.locator('select[data-easing]').selectOption('ease-in-out');
   await page.locator('[data-set-easing]').focus();
@@ -166,9 +183,9 @@ test('creates and reshapes one cursor opacity track with exact six-step history'
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-operation-status]')).toContainText('Revision 6');
   states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
-  await expect(page.locator(`[data-element-id="el_a2849ff826f3e167"][data-property="opacity"] .keyframe[data-offset="1"]`)).toBeFocused();
+  await expect(page.locator(`[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"] .keyframe[data-offset="1"]`)).toBeFocused();
   expect(states.at(-1)!.revision).toBe(6);
-  const created = page.locator(`[data-element-id="el_a2849ff826f3e167"][data-property="opacity"]`);
+  const created = page.locator(`[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"]`);
   await expect(created).toHaveCount(1);
   await expect(created.locator('[data-keyframe-id]')).toHaveCount(2);
   await expect(created).toHaveAttribute('data-delay-ms', '700');
@@ -178,6 +195,9 @@ test('creates and reshapes one cursor opacity track with exact six-step history'
     return iframe.srcdoc === window.__motionEditor.compiledHtml
       && iframe.contentDocument!.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
   })).toBe(true);
+  await expect(page.getByRole('radio', { name: /Cursor — Opacity/ })).toBeDisabled();
+  await expect(page.locator('[data-choice-reason="el_a2849ff826f3e167"]'))
+    .toHaveText('One created track is allowed in this document.');
   await page.locator('[data-duration]').fill('1400.5');
   await page.locator('[data-set-duration]').focus();
   await page.keyboard.press('Enter');
@@ -199,6 +219,26 @@ test('creates and reshapes one cursor opacity track with exact six-step history'
     expect(current.exportDigest).toBe(states[index + 1]!.exportDigest);
   }
   expect(failedRequests).toEqual([]);
+});
+
+test('selects Cursor by pointer and creates a distinct deterministic contained bundle', async ({ page }) => {
+  await page.goto(editorUrl);
+  await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await page.getByRole('radio', { name: /Cursor — Opacity/ }).click();
+  const before = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  await page.getByRole('button', { name: 'Create Cursor opacity track' }).click();
+  const after = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  expect(after.revision).toBe(1);
+  expect(after.selectedCreationElementId).toBe('el_a2849ff826f3e167');
+  expect(after.contentDigest).not.toBe(before.contentDigest);
+  await expect(page.locator('[data-element-id="el_a2849ff826f3e167"][data-property="opacity"]')).toHaveCount(1);
+  await expect(page.getByRole('radio', { name: /Orb — Opacity/ })).toBeDisabled();
+  expect(await page.evaluate(() => {
+    const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    const target = iframe.contentDocument!.querySelector('[data-motion-id="el_a2849ff826f3e167"]');
+    return iframe.srcdoc === window.__motionEditor.compiledHtml && target !== null
+      && iframe.contentDocument!.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
+  })).toBe(true);
 });
 
 test('authors value and time through canonical operations with atomic history and native remounts', async ({ page }) => {

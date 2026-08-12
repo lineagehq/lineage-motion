@@ -444,7 +444,56 @@ type OperationEnvelope = {
   expectedRevision: number;
 };
 
-export const STRUCTURAL_AUTHORING_ELEMENT_ID = 'el_a2849ff826f3e167';
+export const STRUCTURAL_AUTHORING_ELEMENT_IDS = [
+  'el_a2849ff826f3e167',
+  'el_2dbee68b1ea318c8',
+] as const;
+export const STRUCTURAL_AUTHORING_STATUS_ELEMENT_ID = 'el_1f3f2908e4fd2401';
+export type StructuralAuthoringElementId = typeof STRUCTURAL_AUTHORING_ELEMENT_IDS[number];
+/** Kept as the reviewed Cursor default for callers that have not adopted target selection. */
+export const STRUCTURAL_AUTHORING_ELEMENT_ID: StructuralAuthoringElementId = STRUCTURAL_AUTHORING_ELEMENT_IDS[0];
+
+export type TrackCreationEligibility = {
+  elementId: string;
+  property: string;
+  available: boolean;
+  reason: null | 'DOCUMENT_INVALID' | 'ELEMENT_NOT_FOUND' | 'TARGET_PROPERTY_UNSUPPORTED'
+    | 'SHARED_PROPERTY_UNSUPPORTED' | 'PROPERTY_CONFLICT' | 'TRACK_ALREADY_EXISTS'
+    | 'TRACK_LIMIT_REACHED' | 'ID_COLLISION';
+};
+
+/** Pure, selector-independent projection used by both UI and mutation validation. */
+export function projectTrackCreationEligibility(
+  document: MotionDocument,
+  elementId: string,
+  property: string,
+): TrackCreationEligibility {
+  const unavailable = (reason: NonNullable<TrackCreationEligibility['reason']>): TrackCreationEligibility =>
+    ({ elementId, property, available: false, reason });
+  if (!validateMotionDocument(document).ok) return unavailable('DOCUMENT_INVALID');
+  if (!document.elements.some((element) => element.id === elementId)) return unavailable('ELEMENT_NOT_FOUND');
+  if (property !== 'opacity' || ![...STRUCTURAL_AUTHORING_ELEMENT_IDS, STRUCTURAL_AUTHORING_STATUS_ELEMENT_ID]
+    .includes(elementId as StructuralAuthoringElementId)) {
+    return unavailable('TARGET_PROPERTY_UNSUPPORTED');
+  }
+  const propertyTracks = document.tracks.filter((track) => track.property === property);
+  if (propertyTracks.some((track) => track.elementId === elementId
+    && document.tracks.filter((candidate) => candidate.ruleId === track.ruleId
+      && candidate.property === property).length > 1)) return unavailable('SHARED_PROPERTY_UNSUPPORTED');
+  if (propertyTracks.some((track) => track.elementId === elementId)) return unavailable('TRACK_ALREADY_EXISTS');
+  if (STRUCTURAL_AUTHORING_ELEMENT_IDS.some((candidate) =>
+    document.tracks.some((track) => track.id === derivedBundleIds(document.documentId, candidate).trackId))) {
+    return unavailable('TRACK_LIMIT_REACHED');
+  }
+  const ids = derivedBundleIds(document.documentId, elementId as StructuralAuthoringElementId);
+  const allIds = canonicalIdentitySet(document);
+  if ([ids.ruleId, ids.applicationId, ids.slotId, ids.ruleTrackId, ids.trackId, ids.startId, ids.endId]
+    .some((id) => allIds.has(id))
+    || document.rules.some((rule) => rule.sourceName === `created_${sha256Hex(ids.base).slice(0, 16)}`)) {
+    return unavailable('ID_COLLISION');
+  }
+  return { elementId, property, available: true, reason: null };
+}
 
 type EditTarget = { elementId: string; trackId: string; keyframeId: string };
 export type KeyframeValueOperation = OperationEnvelope & EditTarget & {
@@ -457,27 +506,27 @@ export type HistoryOperation = OperationEnvelope & {
   kind: 'motion.history.undo' | 'motion.history.redo';
 };
 export type TrackCreateOperation = OperationEnvelope & {
-  kind: 'motion.track.create'; elementId: typeof STRUCTURAL_AUTHORING_ELEMENT_ID;
+  kind: 'motion.track.create'; elementId: StructuralAuthoringElementId;
   payload: { property: 'opacity'; durationMs: 1000; delayMs: 610; easing: 'linear'; startValue: 0; endValue: 1 };
 };
 export type KeyframeAddOperation = OperationEnvelope & {
-  kind: 'motion.keyframe.add'; elementId: typeof STRUCTURAL_AUTHORING_ELEMENT_ID;
+  kind: 'motion.keyframe.add'; elementId: StructuralAuthoringElementId;
   trackId: string; payload: { timeMs: number; value: number };
 };
 export type KeyframeRemoveOperation = OperationEnvelope & {
-  kind: 'motion.keyframe.remove'; elementId: typeof STRUCTURAL_AUTHORING_ELEMENT_ID;
+  kind: 'motion.keyframe.remove'; elementId: StructuralAuthoringElementId;
   trackId: string; keyframeId: string;
 };
 export type SlotDurationSetOperation = OperationEnvelope & {
-  kind: 'motion.slot-duration.set'; elementId: typeof STRUCTURAL_AUTHORING_ELEMENT_ID;
+  kind: 'motion.slot-duration.set'; elementId: StructuralAuthoringElementId;
   trackId: string; payload: { durationMs: number };
 };
 export type BindingDelaySetOperation = OperationEnvelope & {
-  kind: 'motion.binding-delay.set'; elementId: typeof STRUCTURAL_AUTHORING_ELEMENT_ID;
+  kind: 'motion.binding-delay.set'; elementId: StructuralAuthoringElementId;
   trackId: string; payload: { delayMs: number };
 };
 export type SlotEasingSetOperation = OperationEnvelope & {
-  kind: 'motion.slot-easing.set'; elementId: typeof STRUCTURAL_AUTHORING_ELEMENT_ID;
+  kind: 'motion.slot-easing.set'; elementId: StructuralAuthoringElementId;
   trackId: string; payload: { easing: 'linear' | 'ease-in-out' };
 };
 export type StructuralAuthoringOperation = TrackCreateOperation | KeyframeAddOperation
@@ -488,11 +537,11 @@ export type AuthoringOperation = KeyframeValueOperation | KeyframeTimeOperation
 type EditOperation = Exclude<AuthoringOperation, HistoryOperation>;
 type KeyframeEditOperation = KeyframeValueOperation | KeyframeTimeOperation;
 type InternalTrackDeleteOperation = OperationEnvelope & {
-  kind: 'motion.internal.track.delete'; elementId: typeof STRUCTURAL_AUTHORING_ELEMENT_ID;
+  kind: 'motion.internal.track.delete'; elementId: StructuralAuthoringElementId;
   trackId: string; payload: { bundleDigest: string };
 };
 type InternalKeyframeRestoreOperation = OperationEnvelope & {
-  kind: 'motion.internal.keyframe.restore'; elementId: typeof STRUCTURAL_AUTHORING_ELEMENT_ID;
+  kind: 'motion.internal.keyframe.restore'; elementId: StructuralAuthoringElementId;
   trackId: string; keyframe: RuleTrack['keyframes'][number];
 };
 type ReducerOperation = EditOperation | InternalTrackDeleteOperation | InternalKeyframeRestoreOperation;
@@ -610,7 +659,7 @@ function applyStructural(
     if (!candidateBundle.ruleTrack.keyframes.some((keyframe) => keyframe.id === operation.keyframeId)) {
       return { ok: false, code: 'AUTHORING_KEYFRAME_NOT_FOUND' };
     }
-    const anchors = derivedBundleIds(document.documentId);
+    const anchors = derivedBundleIds(document.documentId, operation.elementId);
     if (operation.keyframeId === anchors.startId || operation.keyframeId === anchors.endId) {
       return { ok: false, code: 'AUTHORING_KEYFRAME_ANCHOR_REQUIRED' };
     }
@@ -622,31 +671,20 @@ function applyStructural(
       || payload.easing !== 'linear' || payload.startValue !== 0 || payload.endValue !== 1) {
       return { ok: false, code: 'AUTHORING_TRACK_CREATE_INVALID' };
     }
-    if (document.tracks.some((track) => track.elementId === element.id && track.property === 'opacity')) {
-      return { ok: false, code: 'AUTHORING_TRACK_ALREADY_EXISTS' };
+    const eligibility = projectTrackCreationEligibility(document, element.id, String(payload.property));
+    if (!eligibility.available) {
+      const codes: Record<NonNullable<TrackCreationEligibility['reason']>, string> = {
+        DOCUMENT_INVALID: 'AUTHORING_DOCUMENT_INVALID', ELEMENT_NOT_FOUND: 'AUTHORING_ELEMENT_NOT_FOUND',
+        TARGET_PROPERTY_UNSUPPORTED: 'AUTHORING_TARGET_PROPERTY_UNSUPPORTED',
+        SHARED_PROPERTY_UNSUPPORTED: 'AUTHORING_SHARED_PROPERTY_UNSUPPORTED',
+        PROPERTY_CONFLICT: 'AUTHORING_PROPERTY_CONFLICT', TRACK_ALREADY_EXISTS: 'AUTHORING_TRACK_ALREADY_EXISTS',
+        TRACK_LIMIT_REACHED: 'AUTHORING_TRACK_LIMIT_REACHED', ID_COLLISION: 'AUTHORING_ID_COLLISION',
+      };
+      return { ok: false, code: codes[eligibility.reason!] };
     }
-    const base = `${document.documentId}\0${element.id}\0opacity`;
-    const ruleId = structuralId('rule', base);
-    const applicationId = structuralId('app', base);
-    const slotId = structuralId('slot', `${base}\0${ruleId}`);
-    const ruleTrackId = structuralId('rule_track', `${base}\0${ruleId}`);
-    const trackId = structuralId('track', `${base}\0${slotId}\0${ruleId}`);
-    const startId = structuralId('kf', `${base}\0${0}`);
-    const endId = structuralId('kf', `${base}\0${1_000_000}`);
-    const allIds = new Set([
-      ...document.elements.map((candidate) => candidate.id), ...document.cues.map((candidate) => candidate.id),
-      ...document.rules.map((rule) => rule.id), ...document.applications.map((app) => app.id),
-      ...document.applications.flatMap((app) => app.slots.map((slot) => slot.id)),
-      ...document.rules.flatMap((rule) => rule.tracks.flatMap((track) =>
-        [track.id, ...track.keyframes.map((keyframe) => keyframe.id)])),
-      ...document.tracks.map((track) => track.id),
-    ]);
-    if ([ruleId, applicationId, slotId, ruleTrackId, trackId, startId, endId]
-      .some((id) => allIds.has(id))) return { ok: false, code: 'AUTHORING_ID_COLLISION' };
+    const { base, ruleId, applicationId, slotId, ruleTrackId, trackId, startId, endId } =
+      derivedBundleIds(document.documentId, operation.elementId);
     const sourceName = `created_${sha256Hex(base).slice(0, 16)}`;
-    if (document.rules.some((candidate) => candidate.sourceName === sourceName)) {
-      return { ok: false, code: 'AUTHORING_ID_COLLISION' };
-    }
     const rule = { id: ruleId, sourceName, tracks: [{
       id: ruleTrackId, property: 'opacity', interpolation: 'continuous' as const,
       keyframes: [{ id: startId, offset: 0, value: '0' }, { id: endId, offset: 1, value: '1' }],
@@ -663,7 +701,7 @@ function applyStructural(
     return { ok: true, document: next, inverse: { schemaVersion: operation.schemaVersion,
       operationId: operation.operationId, documentId: operation.documentId,
       expectedRevision: operation.expectedRevision, kind: 'motion.internal.track.delete',
-      elementId: STRUCTURAL_AUTHORING_ELEMENT_ID, trackId,
+      elementId: operation.elementId, trackId,
       payload: { bundleDigest: sha256Hex(canonicalBundleBytes({ rule, application, expanded })) } } };
   }
   const track = document.tracks.find((candidate) => candidate.id === operation.trackId);
@@ -687,7 +725,7 @@ function applyStructural(
     return { ok: true, document: next, inverse: { schemaVersion: operation.schemaVersion,
       operationId: operation.operationId, documentId: operation.documentId,
       expectedRevision: operation.expectedRevision, kind: 'motion.track.create',
-      elementId: STRUCTURAL_AUTHORING_ELEMENT_ID,
+      elementId: operation.elementId,
       payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear',
         startValue: 0, endValue: 1 } } };
   }
@@ -702,7 +740,7 @@ function applyStructural(
     return { ok: true, document: next, inverse: { schemaVersion: operation.schemaVersion,
       operationId: operation.operationId, documentId: operation.documentId,
       expectedRevision: operation.expectedRevision, kind: 'motion.keyframe.remove',
-      elementId: STRUCTURAL_AUTHORING_ELEMENT_ID, trackId: track.id, keyframeId: restored.id } };
+      elementId: operation.elementId, trackId: track.id, keyframeId: restored.id } };
   }
   if (operation.kind === 'motion.keyframe.add') {
     const timeMs = payload.timeMs;
@@ -746,7 +784,7 @@ function applyStructural(
     return { ok: true, document: next, inverse: { schemaVersion: operation.schemaVersion,
       operationId: operation.operationId, documentId: operation.documentId,
       expectedRevision: operation.expectedRevision, kind: 'motion.internal.keyframe.restore',
-      elementId: STRUCTURAL_AUTHORING_ELEMENT_ID, trackId: track.id,
+      elementId: operation.elementId, trackId: track.id,
       keyframe: structuredClone(removed) } };
   }
   if (operation.kind === 'motion.slot-duration.set') {
@@ -792,11 +830,22 @@ function canonicalBundleBytes(value: unknown): Uint8Array {
   return new TextEncoder().encode(stableStringify(value));
 }
 
-function derivedBundleIds(documentId: string): {
+function canonicalIdentitySet(document: MotionDocument): Set<string> {
+  return new Set([
+    ...document.elements.map((candidate) => candidate.id), ...document.cues.map((candidate) => candidate.id),
+    ...document.rules.map((rule) => rule.id), ...document.applications.map((app) => app.id),
+    ...document.applications.flatMap((app) => app.slots.map((slot) => slot.id)),
+    ...document.rules.flatMap((rule) => rule.tracks.flatMap((track) =>
+      [track.id, ...track.keyframes.map((keyframe) => keyframe.id)])),
+    ...document.tracks.map((track) => track.id),
+  ]);
+}
+
+function derivedBundleIds(documentId: string, elementId: StructuralAuthoringElementId): {
   base: string; ruleId: string; applicationId: string; slotId: string;
   ruleTrackId: string; trackId: string; startId: string; endId: string;
 } {
-  const base = `${documentId}\0${STRUCTURAL_AUTHORING_ELEMENT_ID}\0opacity`;
+  const base = `${documentId}\0${elementId}\0opacity`;
   const ruleId = structuralId('rule', base);
   const slotId = structuralId('slot', `${base}\0${ruleId}`);
   return {
@@ -819,8 +868,12 @@ function resolveIsolatedOpacityBundle(document: MotionDocument, trackId: string)
   | { ok: false; code: string } {
   const expanded = document.tracks.find((track) => track.id === trackId);
   if (!expanded) return { ok: false, code: 'AUTHORING_TRACK_NOT_FOUND' };
-  const ids = derivedBundleIds(document.documentId);
-  if (expanded.id !== ids.trackId || expanded.elementId !== STRUCTURAL_AUTHORING_ELEMENT_ID
+  if (!STRUCTURAL_AUTHORING_ELEMENT_IDS.includes(expanded.elementId as StructuralAuthoringElementId)) {
+    return { ok: false, code: 'AUTHORING_BUNDLE_MISMATCH' };
+  }
+  const elementId = expanded.elementId as StructuralAuthoringElementId;
+  const ids = derivedBundleIds(document.documentId, elementId);
+  if (expanded.id !== ids.trackId
     || expanded.property !== 'opacity' || expanded.ruleId !== ids.ruleId
     || expanded.slotId !== ids.slotId || expanded.interpolation !== 'continuous') {
     return { ok: false, code: 'AUTHORING_BUNDLE_MISMATCH' };
@@ -837,7 +890,7 @@ function resolveIsolatedOpacityBundle(document: MotionDocument, trackId: string)
   const slot = application.slots[slotIndex];
   const ruleTrack = rule.tracks.find((candidate) => candidate.property === 'opacity');
   const binding = application.bindings.find((candidate) =>
-    candidate.elementId === STRUCTURAL_AUTHORING_ELEMENT_ID);
+    candidate.elementId === elementId);
   const sourceName = `created_${sha256Hex(ids.base).slice(0, 16)}`;
   if (!slot || !ruleTrack || !binding || rule.id !== ids.ruleId || rule.sourceName !== sourceName
     || application.id !== ids.applicationId
@@ -1000,7 +1053,7 @@ function parseOperation(input: unknown): AuthoringOperation | null {
   if (base.kind === 'motion.history.undo' || base.kind === 'motion.history.redo') {
     return hasExactObjectKeys(value, baseKeys) ? base : null;
   }
-  const fixedElement = value.elementId === STRUCTURAL_AUTHORING_ELEMENT_ID;
+  const fixedElement = STRUCTURAL_AUTHORING_ELEMENT_IDS.includes(value.elementId as StructuralAuthoringElementId);
   if (base.kind === 'motion.track.create') {
     const payload = plainRecord(value.payload);
     return fixedElement && hasExactObjectKeys(value, [...baseKeys, 'elementId', 'payload'])

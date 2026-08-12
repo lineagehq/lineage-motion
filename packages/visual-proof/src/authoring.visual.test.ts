@@ -21,8 +21,8 @@ import { deriveSamplePlan } from './index.js';
 
 const fixtureUrl = new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url);
 const controlledChromiumArgs = ['--disable-threaded-animation'] as const;
-const streakPath = resolve('artifacts/t002-track-creation-streak.json');
-const proofVersion = 't004-track-creation-controlled.v2';
+const streakPath = resolve('artifacts/t002-target-selection-streak.json');
+const proofVersion = 't002-target-selection-controlled.v1';
 const execFileAsync = promisify(execFile);
 
 describe('Phase 2 controlled authoring proof', () => {
@@ -32,7 +32,8 @@ describe('Phase 2 controlled authoring proof', () => {
     const imported = importMotionHtml(source);
     expect(imported.document).not.toBeNull();
     let state = createAuthoringState(imported.document!);
-    const elementId = 'el_a2849ff826f3e167';
+    const elementId = 'el_2dbee68b1ea318c8';
+    const cursorElementId = 'el_a2849ff826f3e167';
     expect(state.document.elements.some((element) => element.id === elementId)).toBe(true);
     const states = new Map<string, AuthoringState>([['S0', state]]);
     const dispatch = (operation: AuthoringOperation) => {
@@ -89,6 +90,22 @@ describe('Phase 2 controlled authoring proof', () => {
         && JSON.stringify(run.receipt) === JSON.stringify(runs[0]!.receipt))];
     }));
     expect(Object.values(deterministic).every(Boolean)).toBe(true);
+    const cursorCreated = dispatchAuthoringOperation(createAuthoringState(imported.document!), {
+      schemaVersion: 'motion.operation.v1', operationId: 'visual:cursor',
+      documentId: imported.document!.documentId, expectedRevision: 0,
+      kind: 'motion.track.create', elementId: cursorElementId,
+      payload: { property: 'opacity', durationMs: 1000, delayMs: 610,
+        easing: 'linear', startValue: 0, endValue: 1 },
+    });
+    expect(cursorCreated.ok).toBe(true); if (!cursorCreated.ok) throw new Error(cursorCreated.diagnostic.code);
+    const cursorRuns = [0, 1, 2].map(() => compileMotionDocument(cursorCreated.state.document));
+    expect(cursorRuns.every((run) => run.html === cursorRuns[0]!.html
+      && run.exportDigest === cursorRuns[0]!.exportDigest)).toBe(true);
+    const orbTrackId = states.get('S1')!.document.tracks.find((track) => track.elementId === elementId
+      && track.property === 'opacity')!.id;
+    const cursorTrackId = cursorCreated.state.document.tracks.find((track) => track.elementId === cursorElementId
+      && track.property === 'opacity')!.id;
+    expect(cursorTrackId).not.toBe(orbTrackId);
 
     const identities = { U1: 'S5', U2: 'S4', U3: 'S3', U4: 'S2', U5: 'S1', U6: 'S0',
       R1: 'S1', R2: 'S2', R3: 'S3', R4: 'S4', R5: 'S5', R6: 'S6' } as const;
@@ -120,6 +137,10 @@ describe('Phase 2 controlled authoring proof', () => {
       for (const [label, compiled] of compiles) {
         captures.set(label, await captureState(browser, compiled.html, samplePlan.sampleTimesMs, elementId));
       }
+      captures.set('C0', await captureState(browser, compiles.get('S0')!.html,
+        samplePlan.sampleTimesMs, cursorElementId));
+      captures.set('C1', await captureState(browser, cursorRuns[0]!.html,
+        samplePlan.sampleTimesMs, cursorElementId));
     } finally {
       await browser.close();
     }
@@ -136,8 +157,8 @@ describe('Phase 2 controlled authoring proof', () => {
 
     let outsideChangedPixels = 0;
     let nonTargetPropertiesEqual = true;
-    for (const label of ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']) {
-      const baseline = captures.get('S0')!;
+    for (const label of ['S1', 'S2', 'S3', 'S4', 'S5', 'S6', 'C1']) {
+      const baseline = captures.get(label === 'C1' ? 'C0' : 'S0')!;
       const candidate = captures.get(label)!;
       for (const [index, frame] of baseline.frames.entries()) {
         outsideChangedPixels += countOutsideChanges(frame.png, candidate.frames[index]!.png, frame.box, candidate.frames[index]!.box, 2);
@@ -153,7 +174,7 @@ describe('Phase 2 controlled authoring proof', () => {
     const completedStreak = priorStreak + 1;
 
     const receipt = {
-      schemaVersion: 'motion.phase2-track-creation-proof.v1', passed: true,
+      schemaVersion: 'motion.phase2-target-selection-proof.v1', passed: true,
       environment: {
         browser: { name: 'Playwright Chromium', version: browserVersion },
         playwrightVersion: playwrightPackage.version,
@@ -179,7 +200,10 @@ describe('Phase 2 controlled authoring proof', () => {
           sum + frame.rasterHashes.length, 0),
       })),
       staleReject: { code: 'AUTHORING_STALE_REVISION', stateUnchanged: true },
-      deterministic, sampleTimesMs: samplePlan.sampleTimesMs,
+      deterministic: { ...deterministic, cursor: true },
+      choices: { orbElementId: elementId, cursorElementId, orbTrackId, cursorTrackId,
+        distinctTrackIds: cursorTrackId !== orbTrackId },
+      sampleTimesMs: samplePlan.sampleTimesMs,
       unaffectedBoundaryCount: samplePlan.boundaries.length,
       endpointHandling: samplePlan.endpointHandling,
       containment: { marginPx: 2, outsideChangedPixels, nonTargetPropertiesEqual },
@@ -211,7 +235,7 @@ describe('Phase 2 controlled authoring proof', () => {
     await finishFocusedRun(completedStreak);
     if (completedStreak >= 3) {
       await mkdir(resolve('docs/evidence'), { recursive: true });
-      await writeFile(resolve('docs/evidence/t002-phase2-track-creation.json'), `${JSON.stringify(receipt, null, 2)}\n`);
+      await writeFile(resolve('docs/evidence/t002-phase2-target-selection.json'), `${JSON.stringify(receipt, null, 2)}\n`);
     }
   }, 120_000);
 });

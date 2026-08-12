@@ -4,8 +4,10 @@ import {
   canonicalContentBytes,
   createAuthoringState,
   dispatchAuthoringOperation,
+  projectTrackCreationEligibility,
   sha256Hex,
   type AuthoringOperation,
+  type StructuralAuthoringElementId,
 } from '../../../packages/domain/src/index.js';
 import {
   buildTimeline,
@@ -17,7 +19,12 @@ import './styles.css';
 let authoring = createAuthoringState(payload.document);
 let compiled = payload.compiled;
 let operationSequence = 0;
-const creationElementId = 'el_a2849ff826f3e167';
+const creationChoices = [
+  { elementId: 'el_a2849ff826f3e167', label: 'Cursor' },
+  { elementId: 'el_2dbee68b1ea318c8', label: 'Orb' },
+] as const;
+const statusCopyElementId = 'el_1f3f2908e4fd2401';
+let selectedCreationElementId: StructuralAuthoringElementId | null = null;
 let selectedTrackId = findEditableTrack().trackId;
 let selectedKeyframeId = findEditableTrack().keyframes[0]!.id;
 
@@ -39,8 +46,12 @@ document.body.innerHTML = `
       <output class="operation-status" data-operation-status role="status" aria-live="polite">Revision 0 ready.</output>
     </section>
     <section class="structural-panel" aria-label="Bounded opacity track creation">
-      <div class="structural-heading"><strong>Cursor opacity animation</strong><span data-structural-status>Create the track to begin.</span></div>
-      <div class="structural-step"><span>1 · Create</span><button type="button" data-create-track>Create opacity track</button></div>
+      <div class="structural-heading"><strong>Choose an opacity target</strong><span data-structural-status>Select an available target to begin.</span></div>
+      <fieldset class="target-choices" data-target-choices><legend>Target and property</legend>
+        ${creationChoices.map((choice) => `<label><input type="radio" name="creation-target" value="${choice.elementId}"><span><strong>${choice.label} — Opacity</strong><small data-choice-reason="${choice.elementId}">Available</small></span></label>`).join('')}
+        <div class="unavailable-choice" data-status-copy><span><strong>Status copy — Opacity</strong><small data-choice-reason="${statusCopyElementId}">Already has an opacity track.</small></span></div>
+      </fieldset>
+      <div class="structural-step"><span>1 · Create</span><button type="button" data-create-track disabled>Select a target</button></div>
       <div class="structural-step"><span>2 · Shape</span><button type="button" data-add-midpoint>Add midpoint</button><button type="button" data-remove-midpoint>Remove midpoint</button></div>
       <div class="structural-step structural-timing"><span>3 · Time</span>
         <label>Duration (ms) <input data-duration type="number" min="1" step="1" value="1400"></label><button type="button" data-set-duration>Apply</button>
@@ -87,6 +98,14 @@ const previewStage = required<HTMLElement>('.preview-stage');
 const previewSelection = required<HTMLElement>('[data-preview-selection]');
 const previewSelectionLabel = required<HTMLElement>('[data-preview-selection-label]');
 
+for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="creation-target"]')) {
+  radio.addEventListener('change', () => {
+    selectedCreationElementId = radio.value as StructuralAuthoringElementId;
+    updateStructuralControls(buildTimeline(authoring.document).rows);
+    schedulePreviewSelection();
+  });
+}
+
 required<HTMLButtonElement>('[data-play]').addEventListener('click', () => {
   previewSelection.hidden = true;
   controller.play();
@@ -108,30 +127,34 @@ valueInput.addEventListener('input', () => clearValidationFeedback(valueInput));
 timeInput.addEventListener('input', () => clearValidationFeedback(timeInput));
 undoButton.addEventListener('click', () => void dispatch(makeHistory('motion.history.undo')));
 redoButton.addEventListener('click', () => void dispatch(makeHistory('motion.history.redo')));
-createTrackButton.addEventListener('click', () => void dispatch({
-  ...operationEnvelope(), kind: 'motion.track.create', elementId: creationElementId,
+createTrackButton.addEventListener('click', () => {
+  if (!selectedCreationElementId) return;
+  const elementId = selectedCreationElementId;
+  void dispatch({
+  ...operationEnvelope(), kind: 'motion.track.create', elementId,
   payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear', startValue: 0, endValue: 1 },
-} as AuthoringOperation, `[data-element-id="${creationElementId}"][data-property="opacity"] .keyframe[data-offset="0"]`));
+  } as AuthoringOperation, `[data-element-id="${elementId}"][data-property="opacity"] .keyframe[data-offset="0"]`);
+});
 addMidpointButton.addEventListener('click', () => void withCreatedTrack((track) => ({
-  ...operationEnvelope(), kind: 'motion.keyframe.add', elementId: creationElementId, trackId: track.trackId,
+  ...operationEnvelope(), kind: 'motion.keyframe.add', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   payload: { timeMs: 1110, value: 0.5 },
-}), `[data-element-id="${creationElementId}"][data-property="opacity"] .keyframe[data-offset="0.5"]`));
+}), () => `[data-element-id="${selectedCreationElementId}"][data-property="opacity"] .keyframe[data-offset="0.5"]`));
 setDurationButton.addEventListener('click', () => void withCreatedTrack((track) => ({
-  ...operationEnvelope(), kind: 'motion.slot-duration.set', elementId: creationElementId, trackId: track.trackId,
+  ...operationEnvelope(), kind: 'motion.slot-duration.set', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   payload: { durationMs: Number(required<HTMLInputElement>('[data-duration]').value) },
 })));
 setDelayButton.addEventListener('click', () => void withCreatedTrack((track) => ({
-  ...operationEnvelope(), kind: 'motion.binding-delay.set', elementId: creationElementId, trackId: track.trackId,
+  ...operationEnvelope(), kind: 'motion.binding-delay.set', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   payload: { delayMs: Number(required<HTMLInputElement>('[data-delay]').value) },
 })));
 setEasingButton.addEventListener('click', () => void withCreatedTrack((track) => ({
-  ...operationEnvelope(), kind: 'motion.slot-easing.set', elementId: creationElementId, trackId: track.trackId,
+  ...operationEnvelope(), kind: 'motion.slot-easing.set', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   payload: { easing: required<HTMLSelectElement>('[data-easing]').value as 'linear' | 'ease-in-out' },
 })));
 removeMidpointButton.addEventListener('click', () => void withCreatedTrack((track) => ({
-  ...operationEnvelope(), kind: 'motion.keyframe.remove', elementId: creationElementId, trackId: track.trackId,
+  ...operationEnvelope(), kind: 'motion.keyframe.remove', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   keyframeId: track.keyframes.find((keyframe) => keyframe.offset === 0.5)?.id ?? '',
-}), `[data-element-id="${creationElementId}"][data-property="opacity"] .keyframe[data-offset="1"]`));
+}), () => `[data-element-id="${selectedCreationElementId}"][data-property="opacity"] .keyframe[data-offset="1"]`));
 for (const [selector, label] of [['[data-duration]', 'Duration'], ['[data-delay]', 'Delay']] as const) {
   const input = required<HTMLInputElement>(selector);
   input.addEventListener('invalid', () => announceInvalidInput(input, label));
@@ -169,6 +192,7 @@ window.__motionEditor = {
     consumedOperationIds: [...authoring.consumedOperationIds],
     selectedTrackId,
     selectedKeyframeId,
+    selectedCreationElementId,
   }),
   dispatch,
 };
@@ -188,8 +212,7 @@ async function dispatch(operation: AuthoringOperation, focusSelector?: string): 
   authoring = result.state;
   compiled = compileMotionDocument(authoring.document);
   await controller.mount(compiled.html);
-  const created = buildTimeline(authoring.document).rows.find((row) =>
-    row.elementId === creationElementId && row.property === 'opacity');
+  const created = findCreatedTrack(buildTimeline(authoring.document).rows);
   if (created) {
     selectedTrackId = created.trackId;
     if (operation.kind === 'motion.keyframe.add') {
@@ -221,15 +244,14 @@ function operationEnvelope() {
 
 async function withCreatedTrack(
   create: (track: TimelineRow) => AuthoringOperation,
-  focusSelector?: string,
+  focusSelector?: string | (() => string),
 ): Promise<{ ok: boolean; code?: string }> {
-  const track = buildTimeline(authoring.document).rows.find((row) =>
-    row.elementId === creationElementId && row.property === 'opacity');
+  const track = findCreatedTrack(buildTimeline(authoring.document).rows);
   if (!track) {
     status.value = `AUTHORING_TRACK_NOT_FOUND: operation rejected; revision ${authoring.document.revision} unchanged.`;
     status.dataset.kind = 'error'; return { ok: false, code: 'AUTHORING_TRACK_NOT_FOUND' };
   }
-  return dispatch(create(track), focusSelector);
+  return dispatch(create(track), typeof focusSelector === 'function' ? focusSelector() : focusSelector);
 }
 
 function makeEdit(
@@ -281,18 +303,52 @@ function renderProjection(): void {
 }
 
 function updateStructuralControls(rows: TimelineRow[]): void {
-  const track = rows.find((row) => row.elementId === creationElementId && row.property === 'opacity');
+  const track = findCreatedTrack(rows);
   const hasTrack = Boolean(track);
   const hasMidpoint = Boolean(track?.keyframes.some((keyframe) => keyframe.offset === 0.5));
-  createTrackButton.disabled = hasTrack;
+  for (const choice of creationChoices) {
+    const eligibility = projectTrackCreationEligibility(authoring.document, choice.elementId, 'opacity');
+    const radio = required<HTMLInputElement>(`input[name="creation-target"][value="${choice.elementId}"]`);
+    radio.disabled = !eligibility.available && selectedCreationElementId !== choice.elementId;
+    required(`[data-choice-reason="${choice.elementId}"]`).textContent = eligibility.available
+      ? 'Available' : eligibilityReason(eligibility.reason);
+  }
+  const selectedEligibility = selectedCreationElementId
+    ? projectTrackCreationEligibility(authoring.document, selectedCreationElementId, 'opacity') : null;
+  createTrackButton.disabled = !selectedEligibility?.available;
+  createTrackButton.textContent = selectedCreationElementId
+    ? `Create ${creationChoices.find((choice) => choice.elementId === selectedCreationElementId)!.label} opacity track`
+    : 'Select a target';
   addMidpointButton.disabled = !hasTrack || hasMidpoint;
   removeMidpointButton.disabled = !hasMidpoint;
   for (const control of [durationInput, delayInput, easingInput, setDurationButton, setDelayButton, setEasingButton]) {
     control.disabled = !hasTrack;
   }
-  required('[data-structural-status]').textContent = !hasTrack
-    ? 'Create the track to begin.'
+  required('[data-structural-status]').textContent = !selectedCreationElementId
+    ? 'Select an available target to begin.'
+    : !hasTrack && selectedEligibility?.available
+      ? `${creationChoices.find((choice) => choice.elementId === selectedCreationElementId)!.label} is selected and available.`
+      : !hasTrack ? eligibilityReason(selectedEligibility?.reason ?? null)
     : hasMidpoint ? 'Midpoint ready. Adjust timing or remove it.' : 'Track ready. Add a midpoint or adjust timing.';
+}
+
+function eligibilityReason(reason: ReturnType<typeof projectTrackCreationEligibility>['reason']): string {
+  const reasons = {
+    TRACK_ALREADY_EXISTS: 'Already has an opacity track.',
+    TRACK_LIMIT_REACHED: 'One created track is allowed in this document.',
+    SHARED_PROPERTY_UNSUPPORTED: 'Shared opacity cannot be changed here.',
+    PROPERTY_CONFLICT: 'Another opacity binding conflicts with creation.',
+    ID_COLLISION: 'Stable track identity is unavailable.',
+    DOCUMENT_INVALID: 'The document must be valid before creating a track.',
+    ELEMENT_NOT_FOUND: 'The target is no longer in the document.',
+    TARGET_PROPERTY_UNSUPPORTED: 'This target and property are not supported.',
+  } as const;
+  return reason ? reasons[reason] : 'Available';
+}
+
+function findCreatedTrack(rows: TimelineRow[]): TimelineRow | undefined {
+  return rows.find((row) => creationChoices.some((choice) => choice.elementId === row.elementId)
+    && row.property === 'opacity');
 }
 
 function diagnosticMessage(code: string): string {
@@ -336,7 +392,7 @@ function updateSelection(): void {
 
 function findEditableTrack(): TimelineRow {
   const timeline = buildTimeline(authoring.document);
-  const created = timeline.rows.find((row) => row.elementId === creationElementId && row.property === 'opacity');
+  const created = findCreatedTrack(timeline.rows);
   if (created) return created;
   const editable = timeline.rows.filter((row) => row.property === 'opacity'
     && timeline.rows.filter((candidate) => candidate.ruleId === row.ruleId && candidate.property === row.property).length === 1);
@@ -410,7 +466,8 @@ function schedulePreviewSelection(): void {
 
 function updatePreviewSelection(): void {
   const row = currentTarget();
-  const target = iframe.contentDocument?.querySelector<HTMLElement>(`[data-motion-id="${row.elementId}"]`);
+  const targetElementId = selectedCreationElementId ?? row.elementId;
+  const target = iframe.contentDocument?.querySelector<HTMLElement>(`[data-motion-id="${targetElementId}"]`);
   if (!target) {
     previewSelection.hidden = true;
     return;

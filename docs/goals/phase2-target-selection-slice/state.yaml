@@ -1,0 +1,353 @@
+version: 2
+
+goal:
+  title: "Phase 2 Bounded Target Selection"
+  slug: "phase2-target-selection-slice"
+  kind: existing_plan
+  tranche: "Select one eligible neutral element/property pair and create its supported CSS animation track, then stop for owner review."
+  status: done
+  oracle:
+    signal: "Chrome proves a user can understand eligibility, select one bounded neutral element/property pair, create its track, and author it through the existing compiler-native workflow without arbitrary CSS or unstable identity."
+    cadence: "after the Worker package and at final audit"
+    final_proof: "A final Judge maps fresh domain, editor, Chrome, visual, privacy, build, and diff evidence to every grounded criterion and records full_outcome_complete: true."
+  intake:
+    original_request: "Continue to the next bounded Phase 2 step after committing and integrating the reviewed track-creation slice."
+    interpreted_outcome: "Generalize fixed cursor-opacity creation only enough to choose an explicitly eligible existing neutral element and supported property before creating one track."
+    input_shape: existing_plan
+    audience: "CSS animation authors and the Lineage Motion architecture owner"
+    authority: approved
+    proof_type: demo
+    completion_proof: "A complete visible selection/create/author/history workflow passes controlled and installed Chrome proof while all phase and privacy gates remain clean."
+    likely_misfire: "Build a generalized selector/property browser, arbitrary CSS editor, multi-track system, or persistence architecture instead of one bounded selection slice."
+    blind_spots_considered:
+      - "Eligibility must be canonical and selector-independent."
+      - "Existing and unsupported property combinations must be explained before action, not discovered by rejection."
+      - "Selection must survive rerenders/history without becoming a second document state model."
+      - "Track identity allocation must remain deterministic and collision-safe across different eligible targets."
+      - "The browser QA loop must judge whether selection simplifies authoring rather than exposing internal topology."
+    existing_plan_facts:
+      - "Local main includes the reviewed bounded cursor-opacity creation slice at 749e973."
+      - "The next capability is selecting an existing element and supported property before creating a track."
+      - "Typed expected-revision operations, deterministic compiler output, browser-native preview, history, accessibility, privacy, and adversarial proof remain mandatory."
+      - "No push, pull request, broader Phase 2, or Phase 3 work is authorized."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/phase2-target-selection-slice/"
+    command: "node <skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase2-target-selection-slice"
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Validate the bounded target-selection plan against current canonical/editor/compiler contracts and define the exact eligible neutral target/property set, selection semantics, operation envelope, UX, and proof contract before implementation."
+    inputs:
+      - "docs/incubation-plan.md"
+      - "docs/architecture.md"
+      - "docs/browser-qa-loop.md"
+      - "docs/goals/phase2-track-creation-slice/goal.md"
+      - "docs/goals/phase2-track-creation-slice/state.yaml"
+      - "Current domain/compiler/editor/proof contracts"
+    constraints:
+      - "Read-only; do not implement."
+      - "Preserve the existing plan and all phase/privacy boundaries."
+      - "Choose the smallest useful explicit eligible set already representable by the current synthetic document, domain, and compiler."
+      - "Do not authorize arbitrary selectors, free-form properties/values, importer expansion, generalized multi-track creation, or hidden automatic rule cloning."
+      - "Define canonical eligibility, unavailable-reason precedence, stable selection identity, deterministic structural IDs, collision/reference behavior, history behavior, accessibility, and reduced motion."
+      - "Use the browser QA loop as part of the evidence contract and reject technical topology dominating the authoring task."
+      - "Return exact Worker allowed_files, verification commands, stop conditions, and deferred scope."
+    expected_output:
+      - "Go/no-go decision"
+      - "Exact eligible target/property set and selection/eligibility contract"
+      - "Exact typed creation-operation and deterministic identity contract"
+      - "Exact UX, history, compiler/native-preview, and accessibility contract"
+      - "Exact controlled and installed-Chrome evidence contract"
+      - "Exact Worker allowed_files, verify, stop_if, and deferred scope"
+    receipt:
+      result: done
+      task_id: T001
+      decision: approved
+      full_outcome_complete: false
+      rationale: "The plan is safe as one vertical slice if selection is limited to two pre-existing canonical elements and opacity, with a single-created-track document cap. Cursor and Orb provide the minimum real choice; Status copy demonstrates an existing-property reason. Current typed reducer, isolated bundle, compiler, native preview, history, and proof harness can support this without fixture/importer/grammar/compiler-runtime/persistence/later-phase expansion."
+      canonical_choice_set:
+        eligible_pairs:
+          - "Cursor | el_a2849ff826f3e167 | opacity"
+          - "Orb | el_2dbee68b1ea318c8 | opacity"
+        visible_unavailable_pair: "Status copy | el_1f3f2908e4fd2401 | opacity | AUTHORING_TRACK_ALREADY_EXISTS"
+        deferred: "Echo and every other element/property pair"
+      eligibility: "Pure domain projection over canonical element IDs, opacity, current tracks, deterministic bundle IDs, and document validity. Precedence: DOCUMENT_INVALID, ELEMENT_NOT_FOUND, TARGET_PROPERTY_UNSUPPORTED, SHARED_PROPERTY_UNSUPPORTED, PROPERTY_CONFLICT, TRACK_ALREADY_EXISTS, TRACK_LIMIT_REACHED, ID_COLLISION, available. Selector hints, DOM order, labels, and UI indexes are never identity inputs."
+      selection: "null or canonical elementId/opacity tuple; ephemeral editor state only. Selection changes do not revise, consume operation IDs, enter history, compile, remount, or mutate animations. It survives rerenders and accepted/rejected/history operations; undo creation retains the pair and makes it available again."
+      operation: "motion.track.create retains the strict existing payload/defaults and expected-revision envelope, parameterized only by Cursor or Orb canonical elementId. Rejections return the original state and reusable operation ID."
+      structure: "Selector-independent SHA-256 identities parameterized by documentId/elementId/opacity; one isolated opacity rule/application/binding/slot/expanded track; immutable endpoints; exact inverse digest; no suffix, retry, merge, replacement, cloning, random/time/index allocation."
+      history: "E0 none selected r0; E1 Orb selected r0 with identical canonical/compiler/history; S1-S6 r1-r6 existing create/add/duration/delay/easing/remove workflow; U1-U6 r7-r12; R1-R6 r13-r18 with exact revision-neutral canonical/IDs/references/inventory/timeline/compiler/semantic/raster equality."
+      ux: "Native radio choices Cursor — Opacity and Orb — Opacity; visible Status copy unavailable row; no initial selection; dynamic Create <target> opacity track; canonical preview linkage; one-track limit reason after creation; keyboard/pointer parity; IDs collapsed/subordinate; no selection-only remount."
+      proof: "Full eligibility/adverse matrix; distinct deterministic IDs; one-track cap; Orb complete controlled workflow in independent contexts with all boundaries/containment/equality/three passes; separate Cursor determinism/containment; installed Chrome keyboard Orb and pointer Cursor paths, exact srcdoc/CSSAnimation/history/rejection/reduced-motion/network proof; visible browser QA loop; sanitized evidence and complete repository gates."
+      blocked_tasks: []
+      missing_evidence:
+        - "No implementation or fresh domain/compiler/Chrome/visual/private/full-gate evidence exists yet."
+
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: medium
+    objective: "Implement one complete selectable-target workflow: from revision zero, choose Orb opacity through keyboard controls, create exactly one isolated track, complete the existing add/duration/delay/easing/remove workflow and exact six-step undo/redo, while also proving Cursor opacity remains the only alternate eligible choice and cannot become a second created track in the same document."
+    inputs:
+      - "T001 receipt"
+      - "Current reviewed track-creation implementation and browser QA loop"
+    constraints:
+      - "Do not implement until T001 supplies exact eligible targets/properties, semantics, allowed_files, verification, and stop conditions."
+      - "Use red-green-refactor and one shared typed canonical operation path."
+      - "Preview must remain exact compiler output controlled through browser-created CSSAnimation objects."
+      - "Use only neutral synthetic content; private acceptance stays ignored, local, and read-only."
+      - "Do not add arbitrary CSS, generalized selection, persistence, service, CLI/MCP, claims, collaboration, adapters, landing work, video, publication, push, or PR."
+    expected_output:
+      - "Understandable bounded element/property selection"
+      - "Canonical eligibility and unavailable-reason behavior"
+      - "Deterministic track creation for the approved choices"
+      - "Accessible selection/create/author/history workflow"
+      - "Compiler-native Chrome and controlled visual proof"
+      - "Sanitized evidence and complete repository gates"
+    allowed_files:
+      - "packages/domain/src/index.ts"
+      - "packages/domain/src/authoring.test.ts"
+      - "packages/domain/src/domain.test.ts"
+      - "packages/css-compiler/src/determinism.test.ts"
+      - "packages/preview-runtime/src/index.test.ts"
+      - "packages/visual-proof/src/authoring.visual.test.ts"
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/src/global.d.ts"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "docs/browser-qa-loop.md"
+      - "docs/evidence/t002-phase2-target-selection.json"
+      - "artifacts/**"
+    verify:
+      - "npm exec vitest run packages/domain/src/authoring.test.ts packages/domain/src/domain.test.ts packages/css-compiler/src/determinism.test.ts packages/preview-runtime/src/index.test.ts"
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+      - "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+      - "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "node --version && npm --version && npm exec playwright -- --version"
+      - "git diff --exit-code 749e973 -- docs/incubation-plan.md docs/architecture.md fixtures packages/css-import/src packages/css-compiler/src/index.ts packages/preview-runtime/src/index.ts package.json package-lock.json"
+      - "git diff 749e973 --check"
+      - "git diff --name-only 749e973"
+      - "git status --short"
+    stop_if:
+      - "Canonical IDs/property inventory differ or the pair set needs fixture/importer/public-grammar changes."
+      - "Need a file outside allowed_files, dependency, compiler/preview implementation, or later-phase change."
+      - "One-track cap needs persistence, selector identity, hidden UI-only state, or generalized multi-track architecture."
+      - "Identity needs selector/index/time/random allocation, suffixing, merging, replacement, or rule cloning."
+      - "Creation/history changes another owner, presentation, provenance, cue, reduced motion, duration, or imported relationship."
+      - "Selection must enter canonical history, cannot survive history, or remounts preview by itself."
+      - "A rejection changes domain/history/compiler/iframe/animation/selection/focus beyond sanitized feedback."
+      - "Exact compiler srcdoc or native CSSAnimation control cannot be proved."
+      - "Controlled proof cannot converge, cover boundaries, block network, obtain three passes, or contain pixels."
+      - "Private acceptance lacks its owner-authorized ignored manifest; report without inventing/copying private data."
+      - "Private content or paths would enter tracked evidence."
+      - "The same verification failure remains unexplained after two attempts."
+    receipt:
+      result: blocked
+      task_id: T002
+      changed_files: "Domain, editor, compiler/preview tests, visual proof, Chrome QA, and sanitized evidence within the authorized file set."
+      summary: "Implemented exact Cursor/Orb opacity eligibility, visible Status-copy unavailability, ephemeral radio selection, deterministic target-parameterized bundles, the one-created-track cap, Orb full author/history proof, and Cursor alternate proof. All non-private gates passed."
+      commands:
+        - "PASS focused domain/compiler/preview Vitest"
+        - "PASS focused Playwright editor suite"
+        - "PASS controlled authoring visual proof three consecutive runs"
+        - "PASS installed Chrome QA, unit, determinism, browser, visual, privacy scan, typecheck, build, environment, and protected-diff gates"
+        - "FAIL private acceptance and dependent receipt verification because the ignored manifest was absent"
+      remaining_blockers:
+        - "Restore the owner-authorized ignored private-corpus manifest in this new worktree, then rerun the two blocked gates and dependent safety checks."
+      verification_attempts: 2
+      stopped_because: "The T002 stop condition requires a truthful stop when the private manifest is absent."
+
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Restore only the owner-authorized ignored private-acceptance manifest for the cited Word Search scene, rerun private acceptance and receipt/safety gates, and report sanitized aggregate evidence without changing tracked product implementation."
+    inputs:
+      - "T002 blocked receipt"
+      - "Owner-authorized private scene path from the original request"
+    constraints:
+      - "The manifest and generated private receipts remain ignored and local only."
+      - "Do not copy private HTML, CSS, text, branding, screenshots, selectors, or absolute paths into tracked files or receipts."
+      - "Do not change product implementation or broaden the slice."
+    expected_output:
+      - "Passing private acceptance and receipt verification"
+      - "Passing private-ignore and sensitive-content scans"
+      - "Sanitized counts, digests, diagnostics, and aggregate diff evidence only"
+    allowed_files:
+      - ".private-corpus/**"
+      - ".motion/**"
+      - "artifacts/**"
+    verify:
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "git status --short --ignored"
+    stop_if:
+      - "The authorized source path is unavailable or does not resolve to the cited scene."
+      - "Any private content or absolute path would need to enter a tracked file."
+      - "A product implementation change is needed."
+    receipt:
+      result: done
+      task_id: T003
+      changed_files:
+        - ".private-corpus/manifest.json (ignored)"
+        - ".motion/private proof outputs (ignored)"
+      commands:
+        - command: "npm run test:private-acceptance"
+          status: pass
+        - command: "npm run verify:receipts"
+          status: pass
+        - command: "npm run check:private-ignore"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+        - command: "git status --short --ignored"
+          status: pass
+      summary: "Private proof passed with 9 rules, 8 applications, 20 tracks, zero unsupported/missing features or diagnostics, three byte-identical exports, three stable visual replays, zero pixel/channel differences, zero live/unexpected network requests, and zero tracked private or sensitive findings."
+      remaining_blockers: []
+      verification_attempts: 1
+
+  - id: T004
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: medium
+    objective: "Run the visible owner-style in-app-browser QA walkthrough on a fresh local editor session and record whether target selection and the existing authoring workflow succeed without material friction."
+    inputs:
+      - "T002 implementation and automated browser evidence"
+      - "docs/browser-qa-loop.md"
+    constraints:
+      - "Read-only product QA; do not patch implementation under this task."
+      - "Use the visible in-app browser and a fresh application state."
+      - "Exercise keyboard Orb selection, creation, authoring, native playback/scrubbing, invalid rejection, reduced motion, exact undo/redo, and a separate Cursor selection path."
+      - "If material friction or failure appears, stop and create a bounded corrective Worker task."
+    expected_output:
+      - "Action/expected/observed owner-style walkthrough receipt"
+      - "First-try usability assessment"
+      - "Any smallest corrective package, or clearance for final Judge"
+    allowed_files: []
+    verify:
+      - "Visible in-app-browser walkthrough at the local editor subdomain"
+    stop_if:
+      - "The local application cannot be served or reached."
+      - "Any step requires product edits; create a corrective Worker task instead."
+    receipt:
+      result: done
+      task_id: T004
+      summary: "Visible owner-style in-app-browser QA succeeded without material product friction. No product patch was needed."
+      observations:
+        - "Fresh state showed no initial choice, disabled creation, two available native radio targets, and a plain Status-copy existing-track reason."
+        - "Orb selection preserved revision 0 and byte-identical iframe srcdoc; creation reached revision 1, selected the Orb anchor, added exactly one sixth timeline track, disabled Cursor by the one-track limit, and retained Orb identity."
+        - "Add midpoint, duration 1400, delay 700, and ease-in-out reached revisions 2-5 with expected 700/1400/2100 timings; invalid duration 0 was visibly rejected at revision 5 unchanged."
+        - "Master scrub reached 1400 ms; play/pause worked; reduced-motion inspection opened as read-only source-snapshot content."
+        - "Midpoint removal plus exact six undo and six redo steps reached revision 18, disabled redo, retained Orb selection, and restored the S6 no-midpoint state."
+        - "A separate fresh page pointer-selected Cursor and created its distinct sixth track at revision 1."
+        - "Primary Orb tab had no console warnings/errors. The second dev-server tab exposed Vite dependency externalization warnings plus one URL-less MutationObserver error attributable to the in-app-browser instrumentation; UI behavior remained correct and the independent installed-Chrome gate reported no application errors."
+      first_try_assessment: "The product workflow itself completed first try. One browser-control call timed out mid-redo, but the page preserved correct state and the remaining three redos completed; this was automation transport latency, not UX friction."
+      remaining_blockers: []
+
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Adversarially audit whether the bounded target-selection slice satisfies the original owner outcome and is ready to stop for review."
+    inputs:
+      - "All task receipts"
+      - "Fresh complete verification"
+      - "Visible browser QA walkthrough"
+      - "Complete branch diff and safety scans"
+    constraints:
+      - "Read-only; do not implement."
+      - "Reject completion if any required Worker remains queued or active."
+      - "Reject weak proof, arbitrary/generalized authoring, unstable identity, private leakage, or phase expansion."
+      - "State the user-facing claim and dispose of the top three realistic failure modes with direct evidence."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "Claim-to-evidence matrix"
+      - "Top-three failure-mode disposition"
+      - "Owner-review stop or smallest corrective package"
+    receipt:
+      result: done
+      task_id: T999
+      decision: complete
+      full_outcome_complete: true
+      rationale: "The bounded target-selection workflow is proven end to end: exact Cursor/Orb opacity eligibility, revision-neutral selection, typed expected-revision creation, deterministic distinct bundles, one-track cap, compiler-native preview, complete authoring/history, controlled visual equivalence, private acceptance, safety, type, build, and protected-diff gates. Stop for owner review."
+      user_facing_claim: "The editor can aim the bounded CSS-animation creation workflow at an explicitly eligible neutral element/property pair while preserving canonical safety, native playback, deterministic export, and exact history."
+      evidence:
+        - "Fresh focused domain/compiler/preview verification passed 65 tests; editor Playwright passed four workflows; installed Chrome 151 passed exact srcdoc, sandbox, CSSAnimation playback, selection, authoring, rejection, reduced-motion, and six-step undo/redo with zero application console errors."
+        - "Distinct deterministic IDs were reproduced for Orb and Cursor; malformed, stale, shared, colliding, corrupt-history, and invalid-timing cases rejected atomically."
+        - "Controlled visual proof reached nine consecutive passes, 21 contexts, 760 diagnostic samples, exact S/U/R digest equality, zero pixels changed outside the selected target, and zero live requests."
+        - "Fresh complete verification passed 131 unit tests, 25 determinism tests, four browser tests, baseline visual proof, two private-acceptance tests, receipt verification, ignore/sensitive scans with zero findings, typecheck, build, and protected-diff checks."
+      failure_modes:
+        - "Unstable or selector-based eligibility: defeated by fixed canonical IDs, revision-neutral selection, visible reasons, and adverse domain rejection."
+        - "UI magic bypassing reducer/native preview: defeated by typed expected-revision operations, exact compiler iframe HTML, and browser-created CSSAnimation control."
+        - "Nondeterministic identity/history, visual spill, leakage, or phase expansion: defeated by repeated IDs/exports, exact history digests/rasters, zero outside pixels/network, clean privacy scans, and complete diff inspection."
+      missing_evidence: []
+      remaining_blockers: []
+
+checks:
+  dirty_fingerprint: "10 approved product files plus sanitized evidence/GoalBuddy board; ignored private manifest and proof outputs; no protected-path changes"
+  last_verification:
+    result: pass
+    task: T999
+    commands:
+      - "65 focused domain/compiler/preview tests"
+      - "4 editor Playwright workflows"
+      - "3 requested controlled visual runs plus full-suite controlled pass"
+      - "installed Chrome 151 QA with zero application console errors"
+      - "131 unit tests and 25 determinism tests"
+      - "baseline visual and 2 private-acceptance tests"
+      - "receipt, private-ignore, sensitive, typecheck, build, environment, protected-diff, and diff-check gates"

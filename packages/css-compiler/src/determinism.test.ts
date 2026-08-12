@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
-import { canonicalBytes } from '../../domain/src/index.js';
+import { canonicalBytes, createAuthoringState, dispatchAuthoringOperation,
+  type StructuralAuthoringElementId } from '../../domain/src/index.js';
 import { importMotionHtml } from '../../css-import/src/index.js';
 import { compileMotionDocument } from './index.js';
 
@@ -62,6 +63,34 @@ describe('deterministic pure HTML/CSS compiler', () => {
     );
     expect(runs[0]!.receipt.documentDigest).toMatch(/^[a-f0-9]{64}$/);
     expect(new TextDecoder().decode(canonical).endsWith('\n')).toBe(true);
+  });
+
+  test('compiles parameterized Cursor and Orb opacity bundles deterministically with distinct identities', async () => {
+    const imported = importMotionHtml(await readFile(
+      new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8'));
+    const outputs = new Map<string, ReturnType<typeof compileMotionDocument>>();
+    const trackIds: string[] = [];
+    for (const elementId of ['el_a2849ff826f3e167', 'el_2dbee68b1ea318c8'] as const) {
+      const initial = createAuthoringState(imported.document!);
+      const created = dispatchAuthoringOperation(initial, {
+        schemaVersion: 'motion.operation.v1', operationId: `compiler:${elementId}`,
+        documentId: initial.document.documentId, expectedRevision: 0,
+        kind: 'motion.track.create', elementId: elementId as StructuralAuthoringElementId,
+        payload: { property: 'opacity', durationMs: 1000, delayMs: 610,
+          easing: 'linear', startValue: 0, endValue: 1 },
+      });
+      expect(created.ok).toBe(true); if (!created.ok) throw new Error(created.diagnostic.code);
+      const runs = [0, 1, 2].map(() => compileMotionDocument(created.state.document));
+      expect(runs.map((run) => run.html)).toEqual(Array(3).fill(runs[0]!.html));
+      expect(runs.map((run) => run.exportDigest)).toEqual(Array(3).fill(runs[0]!.exportDigest));
+      expect(runs[0]!.html).toContain(`[data-motion-id="${elementId}"]`);
+      trackIds.push(created.state.document.tracks.find((track) => track.elementId === elementId
+        && track.property === 'opacity')!.id);
+      outputs.set(elementId, runs[0]!);
+    }
+    expect(new Set(trackIds).size).toBe(2);
+    expect(outputs.get('el_a2849ff826f3e167')!.exportDigest)
+      .not.toBe(outputs.get('el_2dbee68b1ea318c8')!.exportDigest);
   });
 
   test('rejects opaque motion declarations in presentation CSS', async () => {
