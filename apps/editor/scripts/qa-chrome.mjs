@@ -129,6 +129,47 @@ try {
     && pausedInterval.playStates.every((state) => state === 'paused');
   await page.getByRole('button', { name: 'Inspect reduced motion' }).click();
   const reducedMotionInspectable = await page.locator('[data-reduced-motion-panel]').isVisible();
+  const workflowStates = [await page.evaluate(() => window.__motionEditor.inspectAuthoring())];
+  for (const selector of ['[data-create-track]', '[data-add-midpoint]', '[data-set-duration]', '[data-set-delay]']) {
+    await page.locator(selector).click();
+    workflowStates.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  }
+  await page.locator('select[data-easing]').selectOption('ease-in-out');
+  await page.locator('[data-set-easing]').click();
+  workflowStates.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  await page.getByRole('button', { name: 'Remove midpoint' }).click();
+  workflowStates.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  const staleEvidence = await page.evaluate(async () => {
+    const before = window.__motionEditor.inspectAuthoring();
+    const result = await window.__motionEditor.dispatch({ schemaVersion: 'motion.operation.v1',
+      operationId: 'chrome:stale-structural', documentId: before.documentId, expectedRevision: 5,
+      kind: 'motion.slot-duration.set', elementId: 'el_a2849ff826f3e167',
+      trackId: before.selectedTrackId, payload: { durationMs: 1200 } });
+    return { result, before, after: window.__motionEditor.inspectAuthoring() };
+  });
+  const staleAtomic = staleEvidence.result.ok === false
+    && staleEvidence.result.code === 'AUTHORING_STALE_REVISION'
+    && isDeepStrictEqual(staleEvidence.before, staleEvidence.after);
+  let exactHistory = true;
+  for (let index = 0; index < 6; index += 1) {
+    await page.getByRole('button', { name: 'Undo' }).click();
+    const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    const expected = workflowStates[5 - index];
+    exactHistory &&= current.revision === 7 + index && current.contentDigest === expected.contentDigest
+      && current.exportDigest === expected.exportDigest;
+  }
+  for (let index = 0; index < 6; index += 1) {
+    await page.getByRole('button', { name: 'Redo' }).click();
+    const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    const expected = workflowStates[index + 1];
+    exactHistory &&= current.revision === 13 + index && current.contentDigest === expected.contentDigest
+      && current.exportDigest === expected.exportDigest;
+  }
+  const structuralNative = await page.evaluate(() => {
+    const iframe = document.querySelector('[data-preview]');
+    return iframe.srcdoc === window.__motionEditor.compiledHtml
+      && iframe.contentDocument.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
+  });
 
   const checks = {
     exactCompilerOutput: initial.exactCompilerOutput,
@@ -146,6 +187,10 @@ try {
     everyCueScrubbed,
     playPauseNative,
     reducedMotionInspectable,
+    structuralWorkflow: workflowStates.length === 7 && workflowStates.at(-1).revision === 6,
+    staleAtomic,
+    exactSixStepHistory: exactHistory,
+    structuralNative,
     noConsoleErrors: consoleErrors.length === 0,
   };
   const receipt = {

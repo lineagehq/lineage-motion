@@ -133,8 +133,72 @@ test('renders exact compiled output and controls native animations without mutat
   await page.getByRole('button', { name: 'Inspect reduced motion' }).click();
   await expect(page.locator('[data-reduced-motion-panel]')).toBeVisible();
   await expect(page.locator('[data-reduced-motion-panel]')).toContainText('source-snapshot');
-  expect(await page.locator('input:not([type="range"])').count()).toBe(2);
+  expect(await page.locator('input:not([type="range"])').count()).toBe(4);
   expect(consoleErrors).toEqual([]);
+});
+
+test('creates and reshapes one cursor opacity track with exact six-step history', async ({ page }) => {
+  const failedRequests: string[] = [];
+  page.on('requestfailed', (request) => failedRequests.push(request.failure()?.errorText ?? 'failed'));
+  await page.goto(editorUrl);
+  await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Create opacity track' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Add midpoint' })).toBeDisabled();
+  await expect(page.locator('[data-duration]')).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Remove midpoint' })).toBeDisabled();
+  const states = [await page.evaluate(() => window.__motionEditor.inspectAuthoring())];
+  for (const [index, name] of ['Create opacity track', 'Add midpoint', 'Apply', 'Apply'].entries()) {
+    const button = name === 'Apply' ? page.locator(index === 2 ? '[data-set-duration]' : '[data-set-delay]')
+      : page.getByRole('button', { name });
+    await button.focus();
+    await page.keyboard.press('Enter');
+    await expect(page.locator('[data-operation-status]')).toContainText(`Revision ${states.length}`);
+    states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+    if (index === 0) await expect(page.locator(`[data-element-id="el_a2849ff826f3e167"][data-property="opacity"] .keyframe[data-offset="0"]`)).toBeFocused();
+    if (index === 1) await expect(page.locator(`[data-element-id="el_a2849ff826f3e167"][data-property="opacity"] .keyframe[data-offset="0.5"]`)).toBeFocused();
+  }
+  await page.locator('select[data-easing]').selectOption('ease-in-out');
+  await page.locator('[data-set-easing]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 5');
+  states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  await page.getByRole('button', { name: 'Remove midpoint' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 6');
+  states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  await expect(page.locator(`[data-element-id="el_a2849ff826f3e167"][data-property="opacity"] .keyframe[data-offset="1"]`)).toBeFocused();
+  expect(states.at(-1)!.revision).toBe(6);
+  const created = page.locator(`[data-element-id="el_a2849ff826f3e167"][data-property="opacity"]`);
+  await expect(created).toHaveCount(1);
+  await expect(created.locator('[data-keyframe-id]')).toHaveCount(2);
+  await expect(created).toHaveAttribute('data-delay-ms', '700');
+  await expect(created).toHaveAttribute('data-timing', JSON.stringify({ kind: 'keyword', value: 'ease-in-out' }));
+  expect(await page.evaluate(() => {
+    const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    return iframe.srcdoc === window.__motionEditor.compiledHtml
+      && iframe.contentDocument!.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
+  })).toBe(true);
+  await page.locator('[data-duration]').fill('1400.5');
+  await page.locator('[data-set-duration]').focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-duration]')).toHaveAttribute('aria-invalid', 'true');
+  await expect(page.locator('[data-operation-status]')).toContainText('AUTHORING_DURATION_INVALID');
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toEqual(states.at(-1));
+  for (let index = 0; index < 6; index += 1) {
+    await page.getByRole('button', { name: 'Undo' }).click();
+    const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    expect(current.revision).toBe(7 + index);
+    expect(current.contentDigest).toBe(states[5 - index]!.contentDigest);
+    expect(current.exportDigest).toBe(states[5 - index]!.exportDigest);
+  }
+  for (let index = 0; index < 6; index += 1) {
+    await page.getByRole('button', { name: 'Redo' }).click();
+    const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    expect(current.revision).toBe(13 + index);
+    expect(current.contentDigest).toBe(states[index + 1]!.contentDigest);
+    expect(current.exportDigest).toBe(states[index + 1]!.exportDigest);
+  }
+  expect(failedRequests).toEqual([]);
 });
 
 test('authors value and time through canonical operations with atomic history and native remounts', async ({ page }) => {

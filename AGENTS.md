@@ -64,3 +64,11 @@ For import/compiler work, the minimum receipt should include:
 - visual samples immediately before and after discrete transitions;
 - repeated-run stability;
 - exact commands and environment used.
+
+## Browser UX QA
+
+When asked to QA, polish, or smooth the motion editor in a browser, follow
+`docs/browser-qa-loop.md`. Use the real compiled preview and browser-created
+animations. Prefer the smallest observable UX correction that improves the
+canonical CSS-animation task; do not generalize the editor or add later-phase
+architecture during a polish loop.

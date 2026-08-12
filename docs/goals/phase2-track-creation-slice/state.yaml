@@ -1,0 +1,634 @@
+version: 2
+
+goal:
+  title: "Phase 2 Track Creation and Timing Controls"
+  slug: "phase2-track-creation-slice"
+  kind: existing_plan
+  tranche: "Complete one bounded keyframe/track creation and timing-control slice, then stop for owner review."
+  status: done
+  oracle:
+    signal: "Chrome proves typed keyframe add/remove, duration/delay/easing edits, and one new property track with deterministic compiler-native preview and exact history restoration."
+    cadence: "after the Worker package and at final audit"
+    final_proof: "A final Judge maps fresh domain, compiler, Chrome, visual, privacy, build, and diff evidence to every criterion and records full_outcome_complete: true."
+  intake:
+    original_request: "Continue with the recommended next authoring slice."
+    interpreted_outcome: "Extend the proven authoring loop to bounded structural track/keyframe creation and timing controls without later-phase scope."
+    input_shape: existing_plan
+    audience: "Lineage Motion architecture owner"
+    authority: approved
+    proof_type: demo
+    completion_proof: "The complete creation/edit/removal/history loop passes automated and controlled Chrome proof with deterministic exports and clean safety gates."
+    likely_misfire: "Build generalized timeline controls or UI-local mutations that bypass typed canonical operations, compiler output, or phase boundaries."
+    blind_spots_considered:
+      - "Creation requires deterministic stable-ID allocation and referential integrity."
+      - "Deleting keyframes/tracks needs explicit minimum-count and dependency behavior."
+      - "Duration/delay changes affect master-time projections and boundary sampling."
+      - "Easing grammar must remain bounded and fail closed."
+      - "Intentional visual changes require containment plus exact history restoration."
+    existing_plan_facts:
+      - "The reviewed Phase 2 value/time slice is integrated into local main at 60a4cad."
+      - "The next slice adds/removes keyframes, edits duration/delay/easing, and creates one new property track."
+      - "Typed operations, expected revisions, undo/redo, deterministic compiler output, and native preview remain mandatory."
+      - "Persistence, services, CLI/MCP, collaboration, landing work, and Phase 3 remain deferred."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/phase2-track-creation-slice/"
+    command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase2-track-creation-slice"
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Validate the bounded structural-authoring plan against current contracts and define exact keyframe, timing, easing, track-creation, identity, history, UI, and proof semantics before implementation."
+    inputs:
+      - "docs/incubation-plan.md"
+      - "docs/architecture.md"
+      - "docs/goals/phase2-authoring-slice/goal.md"
+      - "docs/goals/phase2-authoring-slice/state.yaml"
+      - "Current domain/compiler/editor/proof contracts"
+    constraints:
+      - "Read-only; do not implement."
+      - "Preserve the bounded Phase 2 slice and all non-goals."
+      - "Select exactly one neutral target/property already supported by the current domain and compiler; reject importer or grammar expansion."
+      - "Define exact operation envelopes, payloads, diagnostic precedence, ID allocation/validation, reference updates, and atomicity."
+      - "Define insertion/removal ordering, collision, minimum keyframe, shared-rule, slot/application, duration/delay reprojection, and bounded easing behavior."
+      - "Define the complete success/rejection/undo/redo state sequence and revision-neutral identity mappings."
+      - "Require the UI and future adapters to share one reducer without building CLI, MCP, service, persistence, or adapter code."
+      - "State the user-facing claim, top three realistic failure modes, and direct evidence required to defeat each."
+    expected_output:
+      - "Go/no-go decision"
+      - "Exact chosen synthetic target/property and typed operation/identity contract"
+      - "Exact timing/easing/history/rejection contract"
+      - "Exact Worker allowed_files, verify, and stop_if"
+      - "Exact controlled and installed Chrome evidence contract"
+      - "Deferred scope and missing evidence"
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      rationale: "Current contracts support one isolated opacity bundle on neutral cursor element el_a2849ff826f3e167 without importer, fixture, grammar, compiler-architecture, or phase expansion. Delay authority is binding.delayOverridesMs; the new single-binding slot delay must remain aligned. Deterministic selector-independent IDs and collision rejection are feasible. Full domain-to-Chrome proof remains required."
+      target:
+        element_id: el_a2849ff826f3e167
+        property: opacity
+        initial_duration_ms: 1000
+        initial_delay_ms: 610
+        initial_easing: linear
+        endpoints: "0ppm=0; 1000000ppm=1"
+      operations:
+        - motion.track.create
+        - motion.keyframe.add
+        - motion.slot-duration.set
+        - motion.binding-delay.set
+        - motion.slot-easing.set
+        - motion.keyframe.remove
+        - motion.history.undo
+        - motion.history.redo
+      identity: "Derive rule/application/slot/rule-track/expanded-track/keyframe IDs from SHA-256 of documentId, elementId, property, owner IDs, and offset. Operations accept stable element/track/keyframe IDs but never selectors or caller-supplied structural creation IDs. Reject every collision; never suffix, merge, regenerate, or replace."
+      timing: "Add midpoint at 1110ms/500000ppm; duration 1400ms projects 610/1310/2010; delay 700ms projects 700/1400/2100; easing is typed keyword linear or ease-in-out only. Offsets stay fixed. Reject fractional, overflowing, negative, out-of-document, clamped, sorted, merged, or coerced inputs."
+      history_sequence: "S0 r0; create S1 r1; add S2 r2; duration S3 r3; delay S4 r4; easing S5 r5; remove S6 r6; stale rejection unchanged; U1..U6 r7..12 map S5..S0; R1..R6 r13..18 map S1..S6. Revision-neutral canonical/export/IDs/inventory/timeline/semantic/raster equality must be exact."
+      atomicity: "Each success consumes one operation ID, increments revision once, records typed forward/inverse history, recompiles, and remounts exact compiler HTML. Rejections preserve every domain, history, selection/focus, compiler, iframe, animation, feedback, and redo observable."
+      proof: "Three compiles per primary state; fresh independent controlled-Chromium contexts for S0..S6/U1..U6/R1..R6; exact t/t±1 boundary sampling; zero pixels outside cursor union plus 2px; exact equivalent-state pixels; installed Chrome accessible pointer/keyboard workflow; exact srcdoc; CSSAnimation ownership/currentTime; private/safety/type/build/diff gates."
+      deferred: "All other targets/properties, public track deletion, importer/fixture expansion, generalized editing, persistence/service/CLI/MCP/collaboration/adapters/landing/video/publication/push/PR."
+
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: medium
+    objective: "Implement one complete structural authoring loop on canonical element el_a2849ff826f3e167: create exactly one isolated opacity track bundle, add its midpoint keyframe, edit duration, effective delay, and bounded easing, remove the added keyframe, then prove stale rejection and exact six-step undo/redo through the shared reducer, deterministic compiler output, native preview, controlled visual evidence, installed Chrome, accessibility, privacy, and phase safety."
+    inputs:
+      - "T001 receipt"
+      - "docs/goals/phase2-track-creation-slice/goal.md"
+      - "Current reviewed Phase 2 authoring implementation and proof harness"
+    constraints:
+      - "Use red-green-refactor cycles and record meaningful failing and passing evidence."
+      - "Do not implement until T001 supplies exact semantics, allowed_files, verification, and stop conditions."
+      - "Use neutral synthetic content; private acceptance remains local, ignored, and read-only."
+      - "Do not expand the importer, introduce a second compiler/interpolator, or directly mutate preview output."
+      - "Do not add persistence, service, CLI, MCP, claims, adapters, generalized editing, or landing-animation work."
+      - "Every success and rejection must be atomic, deterministic, reversible, and accessible."
+    expected_output:
+      - "Typed keyframe add/remove operations"
+      - "Typed duration, delay, and bounded easing operations"
+      - "Typed creation of exactly one supported property track with stable identities"
+      - "Complete referential-integrity, validation, revision, and history behavior"
+      - "Minimal accessible structural authoring controls and selected-preview link"
+      - "Deterministic compiler/native-preview updates"
+      - "Repeated controlled visual and installed-Chrome proof"
+      - "Sanitized evidence plus private, build, safety, and diff gates"
+    allowed_files:
+      - "packages/domain/src/index.ts"
+      - "packages/domain/src/authoring.test.ts"
+      - "packages/domain/src/domain.test.ts"
+      - "packages/css-compiler/src/determinism.test.ts"
+      - "packages/preview-runtime/src/index.ts"
+      - "packages/preview-runtime/src/index.test.ts"
+      - "packages/visual-proof/src/authoring.visual.test.ts"
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/src/global.d.ts"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "docs/evidence/t002-phase2-track-creation.json"
+      - "artifacts/**"
+    verify:
+      - "npm exec vitest run packages/domain/src/authoring.test.ts packages/domain/src/domain.test.ts packages/css-compiler/src/determinism.test.ts packages/preview-runtime/src/index.test.ts"
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "node --version && npm --version && npm exec playwright -- --version"
+      - "git diff 60a4cad --check"
+      - "git diff --name-only 60a4cad"
+      - "git status --short"
+    stop_if:
+      - "The fixed target is absent, differs from el_a2849ff826f3e167, already has opacity, or needs fixture/importer changes."
+      - "Implementation needs files outside allowed_files, dependency changes, grammar/compiler architecture changes, or later-phase scope."
+      - "Identity needs selectors, randomness/time/index allocation, suffixing, caller structural IDs, rule cloning, or silent replacement."
+      - "binding.delayOverridesMs cannot remain authoritative while the isolated slot delay stays aligned."
+      - "Any operation affects another canonical owner, cue, presentation, provenance, reduced-motion record, or document duration."
+      - "Any input requires sorting, clamping, merging, coercion, free-form CSS, arbitrary easing, fractional time, or invalid projection."
+      - "Undo/redo cannot use typed reducer replay with monotonic revisions and exact revision-neutral restoration."
+      - "A rejection changes any domain, history, focus/selection, compiler, iframe, animation, or feedback observable."
+      - "Controlled proof cannot establish convergence, exact equivalent pixels, or zero outside-target changes."
+      - "Installed Chrome cannot prove exact compiler srcdoc and browser-created CSSAnimation control."
+      - "Private acceptance would disclose or track private material."
+      - "The same verification failure remains unexplained after two attempts."
+    receipt:
+      result: blocked
+      summary: "Implemented the full S0-S6 structural workflow and revision 0-18 typed history contract. Focused domain/compiler/preview tests, editor Chrome, controlled visual proof, Chrome QA, full unit, determinism, browser, and visual suites passed. Private acceptance could not start because the fresh worktree lacks its ignored owner-authorized manifest; the controlled receipt also needs one more successful proof run for its three-pass streak."
+      changed_files:
+        - packages/domain/src/index.ts
+        - packages/domain/src/authoring.test.ts
+        - packages/visual-proof/src/authoring.visual.test.ts
+        - apps/editor/src/main.ts
+        - apps/editor/src/styles.css
+        - apps/editor/tests/editor.spec.ts
+        - apps/editor/scripts/qa-chrome.mjs
+        - artifacts/**
+      passing_evidence:
+        - "Focused domain/compiler/preview verification passed after the expected red test."
+        - "Installed-Chrome editor workflow and qa:chrome passed."
+        - "Independent 19-state controlled visual proof passed once."
+        - "Full unit, determinism, browser, and visual suites passed."
+      blocker: "Restore the ignored private manifest, obtain the configured third controlled-proof pass, then run remaining receipt/privacy/type/build/environment/diff gates."
+      verification_attempts: 1
+      stopped_because: "The required ignored private acceptance manifest is outside T002 allowed_files."
+
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Restore only the owner-authorized ignored private acceptance configuration in this fresh worktree, earn the configured three-pass controlled-proof evidence streak, and complete all remaining private, receipt, safety, type, build, environment, and diff gates without changing implementation semantics."
+    inputs:
+      - "T001 and T002 receipts"
+      - "Owner-provided private first-scene path already authorized in the goal conversation"
+      - "Current ignored private-acceptance schema and existing acceptance scripts"
+    constraints:
+      - "Do not modify public fixtures, importer behavior, dependencies, or product implementation."
+      - "Use apply_patch for the ignored manifest; never copy private source into the repository."
+      - "Private paths, source, selectors, copy, branding, screenshots, and output remain ignored and absent from tracked evidence."
+      - "Do not weaken proof thresholds or edit tests to obtain the streak."
+      - "Preserve all T002 changes and stop at the exact remaining verification scope."
+    expected_output:
+      - "Ignored owner-authorized single-scene manifest"
+      - "Third consecutive controlled-proof pass and sanitized tracked receipt"
+      - "Passing private acceptance and all remaining repository gates"
+      - "Compact sanitized corrective receipt"
+    allowed_files:
+      - ".private-corpus/**"
+      - ".motion/**"
+      - "artifacts/**"
+      - "docs/evidence/t002-phase2-track-creation.json"
+    verify:
+      - "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "node --version && npm --version && npm exec playwright -- --version"
+      - "git diff 60a4cad --check"
+      - "git diff --name-only 60a4cad"
+      - "git status --short"
+    stop_if:
+      - "The existing manifest schema cannot represent exactly the owner-authorized first scene without copying private content."
+      - "Any private file, source, screenshot, selector, copy, branding, absolute path, or credential would become tracked or enter sanitized evidence."
+      - "A passing gate requires changing implementation, tests, thresholds, public fixtures, importer behavior, or dependencies."
+      - "The same verification failure remains unexplained after two attempts."
+    receipt:
+      result: done
+      summary: "Restored the exact ignored owner-authorized single-scene manifest without copying source. Controlled proof reached four consecutive passes across 19 independent contexts with zero outside-target pixels; tracked evidence is sanitized. Private import/visual acceptance, receipts, ignore enforcement, sensitive scan, typecheck, build, environment, and diff gates passed with zero findings."
+      changed_files:
+        - ".private-corpus/**"
+        - ".motion/**"
+        - "artifacts/**"
+        - "docs/evidence/t002-phase2-track-creation.json"
+      commands:
+        - cmd: "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+          status: pass
+        - cmd: "npm run test:private-acceptance"
+          status: pass
+        - cmd: "npm run verify:receipts"
+          status: pass
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "node --version && npm --version && npm exec playwright -- --version"
+          status: pass
+        - cmd: "git diff 60a4cad --check"
+          status: pass
+        - cmd: "git diff --name-only 60a4cad"
+          status: pass
+        - cmd: "git status --short"
+          status: pass
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Adversarially audit the complete slice against the original owner outcome and stop boundary."
+    inputs:
+      - "T001 and T002 receipts plus any corrective receipts"
+      - "Fresh full verification"
+      - "Controlled and interactive Chrome evidence"
+      - "Complete branch diff and safety scans"
+    constraints:
+      - "Do not implement."
+      - "Reject completion if any required Worker remains queued or active."
+      - "Reject weak proof, phase expansion, or private leakage."
+      - "Name the user-facing claim and top three realistic failure modes."
+      - "Reject completion without direct proof of stable structural identity, referential integrity, atomic rejection, exact history restoration, deterministic exports, compiler-only preview, and native animation control."
+      - "If an in-scope defect remains, define the smallest corrective Worker package and require this audit to repeat."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "Claim-to-evidence matrix"
+      - "Top-three failure-mode disposition"
+      - "Owner-review handoff"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "Happy-path S0-S6/r0-r18, compiler/native Chrome, sampled visual equality, private acceptance, safety, types, and build pass. Completion is rejected because public structural operations exceed the fixed target/bundle, accept internal/over-precise inputs, omit exact document/projection/reference validation, and controlled proof misses 1310ms and 1610ms t±1 boundaries. Browser accessibility/atomicity evidence is also incomplete."
+      passing_evidence:
+        - "Fresh focused tests: 58 passed; installed Chrome editor: 3 passed."
+        - "Fresh controlled Chromium, Chrome QA, full unit, determinism, browser, baseline visual, private acceptance, receipts, safety, typecheck, build, environment, diff/status all passed."
+        - "T003 supersedes T002 only for the ignored-manifest and proof-streak blocker."
+      missing_evidence:
+        - "Strict fixed-target typed public operations and exact diagnostic precedence."
+        - "Exact bundle ownership, collision/reference/inventory validation, post-mutation document validation, and atomic adverse cases."
+        - "Document-bounded integral timing projections and exact 610/1110/1610, 610/1310/2010, 700/1400/2100 assertions."
+        - "Keyboard-only structural workflow, required marker focus, aria-invalid/rejection invariance, and redo behavior."
+        - "Three corrected controlled-proof passes including 1309/1310/1311 and 1609/1610/1611."
+
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Harden the existing structural slice to the exact T001 contract and close only the final-audit gaps: strict fixed-target typed operations, exact bundle/reference and projection validation, structural rejection/history tests, required accessible selection/focus behavior, and complete affected-boundary visual proof; regenerate sanitized evidence and rerun every gate."
+    inputs:
+      - "T001, T002, T003, and T999 receipts"
+      - "Current structural implementation and controlled/installed-Chrome harnesses"
+    constraints:
+      - "Public operations are exact discriminated types: fixed track create; add accepts only timeMs/value; duration/delay accept one integer; easing accepts typed keyword linear/ease-in-out."
+      - "Reject unknown/missing fields, public offsetPpm/delete, free strings, exponent/over-six-decimal opacity, NaN/infinity, coercion, wrong target, mismatched/shared/dependent owners, collisions, and invalid projections atomically."
+      - "Require exact isolated bundle ownership and validate every candidate document before commit; internal inverse deletion is inaccessible publicly."
+      - "Preserve binding.delayOverridesMs authority and fixed offsets; enforce safe integral in-document projections."
+      - "Implement exact create/add/remove focus semantics and preserve valid selection/focus across timing/history operations."
+      - "Add the complete explicit visual boundary union and earn three corrected consecutive passes without weakening proof."
+      - "Do not expand scope or modify files outside allowed_files."
+    expected_output:
+      - "Exact typed fixed-target reducer and adversarial domain coverage"
+      - "Validated identity/reference/inventory/timing/history behavior"
+      - "Accessible installed-Chrome workflow with rejection/focus/redo proof"
+      - "Three-pass corrected controlled visual evidence"
+      - "Fresh full repository verification"
+    allowed_files:
+      - "packages/domain/src/index.ts"
+      - "packages/domain/src/authoring.test.ts"
+      - "packages/visual-proof/src/authoring.visual.test.ts"
+      - "apps/editor/src/main.ts"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "docs/evidence/t002-phase2-track-creation.json"
+      - "artifacts/**"
+    verify:
+      - "npm exec vitest run packages/domain/src/authoring.test.ts packages/domain/src/domain.test.ts packages/css-compiler/src/determinism.test.ts packages/preview-runtime/src/index.test.ts"
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+      - "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+      - "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "node --version && npm --version && npm exec playwright -- --version"
+      - "git diff 60a4cad --check"
+      - "git diff --name-only 60a4cad"
+      - "git status --short"
+    stop_if:
+      - "Any correction needs importer, fixture, compiler, preview-runtime, dependency, later-phase, or other file outside allowed_files."
+      - "Exact fixed-bundle validation needs selectors, randomness, suffixing, caller structural IDs, cloning, coercion, or generalized authoring."
+      - "Public and internal replay inputs cannot be separated while retaining the same validated reducer."
+      - "A timing edit would alter document duration, offsets, cues, presentation, provenance, reduced motion, or another owner."
+      - "Any rejection changes canonical/history/redo/compiler/iframe/animation/selection/focus/feedback state."
+      - "Corrected proof cannot include every boundary with convergence and zero outside-target differences."
+      - "Private acceptance/evidence would expose or track private material."
+      - "The same verification failure remains unexplained after two attempts."
+    receipt:
+      result: done
+      summary: "Closed every T999 gap: exact exported fixed-target operations; strict payload rejection; deterministic isolated bundle, collision/reference/inventory/candidate validation; integral bounded projections with exact S0-S6/U/R and corrupted replay coverage; keyboard marker focus, stable selection, aria-invalid rejection invariance, compiler srcdoc and native CSSAnimation proof. Corrected controlled proof passed three consecutive runs across 19 independent contexts, including 1310ms and 1610ms t±1, exact equivalent rasters, zero outside-target changes, and blocked network. Private, sensitive, type, build, Chrome, determinism, receipt, and diff gates passed."
+      changed_files:
+        - "packages/domain/src/index.ts"
+        - "packages/domain/src/authoring.test.ts"
+        - "packages/visual-proof/src/authoring.visual.test.ts"
+        - "apps/editor/src/main.ts"
+        - "apps/editor/tests/editor.spec.ts"
+        - "docs/evidence/t002-phase2-track-creation.json"
+        - "artifacts/**"
+      commands:
+        - cmd: "npm exec vitest run packages/domain/src/authoring.test.ts packages/domain/src/domain.test.ts packages/css-compiler/src/determinism.test.ts packages/preview-runtime/src/index.test.ts"
+          status: pass
+        - cmd: "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+          status: pass
+        - cmd: "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts (three consecutive runs)"
+          status: pass
+        - cmd: "npm run qa:chrome"
+          status: pass
+        - cmd: "npm run test:unit"
+          status: pass
+        - cmd: "npm run verify:determinism"
+          status: pass
+        - cmd: "npm run test:browser"
+          status: pass
+        - cmd: "npm run test:visual"
+          status: pass
+        - cmd: "npm run test:private-acceptance"
+          status: pass
+        - cmd: "npm run verify:receipts"
+          status: pass
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "node --version && npm --version && npm exec playwright -- --version"
+          status: pass
+        - cmd: "git diff 60a4cad --check"
+          status: pass
+        - cmd: "git diff --name-only 60a4cad"
+          status: pass
+        - cmd: "git status --short"
+          status: pass
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
+
+  - id: T005
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Repeat the complete adversarial oracle audit after T004 and decide whether the bounded slice is ready for owner review."
+    inputs:
+      - "All prior receipts and T004 corrective receipt"
+      - "Fresh complete verification and diff"
+    constraints:
+      - "Read-only; do not implement."
+      - "Reject completion unless every T999 gap has direct fresh evidence and every original criterion remains satisfied."
+      - "Require a claim-to-evidence matrix and top-three failure-mode disposition."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "Fresh requirement-by-requirement evidence"
+      - "Owner-review stop or smallest corrective package"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "T004 closed every T999 gap and all fresh suites passed. Completion remains rejected because public removal of the terminal deterministic anchor succeeds with three keyframes, but immediate undo fails AUTHORING_HISTORY_REPLAY_INVALID. This violates universal atomic reversible history."
+      passing_evidence:
+        - "Fresh 60 focused tests, 3 installed-Chrome tests, 19-context/40-sample controlled proof, Chrome QA, full suites, private, receipts, safety, types, build, environment, and diff all passed."
+        - "Fixed-target payloads, reference/collision/inventory validation, timing projections, accessibility, native preview, and corrected boundary sampling are closed."
+      missing_evidence:
+        - "Both deterministic anchors reject removal atomically."
+        - "Midpoint removal remains exactly undoable/redoable after the anchor guard."
+      direct_probe: "Create, add midpoint, remove terminal endpoint succeeds at revision 3; undo rejects AUTHORING_HISTORY_REPLAY_INVALID."
+
+  - id: T006
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Close the single endpoint-removal replay defect without changing the approved midpoint workflow: make deterministic start/end keyframes immutable structural anchors, reject their public removal atomically, prove midpoint removal remains exactly reversible, then rerun the complete gate set."
+    inputs:
+      - "T005 receipt and direct reducer probe"
+      - "Current exact fixed-bundle reducer and tests"
+    constraints:
+      - "Reject derived start/end IDs with AUTHORING_KEYFRAME_ANCHOR_REQUIRED before cloning, mutation, or history changes."
+      - "Preserve MINIMUM precedence at two keyframes and NOT_FOUND for unknown IDs."
+      - "Only non-anchor inserted keyframes remain removable."
+      - "Rejected anchor removals preserve document object, revision, consumed IDs, undo/redo, compiler-facing content, and operation-ID availability."
+      - "Do not change the approved UI/visual/compiler workflow or files outside allowed_files."
+    expected_output:
+      - "Atomic deterministic anchor rejection"
+      - "Exact midpoint remove/undo/redo identity and export restoration"
+      - "Fresh complete verification receipt"
+    allowed_files:
+      - "packages/domain/src/index.ts"
+      - "packages/domain/src/authoring.test.ts"
+      - "docs/evidence/t002-phase2-track-creation.json"
+      - "artifacts/**"
+    verify:
+      - "npm exec vitest run packages/domain/src/authoring.test.ts packages/domain/src/domain.test.ts packages/css-compiler/src/determinism.test.ts packages/preview-runtime/src/index.test.ts"
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "node --version && npm --version && npm exec playwright -- --version"
+      - "git diff 60a4cad --check"
+      - "git diff --name-only 60a4cad"
+      - "git status --short"
+    stop_if:
+      - "The fix needs any product file outside allowed_files or changes importer/fixture/compiler/preview/UI/visual thresholds/dependencies."
+      - "The fix weakens the two-anchor invariant, silently replaces anchors, or introduces a second history path."
+      - "Rejected anchor removal changes any canonical/history/redo/operation-ID observable."
+      - "The approved midpoint workflow, compiled bytes, visual evidence, or native Chrome behavior changes."
+      - "Private material would be exposed or tracked."
+      - "The same verification failure remains unexplained after two attempts."
+    receipt:
+      result: done
+      summary: "Red tests reproduced successful endpoint deletion. The reducer now rejects both deterministic endpoint IDs before cloning with AUTHORING_KEYFRAME_ANCHOR_REQUIRED; two-keyframe removal retains MINIMUM precedence and unknown IDs retain NOT_FOUND. Rejections preserve state identity, document, revision, history/redo, consumed IDs, and operation-ID reuse. Midpoint removal remains exact through undo/redo with stable identities/order/inventory and canonical/compiler/export equality. All gates passed."
+      changed_files:
+        - "packages/domain/src/index.ts"
+        - "packages/domain/src/authoring.test.ts"
+        - "docs/evidence/t002-phase2-track-creation.json"
+        - "artifacts/**"
+      commands:
+        - cmd: "npm exec vitest run packages/domain/src/authoring.test.ts packages/domain/src/domain.test.ts packages/css-compiler/src/determinism.test.ts packages/preview-runtime/src/index.test.ts"
+          status: pass
+        - cmd: "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+          status: pass
+        - cmd: "npm exec vitest run packages/visual-proof/src/authoring.visual.test.ts"
+          status: pass
+        - cmd: "npm run qa:chrome"
+          status: pass
+        - cmd: "npm run test:unit"
+          status: pass
+        - cmd: "npm run verify:determinism"
+          status: pass
+        - cmd: "npm run test:browser"
+          status: pass
+        - cmd: "npm run test:visual"
+          status: pass
+        - cmd: "npm run test:private-acceptance"
+          status: pass
+        - cmd: "npm run verify:receipts"
+          status: pass
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "node --version && npm --version && npm exec playwright -- --version"
+          status: pass
+        - cmd: "git diff 60a4cad --check"
+          status: pass
+        - cmd: "git diff --name-only 60a4cad"
+          status: pass
+        - cmd: "git status --short"
+          status: pass
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+
+  - id: T007
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Repeat the complete oracle audit after the anchor-removal correction and decide final owner-review readiness."
+    inputs:
+      - "All receipts through T006"
+      - "Fresh complete verification and diff"
+    constraints:
+      - "Read-only; reject unless the endpoint probe and every original criterion pass directly."
+      - "No implementation, push, publication, PR, broader Phase 2, or Phase 3."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "Claim/evidence and failure-mode disposition"
+      - "Owner-review stop or smallest correction"
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      rationale: "Fresh reducer, compiler, installed-Chrome, controlled-visual, private, safety, type, build, and diff evidence proves the complete bounded oracle. Both deterministic anchors reject atomically with reusable operation IDs; minimum/not-found precedence and midpoint remove/undo/redo are exact. T003, T004, and T006 directly supersede historical T002, T999, and T005 blockers. Stop for owner review."
+      user_facing_claim: "The editor can create and reshape one bounded cursor opacity animation structure—not only edit existing values—while retaining typed canonical safety, deterministic compiler-native playback, exact reversible history, accessible controls, and clean privacy/phase boundaries."
+      evidence:
+        - "Exact exported fixed-target operations; strict runtime payload parsing; 62 focused tests passed."
+        - "Deterministic selector-independent IDs, exact isolated references/collisions/inventory, and candidate validation passed."
+        - "Direct probe proved both anchors reject atomically with reusable IDs; MINIMUM and NOT_FOUND precedence; exact midpoint remove/undo/redo canonical/compiler/export identity."
+        - "Exact projections and complete S0-S6/r0-r18 history passed."
+        - "Installed Chrome passed keyboard focus, aria-invalid rejection, exact srcdoc, CSSAnimation ownership/currentTime, history, reduced motion, and zero failures/errors."
+        - "Controlled proof passed 19 independent contexts and 40 samples with 12-pass streak, explicit 1310/1610 t±1, exact equivalent rasters, zero outside-target pixels, and blocked network."
+        - "Full unit 128, determinism 24, private acceptance, receipts, ignore/sensitive scans, typecheck, build, environment, and diff scope passed."
+      top_three_failure_modes:
+        - "Identity/shared/anchor corruption — defeated by exact bundle validation and fresh anchor/midpoint probes."
+        - "UI-local mutation/timing drift/second engine — defeated by projections, exact compiler srcdoc, and native CSSAnimation proof."
+        - "Nondeterministic history/visual output/private leakage/phase expansion — defeated by exact mappings, repeated visual/deterministic proof, safety scans, and complete diff inspection."
+      missing_evidence: []
+
+checks:
+  dirty_fingerprint: "bounded expected Phase 2 product/test/evidence/goal changes from 60a4cad; private inputs and generated outputs ignored"
+  last_verification:
+    result: pass
+    task: T007
+    commands:
+      - "Direct T007 reducer probe — pass"
+      - "Focused domain/compiler/preview tests — 62 pass"
+      - "Installed-Chrome editor tests — 3 pass"
+      - "Controlled structural visual proof — pass"
+      - "qa:chrome — pass"
+      - "Full unit — 128 pass; determinism — 24 pass"
+      - "Browser, visual, private acceptance, and receipt verification — pass"
+      - "Private-ignore and sensitive scans — pass with zero findings"
+      - "Typecheck and production build — pass"
+      - "Environment and complete diff/status inspection — pass"

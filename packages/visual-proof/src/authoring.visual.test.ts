@@ -21,8 +21,8 @@ import { deriveSamplePlan } from './index.js';
 
 const fixtureUrl = new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url);
 const controlledChromiumArgs = ['--disable-threaded-animation'] as const;
-const streakPath = resolve('artifacts/t006-focused-streak.json');
-const proofVersion = 't008-process-attested-threaded-animation-disabled.v1';
+const streakPath = resolve('artifacts/t002-track-creation-streak.json');
+const proofVersion = 't004-track-creation-controlled.v2';
 const execFileAsync = promisify(execFile);
 
 describe('Phase 2 controlled authoring proof', () => {
@@ -32,12 +32,8 @@ describe('Phase 2 controlled authoring proof', () => {
     const imported = importMotionHtml(source);
     expect(imported.document).not.toBeNull();
     let state = createAuthoringState(imported.document!);
-    const track = state.document.tracks.find((candidate) => candidate.property === 'opacity'
-      && state.document.tracks.filter((other) => other.ruleId === candidate.ruleId
-        && other.property === candidate.property).length === 1)!;
-    expect(track).toBeTruthy();
-    const start = track.keyframeIds[0]!;
-    const end = track.keyframeIds.at(-1)!;
+    const elementId = 'el_a2849ff826f3e167';
+    expect(state.document.elements.some((element) => element.id === elementId)).toBe(true);
     const states = new Map<string, AuthoringState>([['S0', state]]);
     const dispatch = (operation: AuthoringOperation) => {
       const result = dispatchAuthoringOperation(state, operation);
@@ -49,23 +45,35 @@ describe('Phase 2 controlled authoring proof', () => {
       schemaVersion: 'motion.operation.v1' as const, operationId,
       documentId: state.document.documentId, expectedRevision: state.document.revision,
     });
-    dispatch({ ...envelope('visual:value'), kind: 'motion.keyframe-value.set', elementId: track.elementId, trackId: track.id, keyframeId: start, payload: { value: 0.25 } });
+    dispatch({ ...envelope('visual:create'), kind: 'motion.track.create', elementId,
+      payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear', startValue: 0, endValue: 1 } } as AuthoringOperation);
     states.set('S1', state);
-    dispatch({ ...envelope('visual:time'), kind: 'motion.keyframe-time.set', elementId: track.elementId, trackId: track.id, keyframeId: end, payload: { timeMs: 2180 } });
+    const track = state.document.tracks.find((candidate) => candidate.elementId === elementId && candidate.property === 'opacity')!;
+    dispatch({ ...envelope('visual:add'), kind: 'motion.keyframe.add', elementId, trackId: track.id,
+      payload: { timeMs: 1110, value: 0.5 } } as AuthoringOperation);
     states.set('S2', state);
+    const midpointId = state.document.tracks.find((candidate) => candidate.id === track.id)!.keyframeIds[1]!;
+    dispatch({ ...envelope('visual:duration'), kind: 'motion.slot-duration.set', elementId, trackId: track.id,
+      payload: { durationMs: 1400 } } as AuthoringOperation); states.set('S3', state);
+    dispatch({ ...envelope('visual:delay'), kind: 'motion.binding-delay.set', elementId, trackId: track.id,
+      payload: { delayMs: 700 } } as AuthoringOperation); states.set('S4', state);
+    dispatch({ ...envelope('visual:easing'), kind: 'motion.slot-easing.set', elementId, trackId: track.id,
+      payload: { easing: 'ease-in-out' } } as AuthoringOperation); states.set('S5', state);
+    dispatch({ ...envelope('visual:remove'), kind: 'motion.keyframe.remove', elementId, trackId: track.id,
+      keyframeId: midpointId } as AuthoringOperation); states.set('S6', state);
 
     const rejectedBefore = state;
     const stale = dispatchAuthoringOperation(state, {
       schemaVersion: 'motion.operation.v1', operationId: 'visual:stale', documentId: state.document.documentId,
-      expectedRevision: 1, kind: 'motion.keyframe-value.set', elementId: track.elementId,
-      trackId: track.id, keyframeId: start, payload: { value: 0.5 },
+      expectedRevision: 5, kind: 'motion.slot-duration.set', elementId,
+      trackId: track.id, payload: { durationMs: 1200 },
     });
     expect(stale).toMatchObject({ ok: false, diagnostic: { code: 'AUTHORING_STALE_REVISION' } });
     expect(state).toEqual(rejectedBefore);
 
     for (const [label, kind] of [
-      ['U1', 'motion.history.undo'], ['U2', 'motion.history.undo'],
-      ['R1', 'motion.history.redo'], ['R2', 'motion.history.redo'],
+      ...Array.from({ length: 6 }, (_, index) => [`U${index + 1}`, 'motion.history.undo'] as const),
+      ...Array.from({ length: 6 }, (_, index) => [`R${index + 1}`, 'motion.history.redo'] as const),
     ] as const) {
       dispatch({ ...envelope(`visual:${label}`), kind });
       states.set(label, state);
@@ -73,7 +81,7 @@ describe('Phase 2 controlled authoring proof', () => {
 
     const compiles = new Map([...states].map(([label, snapshot]) =>
       [label, compileMotionDocument(snapshot.document)]));
-    const deterministic = Object.fromEntries(['S0', 'S1', 'S2'].map((label) => {
+    const deterministic = Object.fromEntries(Array.from({ length: 7 }, (_, index) => `S${index}`).map((label) => {
       const snapshot = states.get(label)!;
       const runs = [0, 1, 2].map(() => compileMotionDocument(snapshot.document));
       return [label, runs.every((run) => run.html === runs[0]!.html && run.css === runs[0]!.css
@@ -82,7 +90,8 @@ describe('Phase 2 controlled authoring proof', () => {
     }));
     expect(Object.values(deterministic).every(Boolean)).toBe(true);
 
-    const identities = { U1: 'S1', U2: 'S0', R1: 'S1', R2: 'S2' } as const;
+    const identities = { U1: 'S5', U2: 'S4', U3: 'S3', U4: 'S2', U5: 'S1', U6: 'S0',
+      R1: 'S1', R2: 'S2', R3: 'S3', R4: 'S4', R5: 'S5', R6: 'S6' } as const;
     for (const [actual, expected] of Object.entries(identities)) {
       expect(canonicalContentBytes(states.get(actual)!.document)).toEqual(
         canonicalContentBytes(states.get(expected)!.document),
@@ -92,11 +101,16 @@ describe('Phase 2 controlled authoring proof', () => {
       expect(compiles.get(actual)!.exportDigest).toBe(compiles.get(expected)!.exportDigest);
     }
 
-    const samplePlan = deriveSamplePlan(states.get('S2')!.document, [
-      0, 820, 2179, 2181, 2519, 2521, states.get('S2')!.document.durationMs,
+    const samplePlan = deriveSamplePlan(states.get('S6')!.document, [
+      0, 609, 610, 611, 699, 700, 701, 1109, 1110, 1111, 1399, 1400, 1401,
+      1309, 1310, 1311, 1609, 1610, 1611, 2009, 2010, 2011, 2099, 2100, 2101,
+      states.get('S6')!.document.durationMs,
     ]);
-    expect(samplePlan.sampleTimesMs).toHaveLength(23);
     expect(samplePlan.boundaries).toHaveLength(8);
+    expect(samplePlan.sampleTimesMs).toEqual(expect.arrayContaining([
+      609, 610, 611, 699, 700, 701, 1109, 1110, 1111, 1309, 1310, 1311,
+      1399, 1400, 1401, 1609, 1610, 1611, 2009, 2010, 2011, 2099, 2100, 2101,
+    ]));
     const browser = await chromium.launch({ headless: true, args: [...controlledChromiumArgs] });
     const browserVersion = browser.version();
     const processAttestation = await attestBrowserProcess(browser, browserVersion);
@@ -104,7 +118,7 @@ describe('Phase 2 controlled authoring proof', () => {
     const captures = new Map<string, Awaited<ReturnType<typeof captureState>>>();
     try {
       for (const [label, compiled] of compiles) {
-        captures.set(label, await captureState(browser, compiled.html, samplePlan.sampleTimesMs, track.elementId));
+        captures.set(label, await captureState(browser, compiled.html, samplePlan.sampleTimesMs, elementId));
       }
     } finally {
       await browser.close();
@@ -122,7 +136,7 @@ describe('Phase 2 controlled authoring proof', () => {
 
     let outsideChangedPixels = 0;
     let nonTargetPropertiesEqual = true;
-    for (const label of ['S1', 'S2']) {
+    for (const label of ['S1', 'S2', 'S3', 'S4', 'S5', 'S6']) {
       const baseline = captures.get('S0')!;
       const candidate = captures.get(label)!;
       for (const [index, frame] of baseline.frames.entries()) {
@@ -139,7 +153,7 @@ describe('Phase 2 controlled authoring proof', () => {
     const completedStreak = priorStreak + 1;
 
     const receipt = {
-      schemaVersion: 'motion.phase2-authoring-proof.v1', passed: true,
+      schemaVersion: 'motion.phase2-track-creation-proof.v1', passed: true,
       environment: {
         browser: { name: 'Playwright Chromium', version: browserVersion },
         playwrightVersion: playwrightPackage.version,
@@ -169,17 +183,13 @@ describe('Phase 2 controlled authoring proof', () => {
       unaffectedBoundaryCount: samplePlan.boundaries.length,
       endpointHandling: samplePlan.endpointHandling,
       containment: { marginPx: 2, outsideChangedPixels, nonTargetPropertiesEqual },
-      equalityChecks: { U1_S1: true, U2_S0: true, R1_S1: true, R2_S2: true },
+      equalityChecks: Object.fromEntries(Object.entries(identities).map(([actual, expected]) =>
+        [`${actual}_${expected}`, true])),
       network: { liveRequestCount: 0 },
       nativeAnimation: {
         minimumCount: Math.min(...[...captures.values()].flatMap((capture) =>
           capture.frames.map((frame) => frame.semantic.animations.length))),
         allCssAnimation: true, allPaused: true, allCurrentTimesExact: true,
-      },
-      priorUnflaggedDiagnosis: {
-        changedPixelCount: 681,
-        locus: 'two neutral fractionally transformed circles',
-        genericGpuBackendFlagsRemovedTwoPhaseResult: false,
       },
       diagnosticMatrix: [...states].flatMap(([label, snapshot]) =>
         captures.get(label)!.frames.map((frame, sampleIndex) => ({
@@ -201,9 +211,9 @@ describe('Phase 2 controlled authoring proof', () => {
     await finishFocusedRun(completedStreak);
     if (completedStreak >= 3) {
       await mkdir(resolve('docs/evidence'), { recursive: true });
-      await writeFile(resolve('docs/evidence/t002-phase2-authoring.json'), `${JSON.stringify(receipt, null, 2)}\n`);
+      await writeFile(resolve('docs/evidence/t002-phase2-track-creation.json'), `${JSON.stringify(receipt, null, 2)}\n`);
     }
-  }, 60_000);
+  }, 120_000);
 });
 
 async function captureState(
