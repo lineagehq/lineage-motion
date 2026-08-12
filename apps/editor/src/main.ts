@@ -39,8 +39,8 @@ document.body.innerHTML = `
     </section>
     <section class="workspace">
       <section class="preview-panel" aria-label="Compiled preview">
-        <div class="panel-heading"><span>Compiler output</span><span class="status">Sandboxed · native CSS</span></div>
-        <iframe data-preview title="Compiled motion preview"></iframe>
+        <div class="panel-heading"><span>Compiler output</span><span class="preview-heading-status"><span data-preview-selection-label></span><span class="status">Sandboxed · native CSS</span></span></div>
+        <div class="preview-stage"><iframe data-preview title="Compiled motion preview"></iframe><div class="preview-selection" data-preview-selection hidden><span>Selected element</span></div></div>
         <button class="reduced-toggle" type="button" data-reduced-toggle aria-expanded="false">Inspect reduced motion</button>
         <section data-reduced-motion-panel data-mode="${authoring.document.reducedMotion.mode}" data-css="${authoring.document.reducedMotion.css}" class="reduced-panel" hidden>
           <strong>source-snapshot</strong><p>Inspection only. The canonical document and compiler output remain unchanged.</p><pre></pre>
@@ -61,9 +61,20 @@ const playhead = required<HTMLOutputElement>('[data-playhead]');
 const status = required<HTMLOutputElement>('[data-operation-status]');
 const valueInput = required<HTMLInputElement>('[data-value]');
 const timeInput = required<HTMLInputElement>('[data-time]');
+const undoButton = required<HTMLButtonElement>('[data-undo]');
+const redoButton = required<HTMLButtonElement>('[data-redo]');
+const previewStage = required<HTMLElement>('.preview-stage');
+const previewSelection = required<HTMLElement>('[data-preview-selection]');
+const previewSelectionLabel = required<HTMLElement>('[data-preview-selection-label]');
 
-required<HTMLButtonElement>('[data-play]').addEventListener('click', () => controller.play());
-required<HTMLButtonElement>('[data-pause]').addEventListener('click', () => controller.pause());
+required<HTMLButtonElement>('[data-play]').addEventListener('click', () => {
+  previewSelection.hidden = true;
+  controller.play();
+});
+required<HTMLButtonElement>('[data-pause]').addEventListener('click', () => {
+  controller.pause();
+  schedulePreviewSelection();
+});
 scrubber.addEventListener('input', () => scrub(Number(scrubber.value)));
 required<HTMLFormElement>('[data-value-form]').addEventListener('submit', (event) => {
   event.preventDefault(); void dispatch(makeEdit('motion.keyframe-value.set', { value: Number(valueInput.value) }));
@@ -71,8 +82,12 @@ required<HTMLFormElement>('[data-value-form]').addEventListener('submit', (event
 required<HTMLFormElement>('[data-time-form]').addEventListener('submit', (event) => {
   event.preventDefault(); void dispatch(makeEdit('motion.keyframe-time.set', { timeMs: Number(timeInput.value) }));
 });
-required<HTMLButtonElement>('[data-undo]').addEventListener('click', () => void dispatch(makeHistory('motion.history.undo')));
-required<HTMLButtonElement>('[data-redo]').addEventListener('click', () => void dispatch(makeHistory('motion.history.redo')));
+valueInput.addEventListener('invalid', () => announceInvalidInput(valueInput, 'Opacity value'));
+timeInput.addEventListener('invalid', () => announceInvalidInput(timeInput, 'Master time'));
+valueInput.addEventListener('input', () => clearValidationFeedback(valueInput));
+timeInput.addEventListener('input', () => clearValidationFeedback(timeInput));
+undoButton.addEventListener('click', () => void dispatch(makeHistory('motion.history.undo')));
+redoButton.addEventListener('click', () => void dispatch(makeHistory('motion.history.redo')));
 const reducedToggle = required<HTMLButtonElement>('[data-reduced-toggle]');
 const reducedPanel = required<HTMLElement>('[data-reduced-motion-panel]');
 reducedPanel.querySelector('pre')!.textContent = authoring.document.reducedMotion.css;
@@ -84,7 +99,9 @@ reducedToggle.addEventListener('click', () => {
 
 renderProjection();
 await controller.mount(compiled.html);
+schedulePreviewSelection();
 document.querySelector('main')!.setAttribute('data-editor-ready', 'true');
+window.addEventListener('resize', schedulePreviewSelection);
 
 window.__motionEditor = {
   get compiledHtml() { return compiled.html; },
@@ -165,6 +182,8 @@ function renderProjection(): void {
     cues.append(button);
   }
   required('[data-cue-count]').textContent = String(timeline.cues.length);
+  undoButton.disabled = authoring.undo.length === 0;
+  redoButton.disabled = authoring.redo.length === 0;
   updateSelection();
 }
 
@@ -172,9 +191,16 @@ function updateSelection(): void {
   const row = currentTarget();
   const keyframe = row.keyframes.find((candidate) => candidate.id === selectedKeyframeId) ?? row.keyframes[0]!;
   selectedKeyframeId = keyframe.id;
-  required('[data-selection]').innerHTML = `<strong>Selected canonical target</strong><code>${row.elementId}</code><code>${row.trackId}</code><code>${keyframe.id}</code><span>${row.property} · revision ${authoring.document.revision}</span>`;
+  required('[data-selection]').innerHTML = `
+    <div class="selection-summary"><strong>Selected ${row.property} keyframe</strong><span>Revision ${authoring.document.revision}</span></div>
+    <div class="selection-chips"><span class="preview-link">Linked to preview</span><code title="${row.elementId}">Element ${shortId(row.elementId)}</code><code title="${keyframe.id}">Keyframe ${shortId(keyframe.id)}</code></div>
+    <details class="canonical-ids"><summary>Canonical IDs</summary><code>Element · ${row.elementId}</code><code>Track · ${row.trackId}</code><code>Keyframe · ${keyframe.id}</code></details>`;
+  previewSelectionLabel.textContent = `Selected element · ${row.property}`;
   valueInput.value = keyframe.value;
   timeInput.value = String(keyframe.timeMs);
+  valueInput.setAttribute('aria-invalid', 'false');
+  timeInput.setAttribute('aria-invalid', 'false');
+  schedulePreviewSelection();
 }
 
 function findEditableTrack(): TimelineRow {
@@ -192,6 +218,7 @@ function currentTarget(): TimelineRow {
 
 function scrub(timeMs: number): void {
   controller.scrub(timeMs); scrubber.value = String(timeMs); playhead.value = `${timeMs} ms`;
+  schedulePreviewSelection();
 }
 
 function renderTrack(row: TimelineRow): HTMLElement {
@@ -203,10 +230,11 @@ function renderTrack(row: TimelineRow): HTMLElement {
     delayMs: String(row.delayMs), slotCount: String(row.orderedSlotIds.length),
     interpolation: row.interpolation, timing: JSON.stringify(row.timing), timingKind: row.timing.kind,
     keyframeCount: String(row.keyframes.length),
+    selected: String(row.trackId === selectedTrackId),
   });
   const timing = row.timing.kind === 'steps' ? `steps(${row.timing.count}, ${row.timing.position})`
     : row.timing.kind === 'keyword' ? row.timing.value : 'cubic-bezier';
-  article.innerHTML = `<div class="track-identity"><code>${row.trackId}</code><code>${row.elementId}</code><strong>${row.property}</strong><span>${row.interpolation} · rule ${row.ruleId}</span></div><div class="track-meta"><span>delay ${row.delayMs} ms</span><span>${timing}</span><span>${row.orderedSlotIds.length} ordered slot${row.orderedSlotIds.length === 1 ? '' : 's'}</span><div class="slots"></div></div><div class="keyframes"></div>`;
+  article.innerHTML = `<div class="track-identity"><strong>${row.property}</strong><span>${row.interpolation} motion</span><details class="canonical-ids"><summary>Canonical IDs</summary><code>Element · ${row.elementId}</code><code>Track · ${row.trackId}</code><code>Rule · ${row.ruleId}</code></details></div><div class="track-meta"><span>delay ${row.delayMs} ms</span><span>${timing}</span><span>${row.orderedSlotIds.length} ordered slot${row.orderedSlotIds.length === 1 ? '' : 's'}</span><div class="slots"></div></div><div class="keyframes"></div>`;
   const slotList = article.querySelector('.slots')!;
   for (const slotId of row.orderedSlotIds) {
     const slot = document.createElement('code');
@@ -225,6 +253,47 @@ function renderTrack(row: TimelineRow): HTMLElement {
     keyframeList.append(marker);
   }
   return article;
+}
+
+function announceInvalidInput(input: HTMLInputElement, label: string): void {
+  input.setAttribute('aria-invalid', 'true');
+  status.value = `${label}: ${input.validationMessage} Revision ${authoring.document.revision} unchanged.`;
+  status.dataset.kind = 'error';
+  status.dataset.source = 'validation';
+}
+
+function clearValidationFeedback(input: HTMLInputElement): void {
+  input.setAttribute('aria-invalid', String(!input.validity.valid));
+  if (input.validity.valid && status.dataset.source === 'validation') {
+    status.value = `Revision ${authoring.document.revision} ready.`;
+    status.dataset.kind = 'ready';
+    delete status.dataset.source;
+  }
+}
+
+function schedulePreviewSelection(): void {
+  requestAnimationFrame(updatePreviewSelection);
+}
+
+function updatePreviewSelection(): void {
+  const row = currentTarget();
+  const target = iframe.contentDocument?.querySelector<HTMLElement>(`[data-motion-id="${row.elementId}"]`);
+  if (!target) {
+    previewSelection.hidden = true;
+    return;
+  }
+  const targetRect = target.getBoundingClientRect();
+  const iframeRect = iframe.getBoundingClientRect();
+  const stageRect = previewStage.getBoundingClientRect();
+  previewSelection.style.left = `${iframeRect.left - stageRect.left + targetRect.left}px`;
+  previewSelection.style.top = `${iframeRect.top - stageRect.top + targetRect.top}px`;
+  previewSelection.style.width = `${targetRect.width}px`;
+  previewSelection.style.height = `${targetRect.height}px`;
+  previewSelection.hidden = false;
+}
+
+function shortId(id: string): string {
+  return `…${id.slice(-6)}`;
 }
 
 function required<T extends Element = HTMLElement>(selector: string): T {

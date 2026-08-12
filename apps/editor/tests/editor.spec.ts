@@ -32,6 +32,7 @@ test('renders exact compiled output and controls native animations without mutat
   });
   await page.goto(editorUrl);
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await expect(page).toHaveTitle('Motion Editor');
 
   const proof = await page.evaluate(() => {
     const editor = window.__motionEditor;
@@ -143,6 +144,8 @@ test('authors value and time through canonical operations with atomic history an
   page.on('requestfailed', (request) => failedRequests.push(request.failure()?.errorText ?? 'failed'));
   await page.goto(editorUrl);
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
 
   const editable = page.locator('.keyframe:not(:disabled)');
   await expect(editable).toHaveCount(2);
@@ -151,10 +154,17 @@ test('authors value and time through canonical operations with atomic history an
   await page.locator('input[data-value]').fill('0.25');
   await page.getByRole('button', { name: 'Set value' }).click();
   await expect(page.locator('[data-operation-status]')).toContainText('Revision 1');
+  await expect(page.getByRole('button', { name: 'Undo' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
   const s1 = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
   expect(s1.revision).toBe(1);
   expect(s1.contentDigest).not.toBe(s0.contentDigest);
   expect(s1.compiledHtml).not.toBe(s0.compiledHtml);
+  await page.locator('input[data-value]').fill('1.2');
+  await page.getByRole('button', { name: 'Set value' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Opacity value:');
+  await expect(page.locator('input[data-value]')).toHaveAttribute('aria-invalid', 'true');
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toEqual(s1);
 
   await editable.last().focus();
   await page.keyboard.press('Enter');
@@ -166,6 +176,12 @@ test('authors value and time through canonical operations with atomic history an
   expect(s2.revision).toBe(2);
   expect(s2.contentDigest).not.toBe(s1.contentDigest);
   expect(await editable.last().getAttribute('data-time-ms')).toBe('2180');
+  await expect(page.locator('[data-track-id][data-selected="true"]')).toHaveCount(1);
+  await expect(page.locator('[data-preview-selection]')).toBeVisible();
+  const selectionBox = await page.locator('[data-preview-selection]').boundingBox();
+  expect(selectionBox).not.toBeNull();
+  expect(selectionBox!.width).toBeGreaterThan(0);
+  expect(selectionBox!.height).toBeGreaterThan(0);
 
   const rejected = await page.evaluate(async () => {
     const before = window.__motionEditor.inspectAuthoring();
@@ -197,8 +213,7 @@ test('authors value and time through canonical operations with atomic history an
   await page.locator('input[data-value]').fill('0.5');
   await page.getByRole('button', { name: 'Set value' }).click();
   expect((await page.evaluate(() => window.__motionEditor.inspectAuthoring())).redoCount).toBe(0);
-  await page.getByRole('button', { name: 'Redo' }).click();
-  await expect(page.locator('[data-operation-status]')).toContainText('AUTHORING_HISTORY_EMPTY');
+  await expect(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
 
   await page.locator('[data-scrub]').fill('2181');
   expect(await page.evaluate(() => {
