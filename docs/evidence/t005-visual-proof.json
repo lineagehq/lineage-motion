@@ -1,0 +1,98 @@
+{
+  "schemaVersion": "motion.visual-proof-receipt.v1",
+  "importerVersion": "css-import.v1",
+  "compilerVersion": "css-compiler.v1",
+  "passed": true,
+  "sourceDigests": {
+    "original": "d435b5c2ca30fd4dd22783cf71315a237537487d2ba257d74664e7a6e066f014",
+    "materialized": "6cc1a1d6f099ad904bc6b688cba99a9a135ebba3f1bcdc2e4ee3372814d192cb",
+    "canonical": "1d10d17b54597ad9386a8c93b3166fd5bf7dd6ef76018ff68c689878c5a100cc",
+    "export": "a94538a439ef1395e4dcf4baef9de7ba1388c244cd269c6d34918173fb601e9a"
+  },
+  "browser": {
+    "engine": "chromium",
+    "version": "151.0.7922.34",
+    "playwrightVersion": "1.62.1",
+    "revision": "1234",
+    "viewport": {
+      "width": 1440,
+      "height": 900
+    }
+  },
+  "fonts": {
+    "resourceLockDigest": "2256da10eb9ee196473a4368df7f3b29cf27caac4096dba94d2a85d05ade96bd",
+    "aggregateAssetDigest": "c40942d9286b81ba366810d361800a64c6f5964e7b99679b455cfd3705481f37",
+    "assetCount": 3,
+    "baselineEmbeddedAssetCount": 3,
+    "compiledEmbeddedAssetCount": 3,
+    "samePinnedBytes": true
+  },
+  "sampling": {
+    "durationMs": 7200,
+    "stableSampleCount": 5,
+    "derivedBoundaryCount": 33,
+    "sampleCount": 70,
+    "endpointHandling": {
+      "beforeOutOfRangeCount": 1,
+      "afterOutOfRangeCount": 0,
+      "sampledSideCount": 65,
+      "allBoundarySidesAccountedFor": true
+    }
+  },
+  "readiness": {
+    "captureCount": 4,
+    "domReadyCount": 4,
+    "fontsReadyCount": 4,
+    "minimumStableLayoutConsecutiveCount": 3
+  },
+  "network": {
+    "liveRequestCount": 0,
+    "abortedUnexpectedRequestCount": 0
+  },
+  "baselineStability": {
+    "replayCount": 3,
+    "sampleCount": 70,
+    "correspondingHashesEqual": true,
+    "replaySequenceDigests": [
+      "0bed4e550223724b08498f0f9f7b8670360b1178d0531a1a97969bcd9dcbaf4c",
+      "0bed4e550223724b08498f0f9f7b8670360b1178d0531a1a97969bcd9dcbaf4c",
+      "0bed4e550223724b08498f0f9f7b8670360b1178d0531a1a97969bcd9dcbaf4c"
+    ]
+  },
+  "visualEquivalence": {
+    "thresholds": {
+      "changedPixels": 0,
+      "changedPixelRatio": 0,
+      "maximumChannelDelta": 0
+    },
+    "comparisonCount": 70,
+    "changedPixels": 0,
+    "changedPixelRatio": 0,
+    "maximumChannelDelta": 0,
+    "compiledSequenceDigest": "0bed4e550223724b08498f0f9f7b8670360b1178d0531a1a97969bcd9dcbaf4c"
+  },
+  "exportDeterminism": {
+    "runCount": 3,
+    "htmlDigests": [
+      "d6450abe35d83f3c30833e04588b7c3be38c747e6b82e62b975644fadab73814",
+      "d6450abe35d83f3c30833e04588b7c3be38c747e6b82e62b975644fadab73814",
+      "d6450abe35d83f3c30833e04588b7c3be38c747e6b82e62b975644fadab73814"
+    ],
+    "cssDigests": [
+      "52ea36974cf5283733a5be980f450c5bcfdea157ab801c41130e87c008ac02b8",
+      "52ea36974cf5283733a5be980f450c5bcfdea157ab801c41130e87c008ac02b8",
+      "52ea36974cf5283733a5be980f450c5bcfdea157ab801c41130e87c008ac02b8"
+    ],
+    "exportDigests": [
+      "a94538a439ef1395e4dcf4baef9de7ba1388c244cd269c6d34918173fb601e9a",
+      "a94538a439ef1395e4dcf4baef9de7ba1388c244cd269c6d34918173fb601e9a",
+      "a94538a439ef1395e4dcf4baef9de7ba1388c244cd269c6d34918173fb601e9a"
+    ],
+    "compilerReceiptDigests": [
+      "3a3b8ab7c9520d126bd8b433b3c7cbf907a7d5ace3b4778dd32722fac6f79ce9",
+      "3a3b8ab7c9520d126bd8b433b3c7cbf907a7d5ace3b4778dd32722fac6f79ce9",
+      "3a3b8ab7c9520d126bd8b433b3c7cbf907a7d5ace3b4778dd32722fac6f79ce9"
+    ],
+    "byteIdentical": true
+  }
+}

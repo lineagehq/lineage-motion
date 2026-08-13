@@ -1,0 +1,1007 @@
+version: 2
+
+goal:
+  title: "Phase 2 UX Simplification"
+  slug: "phase2-ux-simplification"
+  kind: existing_plan
+  tranche: "Simplify the proven target-selection authoring workflow without adding capabilities, then stop for owner review."
+  status: done
+  oracle:
+    signal: "Fresh Chrome proves a first-time author can complete Choose, Create, Shape, Time, Preview, validation, and exact history without coaching while technical topology remains inspectable but subordinate."
+    cadence: "after the Worker package and at final audit"
+    final_proof: "A final Judge maps visible browser QA, focused tests, full regression, visual/private proof, accessibility, build, and diff evidence to every grounded UX criterion and records full_outcome_complete: true."
+  intake:
+    original_request: "Do a round of UX simplification, then continue the planned sequence."
+    interpreted_outcome: "Make the current bounded CSS-animation authoring workflow substantially easier to understand and operate before adding further Phase 2 capabilities."
+    input_shape: existing_plan
+    audience: "First-time CSS animation authors"
+    authority: approved
+    proof_type: demo
+    completion_proof: "A fresh visible walkthrough completes the current authoring workflow first try without coaching or material friction."
+    likely_misfire: "Polish colors or hide information without improving task comprehension, or mix simplification with new Phase 2/3 capabilities."
+    blind_spots_considered:
+      - "Draft inputs must be distinguishable from applied canonical state."
+      - "Preview should remain prominent during authoring."
+      - "Keyboard order, focus continuity, reduced motion, and screen-reader clarity must survive layout changes."
+      - "The full timeline and IDs must remain inspectable without dominating the default experience."
+      - "Tests must judge first-time comprehension and not only DOM availability."
+    existing_plan_facts:
+      - "The target-selection slice is integrated locally at 1c7eb03."
+      - "Hold/ripple-retime is the next major Phase 2 capability after this UX tranche."
+      - "Phase 3 persistence/service/CLI work remains out of scope."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/phase2-ux-simplification/"
+    command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase2-ux-simplification"
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Adversarially audit the current editor and visible workflow, then define the exact largest safe UX-simplification Worker package that improves first-time comprehension without changing capability or canonical behavior."
+    inputs:
+      - "docs/incubation-plan.md"
+      - "docs/browser-qa-loop.md"
+      - "docs/goals/phase2-target-selection-slice/state.yaml"
+      - "Current editor implementation, styles, tests, and Chrome QA"
+      - "Fresh visible browser inspection at the local editor subdomain"
+    constraints:
+      - "Read-only; do not implement."
+      - "Preserve the existing plan, product invariants, private-corpus rules, and Phase 2 boundary."
+      - "Prioritize task comprehension, creative control, preview prominence, validation, history, keyboard/focus, and responsive behavior over aesthetic novelty."
+      - "Keep technical evidence inspectable but subordinate."
+      - "Do not authorize new operations, importer/compiler/domain schema changes, or hold/ripple-retime."
+      - "Return exact Worker allowed_files, verification commands, stop conditions, and first-time walkthrough script."
+    expected_output:
+      - "Go/no-go and ranked concrete friction findings"
+      - "Exact information architecture and interaction contract"
+      - "Exact responsive/accessibility and draft/applied-state contract"
+      - "Exact Worker package and proof commands"
+    receipt:
+      result: done
+      task_id: T001
+      decision: approved
+      full_outcome_complete: false
+      rationale: "Approved as one vertical UI slice. Fresh browser evidence shows the operations work, but the interface misstates fresh selection, scrolls away from the next action after creation, exposes unapplied timing as current, overweights canonical topology, and fails narrow layouts. Corrections stay in editor markup, styles, and browser proof with no domain/compiler/schema/capability changes."
+      ranked_friction:
+        - "Fresh state falsely claims an unrelated Status-copy keyframe selection."
+        - "Creation scrolls roughly 714 px into the technical timeline, hiding newly enabled Shape/Time controls."
+        - "Visible 1400/700 timing drafts disagree with applied 1000/610 canonical timing."
+        - "A 768 px viewport produces 1367 px document width."
+        - "Three actions share the accessible name Apply."
+        - "Canonical IDs and full topology dominate the creative workflow."
+      approved_contract: "Plain-language Choose/Create/Shape/Time workflow beside prominent Preview; truthful draft-versus-applied timing; intentional focus/history/rejection; responsive 1440/768/390 layouts; complete technical inspection collapsed by default."
+      parallel_safety:
+        safe: false
+        reason: "Markup, CSS, browser tests, and installed-Chrome proof share selectors and interaction contracts."
+      missing_evidence:
+        - "Implementation, responsive/focus/draft-state proof, visible walkthrough, installed Chrome, and complete regression evidence remain."
+
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: medium
+    objective: "Implement one complete first-time-author UX simplification: a plain-language Choose/Create/Shape/Time workflow beside a prominent compiler-native preview, truthful draft-versus-applied timing, predictable focus/history/validation, responsive layouts, and collapsed but complete technical inspection, without changing any capability or canonical behavior."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "node --version && npm --version && npm exec playwright -- --version"
+      - "git diff --exit-code 1c7eb03 -- docs/incubation-plan.md docs/architecture.md fixtures packages package.json package-lock.json docs/evidence/t002-phase2-target-selection.json"
+      - "git diff 1c7eb03 --check"
+      - "git diff --name-only 1c7eb03"
+      - "git status --short"
+    stop_if:
+      - "Need any file outside allowed_files."
+      - "Need a new or changed domain operation, canonical field, eligibility rule, importer/compiler/preview-runtime behavior, fixture, dependency, or document schema."
+      - "Need hold, ripple-retime, drag editing, arbitrary CSS, persistence, branching, claims, CLI/MCP, Lineage integration, video, publication, or another later-phase capability."
+      - "Simplification would remove an editing action, timeline/keyframe/cue fact, stable identity, reduced-motion inspection, compiler-native preview, or exact history instead of subordinating it."
+      - "Draft/applied truth cannot be derived from the current canonical projection without a domain change."
+      - "Responsive layout requires reducing preview fidelity or hiding required controls or inspection data."
+      - "Focus continuity, atomic rejection, exact history, exact compiler srcdoc, or browser-created CSSAnimation control regresses."
+      - "Private acceptance lacks its owner-authorized ignored manifest; report without inventing or copying private data."
+      - "Any private content, path, credential, screenshot, or database would enter tracked output."
+      - "The same verification failure remains unexplained after two attempts."
+    receipt:
+      result: blocked
+      task_id: T002
+      changed_files: []
+      commands:
+        - cmd: "Inspect worktree, allowed implementation/test files, and ignored private manifest"
+          status: pass
+      summary: "Stopped before editing because the required owner-authorized ignored private manifest was absent. No product files changed and verification did not start."
+      remaining_blockers:
+        - "Restore the owner-authorized ignored manifest in this worktree."
+      verification_attempts: 0
+      stopped_because: "Private acceptance lacks its owner-authorized ignored manifest."
+
+  - id: T004
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: medium
+    objective: "Restore only the owner-authorized ignored private-acceptance manifest in the new worktree and verify it remains untracked."
+    inputs:
+      - "Owner-authorized Word Search source path from the original request"
+      - "Previously proven ignored manifest format"
+    constraints:
+      - "The manifest stays ignored and local."
+      - "Do not copy private source, copy, branding, selectors, or screenshots."
+      - "Do not change tracked product files."
+    expected_output:
+      - "Ignored local manifest"
+      - "Private-ignore verification"
+    allowed_files:
+      - ".private-corpus/manifest.json"
+    verify:
+      - "npm run check:private-ignore"
+      - "git status --short --ignored .private-corpus"
+    receipt:
+      result: done
+      task_id: T004
+      changed_files:
+        - ".private-corpus/manifest.json (ignored local file)"
+      commands:
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "git status --short --ignored .private-corpus"
+          status: pass
+      summary: "Restored the owner-authorized ignored manifest; all three private targets are ignored and trackedPrivateCount remains zero."
+      remaining_blockers: []
+
+  - id: T005
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: medium
+    objective: "Implement the complete T001-approved first-time-author UX simplification after local private acceptance is configured."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "node --version && npm --version && npm exec playwright -- --version"
+      - "git diff --exit-code 1c7eb03 -- docs/incubation-plan.md docs/architecture.md fixtures packages package.json package-lock.json docs/evidence/t002-phase2-target-selection.json"
+      - "git diff 1c7eb03 --check"
+      - "git diff --name-only 1c7eb03"
+      - "git status --short"
+    stop_if:
+      - "Need any file outside allowed_files."
+      - "Need any domain/compiler/importer/schema/capability/dependency change."
+      - "Need hold/ripple-retime or Phase 3 work."
+      - "Required inspectability, accessibility, native preview, deterministic history, or responsive fidelity would regress."
+      - "Private content or paths would enter tracked output."
+      - "The same verification failure remains unexplained after two attempts."
+    receipt:
+      result: blocked
+      task_id: T005
+      changed_files:
+        - "apps/editor/src/main.ts"
+        - "apps/editor/src/styles.css"
+        - "apps/editor/tests/editor.spec.ts"
+        - "apps/editor/scripts/qa-chrome.mjs"
+      commands:
+        - cmd: "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+          status: fail
+      summary: "Implemented the complete approved UX slice, but verification could not resolve @playwright/test because this fresh worktree lacks installed dependencies."
+      remaining_blockers:
+        - "Install the locked repository dependencies locally, then rerun and correct the full verification suite."
+      verification_attempts: 1
+      stopped_because: "Fresh worktree dependency runtime is absent."
+
+  - id: T006
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: low
+    objective: "Install the repository's locked dependencies into the ignored worktree runtime without changing package metadata or tracked source."
+    constraints:
+      - "Use the existing package-lock exactly."
+      - "Do not change package.json or package-lock.json."
+      - "node_modules remains ignored and local."
+    expected_output:
+      - "Resolvable Playwright, Vitest, TypeScript, and Vite runtime"
+      - "No tracked dependency metadata change"
+    allowed_files:
+      - "node_modules/**"
+    verify:
+      - "npm ci"
+      - "npm exec playwright -- --version"
+      - "git diff --exit-code -- package.json package-lock.json"
+    receipt:
+      result: done
+      task_id: T006
+      changed_files:
+        - "node_modules/** (ignored local runtime)"
+      commands:
+        - cmd: "npm ci"
+          status: pass
+        - cmd: "npm exec playwright -- --version"
+          status: pass
+        - cmd: "git diff --exit-code -- package.json package-lock.json"
+          status: pass
+      summary: "Installed 77 locked packages locally; Playwright 1.62.1 resolves, audit reports zero vulnerabilities, and package metadata is unchanged."
+
+  - id: T007
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: medium
+    objective: "Verify, correct, and complete the T001-approved UX simplification after the locked dependency runtime is available."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "node --version && npm --version && npm exec playwright -- --version"
+      - "git diff --exit-code 1c7eb03 -- docs/incubation-plan.md docs/architecture.md fixtures packages package.json package-lock.json docs/evidence/t002-phase2-target-selection.json"
+      - "git diff 1c7eb03 --check"
+      - "git diff --name-only 1c7eb03"
+      - "git status --short"
+    stop_if:
+      - "Need files outside allowed_files or any product capability/domain/compiler/importer/schema/dependency change."
+      - "Need hold/ripple-retime or Phase 3 work."
+      - "Required inspectability, accessibility, native preview, deterministic history, or responsive fidelity would regress."
+      - "Private content or paths would enter tracked output."
+      - "The same verification failure remains unexplained after two attempts."
+    receipt:
+      result: blocked
+      task_id: T007
+      changed_files:
+        - "apps/editor/src/main.ts"
+        - "apps/editor/src/styles.css"
+        - "apps/editor/tests/editor.spec.ts"
+        - "apps/editor/scripts/qa-chrome.mjs"
+        - "artifacts/t005-ux-simplification-chrome-qa.json"
+      commands:
+        - cmd: "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+          status: pass
+        - cmd: "npm run qa:chrome"
+          status: pass
+        - cmd: "npm run test:unit"
+          status: fail
+      summary: "Five Playwright workflows and all 26 installed-Chrome UX checks pass. Full unit verification is blocked only because the PM-owned untracked board contained an absolute local plugin path."
+      remaining_blockers:
+        - "Sanitize the board path and resume full verification."
+      verification_attempts: 3
+      stopped_because: "PM-owned control file triggered the sensitive-path scanner."
+
+  - id: T008
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: low
+    objective: "Sanitize the GoalBuddy board's local command reference and prove the control files contain no sensitive local path."
+    allowed_files:
+      - "docs/goals/phase2-ux-simplification/state.yaml"
+    verify:
+      - "npm run check:sensitive"
+      - "git diff 1c7eb03 --check"
+    receipt:
+      result: done
+      task_id: T008
+      changed_files:
+        - "docs/goals/phase2-ux-simplification/state.yaml"
+      commands:
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "git diff 1c7eb03 --check"
+          status: pass
+      summary: "Replaced the absolute local board command with a portable placeholder; generic and private-corpus sensitive findings are both zero."
+
+  - id: T009
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Complete all remaining full-regression, privacy, build, protected-diff, and repository verification for the implemented UX slice; correct only in-scope product defects."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "node --version && npm --version && npm exec playwright -- --version"
+      - "git diff --exit-code 1c7eb03 -- docs/incubation-plan.md docs/architecture.md fixtures packages package.json package-lock.json docs/evidence/t002-phase2-target-selection.json"
+      - "git diff 1c7eb03 --check"
+      - "git diff --name-only 1c7eb03"
+      - "git status --short"
+    stop_if:
+      - "Need a file outside allowed_files or any capability/domain/compiler/importer/schema/dependency change."
+      - "Need hold/ripple-retime or Phase 3 work."
+      - "Private content or paths would enter tracked output."
+      - "The same verification failure remains unexplained after two attempts."
+    receipt:
+      result: done
+      task_id: T009
+      changed_files:
+        - "artifacts/** (ignored verification outputs)"
+      commands:
+        - cmd: "npm run test:unit"
+          status: pass
+        - cmd: "npm run verify:determinism"
+          status: pass
+        - cmd: "npm run test:browser"
+          status: pass
+        - cmd: "npm run test:visual"
+          status: pass
+        - cmd: "npm run test:private-acceptance"
+          status: pass
+        - cmd: "npm run verify:receipts"
+          status: pass
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "environment, protected-diff, diff-check, diff-name, and status gates"
+          status: pass
+      summary: "Full verification passes: 131 unit tests, 25 determinism tests, browser/visual/private proof, privacy scans, typecheck, build, and protected-file checks."
+      remaining_blockers: []
+
+  - id: T003
+    type: pm
+    assignee: PM
+    status: blocked
+    reasoning_hint: medium
+    objective: "Run the complete visible owner-style first-time browser walkthrough and record action, expectation, observation, and friction; create a corrective Worker only for material UX defects."
+    inputs:
+      - "T001 walkthrough contract"
+      - "T002 implementation receipt"
+      - "docs/browser-qa-loop.md"
+    constraints:
+      - "Read-only product QA."
+      - "Use the visible in-app browser on a fresh state."
+      - "Do not coach the interface by relying on canonical IDs or implementation knowledge."
+    expected_output:
+      - "First-time walkthrough receipt"
+      - "Material-friction decision"
+      - "Clearance for final audit or smallest corrective package"
+    receipt:
+      result: blocked
+      task_id: T003
+      summary: "Fresh visible walkthrough passed the information architecture and create transition, but found two material contract failures: Add midpoint leaves the value/time editor unavailable with No keyframe selected, and timing controls continue to say Not applied after a successful Apply."
+      evidence:
+        - "Fresh state has the correct four-step plain-language workflow, no false keyframe claim, prominent preview, and collapsed inspector."
+        - "Orb selection/create reached revision 1 with 1000/610/linear, Add midpoint focus, scrollY 0, and six tracks."
+        - "After Add midpoint and successful duration Apply at revision 3, the Shape panel still showed No keyframe selected with disabled value/time controls."
+        - "After successful duration Apply, the Duration field still displayed Not applied despite Applied 1400 ms."
+      remaining_blockers:
+        - "Correct midpoint selection/focus and conditional draft-state truth, then repeat the complete walkthrough."
+
+  - id: T010
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Correct the visible UX contract so Add midpoint immediately exposes and focuses its value/time editor without scrolling, and timing controls show a not-applied state only while their current draft differs from canonical Applied state."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "git diff 1c7eb03 --check"
+    stop_if:
+      - "Need files outside allowed_files or any domain/compiler/schema/capability change."
+      - "Focusing the midpoint requires opening or scrolling to technical inspection."
+      - "Draft truth cannot be derived from current canonical applied values."
+      - "Exact history, validation, responsive layout, native preview, or accessibility regresses."
+      - "Private content or paths would enter tracked output."
+    receipt:
+      result: done
+      task_id: T010
+      changed_files:
+        - "apps/editor/src/main.ts"
+        - "apps/editor/tests/editor.spec.ts"
+        - "apps/editor/scripts/qa-chrome.mjs"
+        - "artifacts/t005-ux-simplification-chrome-qa.json"
+      commands:
+        - cmd: "Playwright editor workflows"
+          status: pass
+        - cmd: "Installed Chrome 151, 27 checks"
+          status: pass
+        - cmd: "131 unit tests"
+          status: pass
+        - cmd: "sensitive scan, typecheck, build, diff check"
+          status: pass
+      summary: "Add midpoint now selects and focuses its canonical value editor without scroll/inspection; draft markers appear only when draft differs from Applied state and clear after Apply/history hydration."
+      remaining_blockers: []
+
+  - id: T011
+    type: pm
+    assignee: PM
+    status: blocked
+    reasoning_hint: medium
+    objective: "Repeat the complete fresh visible owner-style walkthrough after the corrective UX package and decide whether any material friction remains."
+    constraints:
+      - "Read-only visible in-app-browser QA."
+      - "Start from revision zero and test choose/create/shape/time/draft/rejection/preview/reduced-motion/history/inspection."
+      - "Stop and create another correction only for material UX defects."
+    expected_output:
+      - "Complete walkthrough receipt"
+      - "First-try usability decision"
+      - "Clearance for final audit"
+    receipt:
+      result: blocked
+      task_id: T011
+      summary: "The fresh corrected walkthrough passed choose/create, midpoint selection, truthful draft/apply, rejection, preview transport, reduced motion, and technical inspection. Exact history restored canonical revision 18, but stale draft warnings remained and focus fell to body after redo."
+      evidence:
+        - "Create: revision 1, 1000/610/linear, Add midpoint focus, scrollY 0."
+        - "Midpoint: revision 2, value 0.5/time 1110, value input focused."
+        - "Timing: applied 1400/700/ease-in-out at revision 5; invalid zero rejected at unchanged revision 5."
+        - "Preview transport and reduced-motion inspection worked; collapsed inspector retained all tracks/cues/IDs."
+        - "History reached revision 18 with correct canonical Applied values and target selection, but all three timing controls again showed Not applied and active focus was body."
+      remaining_blockers:
+        - "History must rehydrate drafts from canonical and retain focus on Undo/Redo."
+
+  - id: T012
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: medium
+    objective: "Ensure every Undo/Redo rerender rehydrates timing drafts from canonical Applied state, clears stale draft/invalid markers, retains focus on the invoked history control, and does not scroll."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "git diff 1c7eb03 --check"
+    stop_if:
+      - "Need files outside allowed_files or any canonical/domain/compiler/capability change."
+      - "History cannot rehydrate drafts or retain focus without weakening exact replay."
+      - "Validation, native preview, responsive layout, accessibility, or privacy regresses."
+    receipt:
+      result: blocked
+      task_id: T012
+      changed_files:
+        - "apps/editor/src/main.ts"
+        - "apps/editor/tests/editor.spec.ts"
+        - "apps/editor/scripts/qa-chrome.mjs"
+      commands:
+        - cmd: "Playwright attempt 1"
+          status: fail
+        - cmd: "Playwright attempt 2"
+          status: fail
+        - cmd: "Playwright attempt 3"
+          status: fail
+      summary: "History now rehydrates canonical drafts, clears draft/invalid markers, and retains focus including exhausted history controls. One rerender shortens the document, forcing a 14 px browser scroll clamp that script restoration cannot overcome."
+      remaining_blockers:
+        - "Stabilize workflow layout height across history states, then rerun proof."
+      verification_attempts: 3
+      stopped_because: "No-scroll geometry failure persisted after two in-scope attempts."
+
+  - id: T014
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: medium
+    objective: "Complete history focus/rehydration by stabilizing the workflow layout height across creation undo/redo so the browser never clamps scroll; preserve native accessibility and responsive layouts."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "git diff 1c7eb03 --check"
+    stop_if:
+      - "Need files outside allowed_files or any canonical/domain/compiler/capability change."
+      - "Height stabilization requires hiding content, fixed viewport assumptions, or document-level overflow."
+      - "Native accessibility, 1440/768/390 responsiveness, preview fidelity, validation, or exact history regresses."
+    receipt:
+      result: blocked
+      task_id: T014
+      changed_files:
+        - "apps/editor/src/main.ts"
+        - "apps/editor/src/styles.css"
+        - "apps/editor/tests/editor.spec.ts"
+        - "apps/editor/scripts/qa-chrome.mjs"
+      commands:
+        - cmd: "Playwright geometry attempts 1-3"
+          status: fail
+      summary: "All history semantics pass; the remaining 14 px clamp is isolated to Undo 6 when an inline availability reason becomes shorter. The attempted min-height reservation did not affect inline geometry."
+      verification_attempts: 3
+      stopped_because: "Exact layout cause isolated after two ineffective CSS attempts."
+
+  - id: T015
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: medium
+    objective: "Make target availability reasons participate in layout with a responsive reserved height across available/existing/one-track-limit states, eliminating Undo 6 scroll clamping, then run the complete UX and regression proof."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm exec playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "git diff --exit-code 1c7eb03 -- docs/incubation-plan.md docs/architecture.md fixtures packages package.json package-lock.json docs/evidence/t002-phase2-target-selection.json"
+      - "git diff 1c7eb03 --check"
+    stop_if:
+      - "Need files outside allowed_files or any canonical/domain/compiler/capability change."
+      - "Reservation causes document overflow, clipped reasons, or viewport-specific assumptions at 1440/768/390."
+      - "Any history, focus, validation, preview, privacy, or build gate regresses."
+      - "The exact Undo 6 clamp remains after this direct layout fix."
+    receipt:
+      result: blocked
+      task_id: T015
+      changed_files:
+        - "apps/editor/src/styles.css"
+      commands:
+        - cmd: "Playwright after direct reason-height reservation"
+          status: fail
+      summary: "Block-level two-line target-reason reservation did not change Undo 6's 372-to-358 clamp, disproving the reason-text hypothesis."
+      verification_attempts: 1
+      stopped_because: "T015 required stopping if the direct fix did not eliminate the clamp."
+
+  - id: T016
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Read-only diagnose the exact layout box and state transition responsible for the 14 px maximum-scroll reduction on Undo 6, and authorize only an evidence-grounded smallest correction."
+    inputs:
+      - "Current UX diff and history tests"
+      - "Fresh browser geometry immediately before and after Undo 6"
+      - "T012/T014/T015 receipts"
+    constraints:
+      - "Read-only; do not implement."
+      - "Measure bounding boxes, scrollHeight, computed styles, disclosure states, and changed text/control states."
+      - "Reject further guessed min-heights."
+      - "Preserve responsive/accessibility/native history contracts."
+    expected_output:
+      - "Exact geometry cause with measured evidence"
+      - "Whether strict zero-scroll is feasible and user-meaningful"
+      - "Exact smallest Worker package or evidence-based acceptance adjustment"
+    receipt:
+      result: done
+      task_id: T016
+      decision: approved
+      full_outcome_complete: false
+      rationale: "Measured geometry proves Undo 6 legitimately shrinks the document 14 px: target choices shrink 26 px while no-track timing copy grows 12 px. Browser clamping preserves the focused control and preview viewport positions; raw scroll equality is the wrong oracle and misses the reverse Redo jump."
+      evidence:
+        - "Workflow height 855.39 to 841.39 (-14); Choose/Create -26; Time +12."
+        - "Undo/footer/inspector viewport positions remain identical across U6; sticky preview stays top 16 px."
+        - "Current Redo 1 keeps raw scroll but moves the focused footer down 14 px, proving viewport anchor is the correct bidirectional invariant."
+      missing_evidence:
+        - "Implement focused-control viewport anchoring, remove failed reservation, and rerun complete proof."
+
+  - id: T017
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Replace absolute history scroll restoration with focused Undo/Redo viewport anchoring, remove the disproven target-reason reservation, and prove U6/R1 continuity without changing canonical history, accessibility, or responsive behavior."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm exec -- playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts -g truthful creation"
+      - "npm exec -- playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "git diff --exit-code 1c7eb03 -- docs/incubation-plan.md docs/architecture.md fixtures packages package.json package-lock.json docs/evidence/t002-phase2-target-selection.json"
+      - "git diff 1c7eb03 --check"
+      - "git diff --name-only 1c7eb03"
+      - "git status --short"
+    stop_if:
+      - "Need files outside allowed_files or any canonical/domain/compiler/schema/capability change."
+      - "Correction requires fixed/minimum workflow heights, viewport constants, clipped/hidden text, or overflow suppression."
+      - "Focused history control cannot retain its viewport position and focus at 1440/1099/768/390 without weakening replay."
+      - "Draft rehydration, validation, native preview, responsive containment, privacy, or deterministic history regresses."
+      - "The same unexplained verification failure remains after two attempts."
+    receipt:
+      result: done
+      task_id: T017
+      changed_files:
+        - "apps/editor/src/main.ts"
+        - "apps/editor/src/styles.css"
+        - "apps/editor/tests/editor.spec.ts"
+        - "apps/editor/scripts/qa-chrome.mjs"
+        - "artifacts/**"
+      summary: "Implemented focused Undo/Redo viewport anchoring with natural max-scroll clamping, retained focus and canonical draft rehydration, removed the failed height reservation, and passed the complete UX/regression/privacy/build proof after T018 restored protected evidence."
+      commands:
+        - cmd: "focused and full Playwright"
+          status: pass
+        - cmd: "installed Chrome 30/30 at 1440/1099/768/390"
+          status: pass
+        - cmd: "131 unit tests, determinism, browser, visual, private acceptance, receipts"
+          status: pass
+        - cmd: "privacy, typecheck, build, protected diff"
+          status: pass
+      remaining_blockers: []
+
+  - id: T018
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: low
+    objective: "Restore the single protected evidence streak value rewritten by verification and rerun final protected-diff/repository gates."
+    allowed_files:
+      - "docs/evidence/t002-phase2-target-selection.json"
+    verify:
+      - "git diff --exit-code 1c7eb03 -- docs/incubation-plan.md docs/architecture.md fixtures packages package.json package-lock.json docs/evidence/t002-phase2-target-selection.json"
+      - "git diff 1c7eb03 --check"
+      - "git diff --name-only 1c7eb03"
+      - "git status --short"
+    receipt:
+      result: done
+      task_id: T018
+      changed_files:
+        - "docs/evidence/t002-phase2-target-selection.json restored to baseline"
+      commands:
+        - cmd: "protected diff"
+          status: pass
+        - cmd: "diff check"
+          status: pass
+        - cmd: "diff name and status"
+          status: pass
+      summary: "Restored the verification-rewritten aggregate streak value; protected paths are unchanged and the product diff contains only four approved editor files."
+
+  - id: T013
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: medium
+    objective: "Run a fresh final visible history-focused walkthrough and clear the UX slice for adversarial audit only if applied/draft state, focus, scroll, and exact replay all pass."
+    constraints:
+      - "Read-only visible in-app-browser QA."
+      - "Fresh revision-zero workflow through S6/U6/R6."
+      - "Require no stale draft/invalid state and intentional history focus."
+    receipt:
+      result: done
+      task_id: T013
+      summary: "Fresh visible owner-style replay completed without material friction after corrections. Choose/create/shape/time/draft/apply/rejection/preview/reduced-motion/inspection passed; S6/U6/R6 preserved exact state and focused-control viewport anchoring."
+      evidence:
+        - "Fresh revision 0: no false selection, no horizontal overflow, inspector collapsed."
+        - "Create: revision 1, 1000/610/linear, Add midpoint focus, scrollY 0."
+        - "Midpoint: revision 2, value input focused with 0.5/1110."
+        - "Timing and rejection: revisions 3-5; applied 1400/700/ease-in-out; invalid zero rejected at unchanged revision 5."
+        - "Undo 7-12: focused Undo viewport top 534.28125 throughout; U6 naturally clamped raw scroll 372 to 358."
+        - "Redo 13-18: focused Redo viewport top 534.28125 throughout; raw scroll returned 372; target/applied state exact, invalid cleared, draft helpers hidden, Redo exhausted."
+      remaining_blockers: []
+
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Adversarially audit whether the UX-simplification tranche satisfies the owner outcome and is ready to stop before hold/ripple-retime."
+    inputs:
+      - "All task receipts"
+      - "Fresh complete verification"
+      - "Visible first-time browser QA"
+      - "Complete branch diff and safety scans"
+    constraints:
+      - "Read-only; do not implement."
+      - "Reject cosmetic-only polish, hidden required state, accessibility regressions, weak proof, private leakage, capability expansion, or Phase 3 work."
+      - "State the user-facing claim and dispose of the top three realistic failure modes with direct evidence."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "Claim-to-evidence matrix"
+      - "Top-three failure-mode disposition"
+      - "Owner-review stop or smallest corrective package"
+    receipt:
+      result: done
+      task_id: T999
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "All full gates pass and simplification is substantive, but U6 returns canonical content to the initial digest while the UI falsely selects and enables editing of the unrelated Status-copy opacity track. This recreates the highest-ranked original defect."
+      evidence:
+        - "At U6 revision 12, exact initial content digest returned, but UI showed Selected opacity keyframe with enabled value/time and Status-copy track identity while Orb remained chosen."
+        - "Editing 0.25 then Set value succeeded at revision 13 and mutated the unrelated fallback track."
+        - "Responsive, focus-anchor, native preview, privacy, determinism, visual, private acceptance, type, build, and protected-diff gates otherwise pass."
+      missing_evidence:
+        - "Clear invalid keyframe selection at U5/U6; restore only truthful selection at R1/R2; rerun visible replay and final audit."
+
+  - id: T019
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Make history rehydrate truthful keyframe selection: when undo removes the selected midpoint or created track, show No keyframe selected, disable exact value/time editing, and never fall back to another track; redo restores selection only when the appropriate object exists."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "artifacts/**"
+    verify:
+      - "npm exec -- playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts -g truthful creation"
+      - "npm exec -- playwright test --config apps/editor/playwright.config.ts apps/editor/tests/editor.spec.ts"
+      - "npm run qa:chrome"
+      - "npm run test:unit"
+      - "npm run verify:determinism"
+      - "npm run test:browser"
+      - "npm run test:visual"
+      - "npm run test:private-acceptance"
+      - "npm run verify:receipts"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+      - "npm run typecheck"
+      - "npm run build"
+      - "git diff --exit-code 1c7eb03 -- docs/incubation-plan.md docs/architecture.md fixtures packages package.json package-lock.json docs/evidence/t002-phase2-target-selection.json"
+      - "git diff 1c7eb03 --check"
+    stop_if:
+      - "Need files outside allowed_files or a domain/compiler/schema/capability/UI-history-persistence change."
+      - "Need hold/ripple-retime or Phase 3 work."
+      - "Exact replay, history focus/anchoring, responsive containment, accessibility, native preview, or privacy regresses."
+      - "Selection truth cannot be derived from current ephemeral selection and canonical existence."
+    receipt:
+      result: done
+      task_id: T019
+      changed_files:
+        - "apps/editor/src/main.ts"
+        - "apps/editor/tests/editor.spec.ts"
+        - "apps/editor/scripts/qa-chrome.mjs"
+        - "artifacts/**"
+      summary: "Existence-aware selection clears at U5/U6, blocks unrelated editing, and restores only the Orb anchor/midpoint at R1/R2. Focused/full Playwright, 32 Chrome checks, 131 unit tests, full proof, privacy, type, build, and post-T021 protected diff pass."
+      commands:
+        - cmd: "focused/full Playwright and Chrome 32/32"
+          status: pass
+        - cmd: "131 unit, determinism, browser, visual, private acceptance, receipts"
+          status: pass
+        - cmd: "privacy, typecheck, build, protected diff"
+          status: pass
+      remaining_blockers: []
+
+  - id: T021
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: low
+    objective: "Restore the verification-rewritten protected streak value to baseline and rerun protected repository gates."
+    allowed_files:
+      - "docs/evidence/t002-phase2-target-selection.json"
+    verify:
+      - "protected diff"
+      - "diff check"
+    receipt:
+      result: done
+      task_id: T021
+      summary: "Restored the old aggregate streak value to baseline; protected diff and diff check pass."
+      commands:
+        - cmd: "protected diff"
+          status: pass
+        - cmd: "diff check"
+          status: pass
+
+  - id: T020
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: medium
+    objective: "Run a fresh visible S6/U6/R6 replay explicitly checking keyframe label, enabled controls, selected track identity, attempted edit target, timing hydration, focus, and viewport geometry."
+    constraints:
+      - "Read-only visible browser QA."
+      - "Prove U5/U6 and R1/R2 selection truth."
+    receipt:
+      result: done
+      task_id: T020
+      summary: "Fresh visible S6/U6/R2 replay explicitly proved truthful selection and edit targeting."
+      evidence:
+        - "U5 revision 11: No keyframe selected, value disabled, selected element null."
+        - "U6 revision 12: No keyframe selected, value editing disabled, Orb target choice retained, Undo focus retained."
+        - "R1 revision 13: selected Orb start anchor at 610 ms/value 0, Redo focus retained."
+        - "R2 revision 14: selected Orb midpoint at 1110 ms/value 0.5, Redo focus retained."
+      remaining_blockers: []
+
+  - id: T998
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Final re-audit of the corrected UX simplification against the original oracle and all fresh proof."
+    constraints:
+      - "Read-only; reject any stale selection, weak visible proof, regression, leakage, or phase expansion."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "Claim and top-three failure-mode evidence"
+    receipt:
+      result: done
+      task_id: T998
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "UX claim and T019 correction are freshly proven, but the audit's visual run rewrote the protected evidence streak from baseline 4 to 6. Restore it and run a non-writing terminal audit."
+      evidence:
+        - "U5/U6 all selection IDs null with editing disabled; R1 Orb 610/0; R2 Orb 1110/0.5; no Status-copy fallback."
+        - "Playwright 5/5, Chrome 32/32, 131 unit, 25 determinism, visual/private/privacy/type/build all pass."
+      missing_evidence:
+        - "Passing protected diff after restoring generated value."
+
+  - id: T022
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: low
+    objective: "Restore the protected evidence streak to baseline after the final write-producing visual proof and record a passing protected diff."
+    allowed_files:
+      - "docs/evidence/t002-phase2-target-selection.json"
+    verify:
+      - "protected diff"
+      - "diff check"
+      - "sensitive scan"
+    receipt:
+      result: done
+      task_id: T022
+      summary: "Restored the protected streak after all write-producing proof; protected diff, diff check, and sensitive scan pass with a four-file product diff."
+      commands:
+        - cmd: "protected diff"
+          status: pass
+        - cmd: "diff check"
+          status: pass
+        - cmd: "sensitive scan"
+          status: pass
+
+  - id: T997
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Terminal read-only audit using the fresh T998 receipts and current protected diff; do not rerun write-producing visual verification."
+    constraints:
+      - "Read-only."
+      - "Verify current diff/status/safety without invoking commands that rewrite receipts."
+      - "Require full_outcome_complete true only if no evidence gap remains."
+    receipt:
+      result: done
+      task_id: T997
+      decision: complete
+      full_outcome_complete: true
+      rationale: "A first-time author can complete Choose/Create/Shape/Time/Preview, validation, and exact history without coaching while technical topology remains subordinate. T022 closed the final protected-evidence gap. Stop before hold/ripple-retime."
+      evidence:
+        - "Playwright 5/5, Chrome 32/32, 131 unit tests, 25 determinism tests, visual/private/privacy/type/build gates pass."
+        - "U5/U6 selection null and editing disabled; R1 Orb 610/0; R2 Orb 1110/0.5; no Status-copy fallback."
+        - "Canonical draft rehydration, invalid clearing, focused history anchors, responsive containment, and exact digest replay pass."
+        - "Protected diff and diff check pass; sensitive findings zero; product diff limited to four approved editor files."
+      missing_evidence: []
+
+checks:
+  dirty_fingerprint: "Four approved editor files plus GoalBuddy control files; ignored local private/runtime/proof outputs; protected paths unchanged."
+  last_verification:
+    result: pass
+    task: T997
+    commands:
+      - "Playwright 5/5"
+      - "Installed Chrome 32/32 at 1440/1099/768/390"
+      - "131 unit and 25 determinism tests"
+      - "browser, visual, private acceptance, receipt, ignore, sensitive, typecheck, build"
+      - "protected diff and diff check"

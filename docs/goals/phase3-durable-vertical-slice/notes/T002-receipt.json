@@ -1,0 +1,28 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T002",
+    "board_path": "docs/goals/phase3-durable-vertical-slice/state.yaml",
+    "changed_files": ["package.json", "tsconfig.json", "apps/editor/vite.config.ts", "apps/editor/src/main.ts", "apps/editor/src/global.d.ts", "apps/editor/src/virtual.d.ts", "apps/editor/tests/phase3.spec.ts", "apps/editor/scripts/serve-editor.mjs", "apps/editor/scripts/qa-chrome.mjs", "packages/domain/src/index.ts", "packages/motion-protocol/src/index.ts", "packages/motion-protocol/src/index.test.ts", "packages/project-store/src/index.ts", "packages/local-service/src/index.ts", "packages/local-service/src/lock-runner.ts", "packages/local-service/src/migrations.ts", "packages/local-service/src/paths.ts", "packages/local-service/src/seed.ts", "packages/local-service/src/sqlite-project-store.ts", "packages/local-service/src/test-support.ts", "packages/local-service/src/service.test.ts", "packages/local-service/src/recovery.test.ts", "packages/motion-cli/src/cli.ts", "packages/phase3-proof/src/parity.test.ts", "packages/phase3-proof/src/privacy.test.ts"],
+    "commands": [
+      {"cmd":"npm run test:phase3:service","status":"pass"},
+      {"cmd":"npm run test:phase3:recovery","status":"pass"},
+      {"cmd":"npm run test:phase3:parity","status":"pass"},
+      {"cmd":"npm run test:phase3:browser","status":"pass"},
+      {"cmd":"npm run qa:chrome","status":"pass"},
+      {"cmd":"repo_root=$(git rev-parse --show-toplevel) && npm exec vitest -- run --root \"$repo_root\" \"$repo_root/packages/domain/src/domain.test.ts\" \"$repo_root/packages/domain/src/authoring.test.ts\" \"$repo_root/packages/domain/src/repository-safety.test.ts\" \"$repo_root/packages/css-import/src/import.test.ts\" \"$repo_root/packages/css-import/src/materialize.test.ts\" \"$repo_root/packages/css-compiler/src/determinism.test.ts\" \"$repo_root/packages/preview-runtime/src/index.test.ts\" \"$repo_root/packages/visual-proof/src/index.test.ts\" \"$repo_root/packages/motion-protocol/src/index.test.ts\" \"$repo_root/packages/local-service/src/service.test.ts\" \"$repo_root/packages/local-service/src/recovery.test.ts\" \"$repo_root/packages/phase3-proof/src/parity.test.ts\" \"$repo_root/packages/phase3-proof/src/privacy.test.ts\" --sequence.concurrent false","status":"pass"},
+      {"cmd":"npm run verify:determinism","status":"pass"},
+      {"cmd":"npm run test:browser","status":"pass"},
+      {"cmd":"npm run typecheck","status":"pass"},
+      {"cmd":"npm run build","status":"pass"},
+      {"cmd":"npm run verify:phase3","status":"pass"},
+      {"cmd":"npm run check:sensitive","status":"pass"},
+      {"cmd":"npm run check:private-ignore","status":"pass"},
+      {"cmd":"git diff --check","status":"pass"},
+      {"cmd":"git diff --exit-code -- package-lock.json AGENTS.md docs/architecture/phase3-persistence-boundary.md docs/incubation-plan.md fixtures packages/css-import packages/css-compiler packages/preview-runtime packages/visual-proof scripts","status":"pass"},
+      {"cmd":"git status --short","status":"pass"}
+    ],
+    "summary": "Implemented the complete durable fixed-main slice. Direct evidence covers the lock-held sole writer, atomic rejection, restart/lost-response idempotency, byte-identical CLI/editor output, metadata-only SSE immutable refetch, native compiler preview, Chrome QA, and privacy. Top tested risks were hidden writers, partial/crash commits, and protocol/preview drift or leakage. Every required final gate passed.",
+    "verification_attempts": 2
+  }
+}

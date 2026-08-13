@@ -5,6 +5,48 @@
   "description": "Shared human-and-agent authoring for browser-native product-demo motion",
   "license": "MIT",
   "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:editor": "vite --config apps/editor/vite.config.ts",
+    "build": "vite build --config apps/editor/vite.config.ts",
+    "test:browser": "playwright test --config apps/editor/playwright.config.ts",
+    "test:visual": "vitest run packages/visual-proof/src/visual.test.ts",
+    "test:private-acceptance": "vitest run packages/css-import/src/private.private.test.ts packages/visual-proof/src/private.private.test.ts --sequence.concurrent false",
+    "verify:receipts": "vitest run packages/visual-proof/src/receipt.private.test.ts",
+    "qa:chrome": "node apps/editor/scripts/qa-chrome.mjs && npm run test:phase3:browser",
+    "test:phase3:service": "vitest run packages/local-service/src/service.test.ts --sequence.concurrent false",
+    "test:phase3:recovery": "vitest run packages/local-service/src/recovery.test.ts --sequence.concurrent false",
+    "test:phase3:parity": "vitest run packages/motion-protocol/src/index.test.ts packages/phase3-proof/src/parity.test.ts packages/phase3-proof/src/privacy.test.ts --sequence.concurrent false",
+    "test:phase3:browser": "playwright test apps/editor/tests/phase3.spec.ts --config apps/editor/playwright.config.ts --workers=1",
+    "verify:phase3": "npm run test:phase3:service && npm run test:phase3:recovery && npm run test:phase3:parity && npm run test:phase3:browser && npm run qa:chrome && npm run verify:determinism && npm run test:browser && npm run typecheck && npm run build && npm run check:sensitive && npm run check:private-ignore && git diff --check && git diff --exit-code -- package-lock.json AGENTS.md docs/architecture/phase3-persistence-boundary.md docs/incubation-plan.md fixtures packages/css-import packages/css-compiler packages/preview-runtime packages/visual-proof scripts",
+    "test:unit": "vitest run packages --exclude '**/*.private.test.ts' --exclude '**/visual.test.ts'",
+    "verify:determinism": "vitest run packages/css-compiler/src/determinism.test.ts",
+    "test:private-import": "vitest run packages/css-import/src/private.private.test.ts",
+    "check:private-ignore": "node scripts/check-private-ignore.mjs",
+    "check:sensitive": "node scripts/check-sensitive.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "css-select": "^6.0.0",
+    "domhandler": "^5.0.3",
+    "parse5": "^7.3.0",
+    "parse5-htmlparser2-tree-adapter": "^7.1.0",
+    "postcss": "^8.5.6",
+    "postcss-selector-parser": "^7.1.0",
+    "postcss-value-parser": "^4.2.0",
+    "zod": "^4.0.17"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^24.3.0",
+    "@types/pngjs": "^6.0.5",
+    "pngjs": "^7.0.0",
+    "typescript": "^5.9.2",
+    "vite": "^7.3.6",
+    "vitest": "^3.2.4"
+  },
   "engines": {
     "node": ">=22.22.0"
   }

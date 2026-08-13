@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neutral motion specimen</title>
+  <style>
+    html, body { margin: 0; min-height: 100%; background: #10131a; color: #f5f7fb; font-family: system-ui, sans-serif; }
+    body { display: grid; place-items: center; min-height: 100vh; overflow: hidden; }
+    .stage { position: relative; width: 520px; height: 300px; border: 1px solid #3d4658; border-radius: 28px; background: #171c26; }
+    .orb, .echo { position: absolute; top: 64px; width: 68px; height: 68px; border-radius: 50%; }
+    .orb { left: 68px; background: #81d8c9; }
+    .echo { left: 68px; top: 168px; background: #facf74; }
+    .copy { position: absolute; left: 68px; top: 28px; letter-spacing: .18em; font-size: 12px; text-transform: uppercase; }
+    .cursor { position: absolute; left: 72px; bottom: 32px; width: 14px; height: 22px; background: #f5f7fb; clip-path: polygon(0 0, 100% 65%, 58% 72%, 42% 100%); }
+    @keyframes drift { from { transform: translateX(0px) scale(1); } to { transform: translateX(310px) scale(.82); } }
+    @keyframes reveal { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes hold { 0% { visibility: hidden; } 35% { visibility: visible; } 100% { visibility: visible; } }
+    @keyframes cursor-steps { from { transform: translateX(0px); } to { transform: translateX(288px); } }
+    .orb, .echo { animation: drift 4300ms ease-in-out 360ms both; }
+    .copy { animation: reveal 1700ms linear 820ms both, hold 2900ms linear 820ms both; }
+    .cursor { animation: cursor-steps 3600ms steps(4, end) 610ms both; }
+  </style>
+</head>
+<body>
+  <section class="stage" aria-label="Neutral motion specimen">
+    <div class="copy">Sample status</div>
+    <div class="orb"></div>
+    <div class="echo"></div>
+    <div class="cursor"></div>
+  </section>
+</body>
+</html>
