@@ -305,6 +305,99 @@ export async function runControlledVisualProof(input: {
   }
 }
 
+export type HoldRippleVisualProof = {
+  passed: boolean;
+  browserVersion: string;
+  samples: Array<{
+    label: string; sourceTimeMs: number; storyTimeMs: number;
+    baselineHash: string; heldHash: string; changedPixels: number; maximumChannelDelta: number;
+  }>;
+  repeatedRunStable: boolean;
+  network: ControlledVisualProof['network'];
+};
+
+/** Controlled raster proof for corresponding source/story instants around the approved hold and step edge. */
+export async function runHoldRippleVisualProof(input: {
+  baselineHtml: string;
+  heldHtml: string;
+  samples: Array<{ label: string; sourceTimeMs: number; storyTimeMs: number }>;
+  viewport: { width: number; height: number };
+}): Promise<HoldRippleVisualProof> {
+  const browser = await chromium.launch({ headless: true });
+  try {
+    const baseline = await captureMemory(browser, input.baselineHtml,
+      input.samples.map((sample) => sample.sourceTimeMs), input.viewport);
+    const heldRuns: MemoryCapture[] = [];
+    for (let replay = 0; replay < 3; replay += 1) {
+      heldRuns.push(await captureMemory(browser, input.heldHtml,
+        input.samples.map((sample) => sample.storyTimeMs), input.viewport));
+    }
+    const repeatedRunStable = heldRuns.every((run) => run.frames.every((frame, index) =>
+      frame.hash === heldRuns[0]!.frames[index]!.hash));
+    const samples = input.samples.map((sample, index) => {
+      const baselinePng = PNG.sync.read(baseline.frames[index]!.bytes);
+      const heldPng = PNG.sync.read(heldRuns[0]!.frames[index]!.bytes);
+      const comparison = compareRgba(
+        baselinePng.data, heldPng.data, baselinePng.width, baselinePng.height,
+      );
+      return { ...sample, baselineHash: baseline.frames[index]!.hash,
+        heldHash: heldRuns[0]!.frames[index]!.hash,
+        changedPixels: comparison.changedPixels,
+        maximumChannelDelta: comparison.maximumChannelDelta };
+    });
+    const allRuns = [baseline, ...heldRuns];
+    const network = allRuns.reduce((sum, run) => ({
+      liveRequestCount: sum.liveRequestCount + run.network.liveRequestCount,
+      abortedUnexpectedRequestCount:
+        sum.abortedUnexpectedRequestCount + run.network.abortedUnexpectedRequestCount,
+    }), { liveRequestCount: 0, abortedUnexpectedRequestCount: 0 });
+    return {
+      passed: repeatedRunStable && samples.every((sample) => sample.changedPixels === 0)
+        && network.liveRequestCount === 0 && network.abortedUnexpectedRequestCount === 0,
+      browserVersion: browser.version(), samples, repeatedRunStable, network,
+    };
+  } finally {
+    await browser.close();
+  }
+}
+
+type MemoryCapture = {
+  frames: Array<{ bytes: Buffer; hash: string }>;
+  network: ControlledVisualProof['network'];
+};
+
+async function captureMemory(
+  browser: Browser,
+  html: string,
+  times: number[],
+  viewport: { width: number; height: number },
+): Promise<MemoryCapture> {
+  const context = await browser.newContext({ viewport, deviceScaleFactor: 1, colorScheme: 'light',
+    reducedMotion: 'no-preference', locale: 'en-US', timezoneId: 'UTC', serviceWorkers: 'block' });
+  const network = { liveRequestCount: 0, abortedUnexpectedRequestCount: 0 };
+  await context.route('**/*', async (route) => {
+    const url = route.request().url();
+    if (/^(?:about:|data:|blob:)/.test(url)) { await route.continue(); return; }
+    if (/^https?:/i.test(url)) network.liveRequestCount += 1;
+    network.abortedUnexpectedRequestCount += 1; await route.abort('blockedbyclient');
+  });
+  try {
+    const page = await context.newPage();
+    await page.setContent(html, { waitUntil: 'load' });
+    await preparePage(page);
+    const frames = [];
+    for (const time of times) {
+      await setNativeAnimationTime(page, time);
+      const bytes = await page.screenshot({ animations: 'allow', caret: 'hide', fullPage: false,
+        scale: 'css', type: 'png' });
+      frames.push({ bytes, hash: digest(bytes) });
+    }
+    return { frames, network };
+  } finally {
+    await context.close();
+  }
+}
+
 type CaptureReplay = {
   frames: Array<{ bytes: Buffer; hash: string }>;
   readiness: ControlledVisualProof['readiness'][number];

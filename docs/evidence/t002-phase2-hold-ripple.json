@@ -1,0 +1,136 @@
+{
+  "schemaVersion": "motion.hold-ripple-evidence.v1",
+  "passed": true,
+  "operation": {
+    "kind": "motion.hold.insert",
+    "cueId": "cue_pair",
+    "sourceTimeMs": 2870,
+    "durationMs": 600,
+    "holdId": "hold_fbfe413d12b5ab2c"
+  },
+  "digests": {
+    "source": "6b820d179a6ee83a4a24442b057b99a0380e28859a71a374718000f0058ada00",
+    "canonicalBefore": "6ec1366bc536040e10aab570ed9343433eacac9e8ac3bff2691deedb11606b73",
+    "canonicalAfter": "dfaa567c7283cd0efc485595a183c4707bcde3cf9ce2012f6e6029183a7500c4",
+    "exportBefore": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
+    "exportAfter": "5fe924e66adf1622c73e874ad1f7766bc19dd21eb8b6652ddebe639da99649e5"
+  },
+  "inventory": {
+    "sourceDigest": "6b820d179a6ee83a4a24442b057b99a0380e28859a71a374718000f0058ada00",
+    "ruleCount": 4,
+    "applicationCount": 3,
+    "slotCount": 4,
+    "trackCount": 5,
+    "supportedCount": 16,
+    "unsupportedCount": 0,
+    "missingCount": 0,
+    "diagnosticCodes": []
+  },
+  "projection": {
+    "durationBeforeMs": 4660,
+    "durationAfterMs": 5260,
+    "cues": [
+      {
+        "id": "cue_pair",
+        "timeMs": 3470
+      },
+      {
+        "id": "cue_hold",
+        "timeMs": 4910
+      },
+      {
+        "id": "cue_rest",
+        "timeMs": 5260
+      }
+    ],
+    "stableTrackIds": [
+      "track_197d3524846118b7",
+      "track_6ed2736b6793f4fc",
+      "track_ba0f74d370f59fe0",
+      "track_c0a6ef0c86fc582a",
+      "track_f0c8f982cf3e5a00"
+    ]
+  },
+  "nativeCss": {
+    "scriptFree": true,
+    "compilerVersion": "css-compiler.v1",
+    "deterministic": true
+  },
+  "visual": {
+    "passed": true,
+    "browserVersion": "151.0.7922.34",
+    "samples": [
+      {
+        "label": "hold-t-1",
+        "sourceTimeMs": 2869,
+        "storyTimeMs": 2869,
+        "baselineHash": "ff4af4f52fb7ee72271380f932754b1a16749ef61d55e9baea9b8f4a2336ad8f",
+        "heldHash": "ff4af4f52fb7ee72271380f932754b1a16749ef61d55e9baea9b8f4a2336ad8f",
+        "changedPixels": 0,
+        "maximumChannelDelta": 0
+      },
+      {
+        "label": "hold-t",
+        "sourceTimeMs": 2870,
+        "storyTimeMs": 2870,
+        "baselineHash": "d3dfe3a2db90dd92afaecd46849bf295d9939292e40a9ab83f0495ef6c33dbc4",
+        "heldHash": "d3dfe3a2db90dd92afaecd46849bf295d9939292e40a9ab83f0495ef6c33dbc4",
+        "changedPixels": 0,
+        "maximumChannelDelta": 0
+      },
+      {
+        "label": "hold-end-t-1",
+        "sourceTimeMs": 2870,
+        "storyTimeMs": 3469,
+        "baselineHash": "d3dfe3a2db90dd92afaecd46849bf295d9939292e40a9ab83f0495ef6c33dbc4",
+        "heldHash": "d3dfe3a2db90dd92afaecd46849bf295d9939292e40a9ab83f0495ef6c33dbc4",
+        "changedPixels": 0,
+        "maximumChannelDelta": 0
+      },
+      {
+        "label": "hold-end-t+1",
+        "sourceTimeMs": 2871,
+        "storyTimeMs": 3471,
+        "baselineHash": "0b3eb377d6a59f3f451c44e06a7dfa3f2950bdd06c9989f4b7295fd66ff256eb",
+        "heldHash": "0b3eb377d6a59f3f451c44e06a7dfa3f2950bdd06c9989f4b7295fd66ff256eb",
+        "changedPixels": 0,
+        "maximumChannelDelta": 0
+      },
+      {
+        "label": "step-t-1",
+        "sourceTimeMs": 3309,
+        "storyTimeMs": 3909,
+        "baselineHash": "c21afa527111d94bc8c74f1ee53bada6f9db4fe216ea78e6d58e3a4019e9e471",
+        "heldHash": "c21afa527111d94bc8c74f1ee53bada6f9db4fe216ea78e6d58e3a4019e9e471",
+        "changedPixels": 0,
+        "maximumChannelDelta": 0
+      },
+      {
+        "label": "step-t+1",
+        "sourceTimeMs": 3311,
+        "storyTimeMs": 3911,
+        "baselineHash": "679e922e1b103e4041bac8a082a5193233cbfaa0e43040ee71577c94170710b6",
+        "heldHash": "679e922e1b103e4041bac8a082a5193233cbfaa0e43040ee71577c94170710b6",
+        "changedPixels": 0,
+        "maximumChannelDelta": 0
+      },
+      {
+        "label": "rest-t-1",
+        "sourceTimeMs": 4659,
+        "storyTimeMs": 5259,
+        "baselineHash": "265f863136acb4ad68dc395a05bb7ea2c6d6af181a080d98e564edf5f48069f8",
+        "heldHash": "265f863136acb4ad68dc395a05bb7ea2c6d6af181a080d98e564edf5f48069f8",
+        "changedPixels": 0,
+        "maximumChannelDelta": 0
+      }
+    ],
+    "repeatedRunStable": true,
+    "network": {
+      "liveRequestCount": 0,
+      "abortedUnexpectedRequestCount": 0
+    }
+  },
+  "commands": [
+    "npm exec -- vitest run packages/visual-proof/src/hold-ripple.visual.test.ts --sequence.concurrent false"
+  ]
+}

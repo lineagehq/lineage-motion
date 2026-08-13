@@ -6,6 +6,34 @@ import { createAuthoringState, dispatchAuthoringOperation } from '../../domain/s
 import { buildTimeline } from './index.js';
 
 describe('read-only master timeline', () => {
+  test('projects the approved hold while preserving source identities and exact later story times', async () => {
+    const imported = importMotionHtml(await readFile(
+      new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8'));
+    imported.document!.cues = [
+      { schemaVersion: 'motion.cue.v1', id: 'cue_pair', label: 'Pair crosses', timeMs: 2870 },
+      { schemaVersion: 'motion.cue.v1', id: 'cue_hold', label: 'Hold inspected', timeMs: 4310 },
+      { schemaVersion: 'motion.cue.v1', id: 'cue_rest', label: 'Rest', timeMs: 4660 },
+    ];
+    const initial = createAuthoringState(imported.document!);
+    const held = dispatchAuthoringOperation(initial, {
+      schemaVersion: 'motion.operation.v1', operationId: 'timeline:hold',
+      documentId: initial.document.documentId, expectedRevision: 0,
+      kind: 'motion.hold.insert', payload: { cueId: 'cue_pair', durationMs: 600 },
+    });
+    expect(held.ok).toBe(true); if (!held.ok) throw new Error(held.diagnostic.code);
+    const before = buildTimeline(initial.document);
+    const after = buildTimeline(held.state.document);
+    expect(after.durationMs).toBe(5260);
+    expect(after.holds).toEqual(held.state.document.holds);
+    expect(after.cues.map((cue) => cue.timeMs)).toEqual([3470, 4910, 5260]);
+    expect(after.rows.map((row) => row.trackId)).toEqual(before.rows.map((row) => row.trackId));
+    const reveal = after.rows.find((row) => row.property === 'opacity')!;
+    expect(reveal.keyframes.at(-1)!.timeMs).toBe(2520);
+    const crossingEnds = after.rows.filter((row) => row.keyframes.at(-1)!.timeMs > 2870)
+      .map((row) => row.keyframes.at(-1)!.timeMs).sort((a, b) => a - b);
+    expect(crossingEnds).toEqual([4320, 4810, 5260, 5260]);
+  });
+
   test('accounts for every canonical track, keyframe, delay, simultaneous slot, step timing, and cue', () => {
     const imported = importMotionHtml(`<!doctype html><html><head><style>
       @keyframes reveal { from { opacity: 0; } to { opacity: 1; } }

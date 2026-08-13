@@ -42,6 +42,14 @@ export type MotionCue = {
   timeMs: number;
 };
 
+export type MotionHold = {
+  schemaVersion: 'motion.hold.v1';
+  id: string;
+  cueId: 'cue_pair';
+  sourceTimeMs: 2870;
+  durationMs: 600;
+};
+
 export type MotionDocument = {
   schemaVersion: 'motion.document.v1';
   documentId: string;
@@ -84,6 +92,8 @@ export type MotionDocument = {
     keyframeIds: string[];
   }>;
   cues: MotionCue[];
+  /** Source-to-story warps. Absent on imported source; authored documents store the explicit record. */
+  holds?: MotionHold[];
   inventory: {
     sourceDigest: string;
     ruleCount: number;
@@ -141,6 +151,13 @@ const cueSchema = z.object({
   label: z.string().min(1),
   timeMs: z.number().int().nonnegative(),
 });
+const holdSchema = z.object({
+  schemaVersion: z.literal('motion.hold.v1'),
+  id: identifier,
+  cueId: z.literal('cue_pair'),
+  sourceTimeMs: z.literal(2870),
+  durationMs: z.literal(600),
+});
 const motionDocumentSchema = z.object({
   schemaVersion: z.literal('motion.document.v1'),
   documentId: identifier,
@@ -187,6 +204,7 @@ const motionDocumentSchema = z.object({
     keyframeIds: z.array(identifier).min(1),
   })),
   cues: z.array(cueSchema),
+  holds: z.array(holdSchema).max(1).optional(),
   inventory: z.object({
     sourceDigest: z.string().regex(/^[a-f0-9]{64}$/),
     ruleCount: z.number().int().nonnegative(),
@@ -236,6 +254,7 @@ export function validateMotionDocument(input: unknown): ValidationResult {
     keyframes.map((keyframe) => keyframe.id),
     document.tracks.map((track) => track.id),
     document.cues.map((cue) => cue.id),
+    (document.holds ?? []).map((hold) => hold.id),
   ];
   if (idGroups.some(hasDuplicates)
     || hasDuplicates(document.rules.map((rule) => rule.sourceName))
@@ -244,6 +263,14 @@ export function validateMotionDocument(input: unknown): ValidationResult {
   }
   if (document.cues.some((cue) => cue.timeMs > document.durationMs)) {
     return domainFailure('DOMAIN_CUE_TIME_INVALID', 'A cue falls outside the document duration.');
+  }
+  const holds = document.holds ?? [];
+  if (holds.length > 0) {
+    const hold = holds[0]!;
+    const cue = document.cues.find((candidate) => candidate.id === hold.cueId);
+    if (!cue || cue.timeMs !== hold.sourceTimeMs + hold.durationMs) {
+      return domainFailure('DOMAIN_HOLD_CUE_INVALID', 'The hold must end at its approved cue.');
+    }
   }
 
   const elementIds = new Set(document.elements.map((element) => element.id));
@@ -529,9 +556,12 @@ export type SlotEasingSetOperation = OperationEnvelope & {
   kind: 'motion.slot-easing.set'; elementId: StructuralAuthoringElementId;
   trackId: string; payload: { easing: 'linear' | 'ease-in-out' };
 };
+export type HoldInsertOperation = OperationEnvelope & {
+  kind: 'motion.hold.insert'; payload: { cueId: 'cue_pair'; durationMs: 600 };
+};
 export type StructuralAuthoringOperation = TrackCreateOperation | KeyframeAddOperation
   | KeyframeRemoveOperation | SlotDurationSetOperation | BindingDelaySetOperation
-  | SlotEasingSetOperation;
+  | SlotEasingSetOperation | HoldInsertOperation;
 export type AuthoringOperation = KeyframeValueOperation | KeyframeTimeOperation
   | StructuralAuthoringOperation | HistoryOperation;
 type EditOperation = Exclude<AuthoringOperation, HistoryOperation>;
@@ -544,7 +574,11 @@ type InternalKeyframeRestoreOperation = OperationEnvelope & {
   kind: 'motion.internal.keyframe.restore'; elementId: StructuralAuthoringElementId;
   trackId: string; keyframe: RuleTrack['keyframes'][number];
 };
-type ReducerOperation = EditOperation | InternalTrackDeleteOperation | InternalKeyframeRestoreOperation;
+type InternalHoldRemoveOperation = OperationEnvelope & {
+  kind: 'motion.internal.hold.remove'; payload: { holdId: string; contentDigest: string };
+};
+type ReducerOperation = EditOperation | InternalTrackDeleteOperation | InternalKeyframeRestoreOperation
+  | InternalHoldRemoveOperation;
 
 type EditRecord = {
   forward: ReducerOperation;
@@ -612,6 +646,10 @@ export function dispatchAuthoringOperation(
     };
   }
 
+  if ((state.document.holds ?? []).length > 0 && operation.kind !== 'motion.hold.insert') {
+    return authoringFailure(state, 'AUTHORING_HOLD_LOCKED');
+  }
+
   const editOperation = operation as EditOperation;
   const applied = applyOperation(state.document, editOperation);
   if (!applied.ok) return authoringFailure(state, applied.code);
@@ -636,12 +674,67 @@ function applyOperation(
   if (operation.kind === 'motion.keyframe-value.set' || operation.kind === 'motion.keyframe-time.set') {
     return applyEdit(document, operation);
   }
+  if (operation.kind === 'motion.hold.insert' || operation.kind === 'motion.internal.hold.remove') {
+    return applyHold(document, operation);
+  }
   return applyStructural(document, operation);
+}
+
+function applyHold(
+  document: MotionDocument,
+  operation: HoldInsertOperation | InternalHoldRemoveOperation,
+): { ok: true; document: MotionDocument; inverse: ReducerOperation } | { ok: false; code: string } {
+  if (operation.kind === 'motion.hold.insert') {
+    if (operation.payload.cueId !== 'cue_pair' || operation.payload.durationMs !== 600) {
+      return { ok: false, code: 'AUTHORING_HOLD_INVALID' };
+    }
+    if ((document.holds ?? []).length > 0) return { ok: false, code: 'AUTHORING_HOLD_COLLISION' };
+    const cue = document.cues.find((candidate) => candidate.id === 'cue_pair');
+    if (!cue || cue.timeMs !== 2870 || document.durationMs !== 4660) {
+      return { ok: false, code: 'AUTHORING_HOLD_BOUNDARY_MISMATCH' };
+    }
+    if (document.durationMs > Number.MAX_SAFE_INTEGER - 600) {
+      return { ok: false, code: 'AUTHORING_HOLD_OVERFLOW' };
+    }
+    const hold: MotionHold = {
+      schemaVersion: 'motion.hold.v1',
+      id: structuralId('hold', `${document.documentId}\0cue_pair\0${2870}\0${600}`),
+      cueId: 'cue_pair', sourceTimeMs: 2870, durationMs: 600,
+    };
+    if (canonicalIdentitySet(document).has(hold.id)) return { ok: false, code: 'AUTHORING_ID_COLLISION' };
+    const next = structuredClone(document);
+    next.holds = [hold];
+    next.durationMs += 600;
+    next.cues = next.cues.map((candidate) => candidate.timeMs >= 2870
+      ? { ...candidate, timeMs: candidate.timeMs + 600 } : candidate);
+    const contentDigest = sha256Hex(canonicalContentBytes(next));
+    return { ok: true, document: next, inverse: {
+      schemaVersion: operation.schemaVersion, operationId: operation.operationId,
+      documentId: operation.documentId, expectedRevision: operation.expectedRevision,
+      kind: 'motion.internal.hold.remove', payload: { holdId: hold.id, contentDigest },
+    } };
+  }
+  const hold = document.holds?.[0];
+  if (!hold || hold.id !== operation.payload.holdId
+    || sha256Hex(canonicalContentBytes(document)) !== operation.payload.contentDigest) {
+    return { ok: false, code: 'AUTHORING_HOLD_REPLAY_INVALID' };
+  }
+  const next = structuredClone(document);
+  delete next.holds;
+  next.durationMs -= hold.durationMs;
+  next.cues = next.cues.map((candidate) => candidate.timeMs >= hold.sourceTimeMs + hold.durationMs
+    ? { ...candidate, timeMs: candidate.timeMs - hold.durationMs } : candidate);
+  return { ok: true, document: next, inverse: {
+    schemaVersion: operation.schemaVersion, operationId: operation.operationId,
+    documentId: operation.documentId, expectedRevision: operation.expectedRevision,
+    kind: 'motion.hold.insert', payload: { cueId: 'cue_pair', durationMs: 600 },
+  } };
 }
 
 function applyStructural(
   document: MotionDocument,
-  operation: StructuralAuthoringOperation | InternalTrackDeleteOperation | InternalKeyframeRestoreOperation,
+  operation: Exclude<StructuralAuthoringOperation, HoldInsertOperation>
+    | InternalTrackDeleteOperation | InternalKeyframeRestoreOperation,
 ): { ok: true; document: MotionDocument; inverse: ReducerOperation } | { ok: false; code: string } {
   const element = document.elements.find((candidate) => candidate.id === operation.elementId);
   if (!element) return { ok: false, code: 'AUTHORING_ELEMENT_NOT_FOUND' };
@@ -833,6 +926,7 @@ function canonicalBundleBytes(value: unknown): Uint8Array {
 function canonicalIdentitySet(document: MotionDocument): Set<string> {
   return new Set([
     ...document.elements.map((candidate) => candidate.id), ...document.cues.map((candidate) => candidate.id),
+    ...(document.holds ?? []).map((candidate) => candidate.id),
     ...document.rules.map((rule) => rule.id), ...document.applications.map((app) => app.id),
     ...document.applications.flatMap((app) => app.slots.map((slot) => slot.id)),
     ...document.rules.flatMap((rule) => rule.tracks.flatMap((track) =>
@@ -1045,6 +1139,7 @@ function parseOperation(input: unknown): AuthoringOperation | null {
     || !['motion.keyframe-value.set', 'motion.keyframe-time.set', 'motion.track.create',
       'motion.keyframe.add', 'motion.keyframe.remove', 'motion.slot-duration.set',
       'motion.binding-delay.set', 'motion.slot-easing.set',
+      'motion.hold.insert',
       'motion.history.undo', 'motion.history.redo'].includes(String(value.kind))) {
     return null;
   }
@@ -1052,6 +1147,12 @@ function parseOperation(input: unknown): AuthoringOperation | null {
   const base = value as unknown as AuthoringOperation;
   if (base.kind === 'motion.history.undo' || base.kind === 'motion.history.redo') {
     return hasExactObjectKeys(value, baseKeys) ? base : null;
+  }
+  if (base.kind === 'motion.hold.insert') {
+    const payload = plainRecord(value.payload);
+    return hasExactObjectKeys(value, [...baseKeys, 'payload']) && payload
+      && hasExactObjectKeys(payload, ['cueId', 'durationMs'])
+      && payload.cueId === 'cue_pair' && payload.durationMs === 600 ? base : null;
   }
   const fixedElement = STRUCTURAL_AUTHORING_ELEMENT_IDS.includes(value.elementId as StructuralAuthoringElementId);
   if (base.kind === 'motion.track.create') {

@@ -54,6 +54,84 @@ const envelope = (operationId: string, expectedRevision: number) => ({
 });
 
 describe('typed authoring operations', () => {
+  test('inserts only the approved 600 ms cue_pair hold and replays its exact inverse', async () => {
+    const source = await readFile(new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8');
+    const imported = importMotionHtml(source);
+    imported.document!.cues = [
+      { schemaVersion: 'motion.cue.v1', id: 'cue_pair', label: 'Pair crosses', timeMs: 2870 },
+      { schemaVersion: 'motion.cue.v1', id: 'cue_hold', label: 'Hold inspected', timeMs: 4310 },
+      { schemaVersion: 'motion.cue.v1', id: 'cue_rest', label: 'Rest', timeMs: 4660 },
+    ];
+    let state = createAuthoringState(imported.document!);
+    const beforeBytes = canonicalContentBytes(state.document);
+    const beforeIds = {
+      rules: state.document.rules.map((rule) => rule.id),
+      tracks: state.document.tracks.map((track) => track.id),
+      keyframes: state.document.rules.flatMap((rule) => rule.tracks.flatMap((track) =>
+        track.keyframes.map((keyframe) => keyframe.id))),
+    };
+    const insert = { ...strictEnvelope(state, 'hold:insert'), kind: 'motion.hold.insert' as const,
+      payload: { cueId: 'cue_pair' as const, durationMs: 600 as const } };
+    const accepted = dispatchAuthoringOperation(state, insert);
+    expect(accepted.ok).toBe(true); if (!accepted.ok) throw new Error(accepted.diagnostic.code);
+    state = accepted.state;
+    expect(state.document.durationMs).toBe(5260);
+    expect(state.document.cues.map(({ id, timeMs }) => ({ id, timeMs }))).toEqual([
+      { id: 'cue_pair', timeMs: 3470 }, { id: 'cue_hold', timeMs: 4910 },
+      { id: 'cue_rest', timeMs: 5260 },
+    ]);
+    expect(state.document.holds).toEqual([expect.objectContaining({
+      schemaVersion: 'motion.hold.v1', cueId: 'cue_pair', sourceTimeMs: 2870, durationMs: 600,
+    })]);
+    expect(state.document.holds![0]!.id).toMatch(/^hold_[a-f0-9]{16}$/);
+    expect({
+      rules: state.document.rules.map((rule) => rule.id), tracks: state.document.tracks.map((track) => track.id),
+      keyframes: state.document.rules.flatMap((rule) => rule.tracks.flatMap((track) =>
+        track.keyframes.map((keyframe) => keyframe.id))),
+    }).toEqual(beforeIds);
+    const heldBytes = canonicalContentBytes(state.document);
+    const heldCompile = compileMotionDocument(state.document);
+    expect(heldCompile.css).toContain('motion_hold_');
+    expect(heldCompile.css).toContain('cubic-bezier(');
+    expect(heldCompile.css).toContain('steps(1, end)');
+    expect(heldCompile.css).not.toContain('setTimeout');
+    const collision = dispatchAuthoringOperation(state, { ...insert, operationId: 'hold:collision',
+      expectedRevision: state.document.revision });
+    expect(collision).toMatchObject({ ok: false, diagnostic: { code: 'AUTHORING_HOLD_COLLISION' } });
+    const undone = dispatchAuthoringOperation(state, { ...strictEnvelope(state, 'hold:undo'),
+      kind: 'motion.history.undo' });
+    expect(undone.ok).toBe(true); if (!undone.ok) throw new Error(undone.diagnostic.code);
+    expect(canonicalContentBytes(undone.state.document)).toEqual(beforeBytes);
+    const redone = dispatchAuthoringOperation(undone.state, { ...strictEnvelope(undone.state, 'hold:redo'),
+      kind: 'motion.history.redo' });
+    expect(redone.ok).toBe(true); if (!redone.ok) throw new Error(redone.diagnostic.code);
+    expect(canonicalContentBytes(redone.state.document)).toEqual(heldBytes);
+    const replayCompile = compileMotionDocument(redone.state.document);
+    expect({ html: replayCompile.html, css: replayCompile.css, exportDigest: replayCompile.exportDigest })
+      .toEqual({ html: heldCompile.html, css: heldCompile.css, exportDigest: heldCompile.exportDigest });
+  });
+
+  test('strictly rejects every non-canonical hold shape without mutation', async () => {
+    const source = await readFile(new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8');
+    const imported = importMotionHtml(source);
+    imported.document!.cues = [
+      { schemaVersion: 'motion.cue.v1', id: 'cue_pair', label: 'Pair crosses', timeMs: 2870 },
+    ];
+    const state = createAuthoringState(imported.document!);
+    const base = { ...strictEnvelope(state, 'hold:strict'), kind: 'motion.hold.insert',
+      payload: { cueId: 'cue_pair', durationMs: 600 } };
+    for (const malformed of [
+      { ...base, payload: { ...base.payload, durationMs: 601 } },
+      { ...base, payload: { ...base.payload, cueId: 'cue_hold' } },
+      { ...base, payload: { ...base.payload, extra: true } },
+      { ...base, extra: true },
+    ]) {
+      const before = structuredClone(state);
+      expect(dispatchAuthoringOperation(state, malformed)).toMatchObject({ ok: false,
+        diagnostic: { code: 'AUTHORING_ENVELOPE_INVALID' } });
+      expect(state).toEqual(before);
+    }
+  });
   test('creates one isolated track, reshapes it, and exactly replays six undo/redos', async () => {
     const source = await readFile(new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8');
     const imported = importMotionHtml(source);

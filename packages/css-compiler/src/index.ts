@@ -51,6 +51,9 @@ export function compileMotionDocument(document: MotionDocument): CompilerResult 
   const presentationCss = document.presentation.css.trim();
   if (presentationCss) cssParts.push(presentationCss);
 
+  if ((document.holds ?? []).length > 0) {
+    cssParts.push(...compileHoldProjection(document));
+  } else {
   for (const application of document.applications) {
     for (const binding of application.bindings) {
       const slotCss = application.slots.map((slot, slotIndex) => {
@@ -91,6 +94,7 @@ export function compileMotionDocument(document: MotionDocument): CompilerResult 
     });
     cssParts.push(`@keyframes ${generatedName} {\n${blocks.join('\n')}\n}`);
   }
+  }
 
   const css = `${cssParts.join('\n\n')}\n`;
   const styleElement = `<style>\n${css}</style>`;
@@ -121,6 +125,192 @@ export function compileMotionDocument(document: MotionDocument): CompilerResult 
     provenance: document.provenance,
   };
   return { html, css, exportDigest, receipt };
+}
+
+function compileHoldProjection(document: MotionDocument): string[] {
+  const hold = document.holds?.[0];
+  if (!hold) return [];
+  const output: string[] = [];
+  let sequence = 0;
+  for (const application of document.applications) {
+    for (const binding of application.bindings) {
+      const animations: string[] = [];
+      for (const [slotIndex, slot] of application.slots.entries()) {
+        const rule = document.rules.find((candidate) => candidate.id === slot.ruleId);
+        const sourceDelay = binding.delayOverridesMs[slotIndex];
+        if (!rule || sourceDelay === undefined) throw new Error('COMPILER_HOLD_RELATIONSHIP_INVALID');
+        if (slot.iterationCount !== 1) throw new Error('COMPILER_HOLD_ITERATION_UNSUPPORTED');
+        const generatedName = `motion_hold_${String(sequence).padStart(4, '0')}`;
+        sequence += 1;
+        const storyDelay = warpTime(sourceDelay, hold.sourceTimeMs, hold.durationMs);
+        const sourceEnd = sourceDelay + slot.durationMs;
+        const storyEnd = warpTime(sourceEnd, hold.sourceTimeMs, hold.durationMs);
+        const storyDuration = storyEnd - storyDelay;
+        animations.push([
+          generatedName, formatTime(storyDuration), 'linear', formatTime(storyDelay),
+          String(slot.iterationCount), slot.direction, slot.fillMode, slot.playState,
+        ].join(' '));
+        output.push(compileWarpedKeyframes(
+          generatedName, rule.tracks, sourceDelay, slot.durationMs, storyDelay, storyDuration,
+          slot.timingFunction, hold.sourceTimeMs, hold.durationMs,
+        ));
+      }
+      output.unshift(`[data-motion-id="${escapeCssString(binding.elementId)}"] {\n  animation: ${animations.join(', ')};\n}`);
+    }
+  }
+  return output;
+}
+
+type WarpedDeclaration = { property: string; value: string; easing?: TimingFunction };
+
+function compileWarpedKeyframes(
+  name: string,
+  tracks: MotionDocument['rules'][number]['tracks'],
+  sourceDelay: number,
+  sourceDuration: number,
+  storyDelay: number,
+  storyDuration: number,
+  slotEasing: TimingFunction,
+  boundary: number,
+  holdDuration: number,
+): string {
+  const blocks = new Map<number, WarpedDeclaration[]>();
+  const add = (storyTime: number, declaration: WarpedDeclaration): void => {
+    const offset = (storyTime - storyDelay) / storyDuration;
+    const declarations = blocks.get(offset) ?? [];
+    declarations.push(declaration);
+    blocks.set(offset, declarations);
+  };
+  for (const track of tracks) {
+    const sourceFrames = track.keyframes.map((keyframe) => ({
+      ...keyframe, timeMs: sourceDelay + keyframe.offset * sourceDuration,
+    }));
+    if (slotEasing.kind === 'steps' && sourceFrames.length === 2) {
+      const [first, last] = sourceFrames as [typeof sourceFrames[number], typeof sourceFrames[number]];
+      const fractions = Array.from({ length: slotEasing.count + 1 }, (_, index) => index / slotEasing.count);
+      const times = new Set(fractions.map((fraction) => first.timeMs + (last.timeMs - first.timeMs) * fraction));
+      if (boundary > first.timeMs && boundary < last.timeMs) times.add(boundary);
+      for (const timeMs of [...times].sort((a, b) => a - b)) {
+        const progress = (timeMs - first.timeMs) / (last.timeMs - first.timeMs);
+        const stepped = Math.floor(progress * slotEasing.count + 1e-12) / slotEasing.count;
+        const value = interpolateCssValue(first.value, last.value, Math.min(1, stepped));
+        const storyTime = warpTime(timeMs, boundary, holdDuration);
+        add(storyTime, { property: track.property, value,
+          easing: { kind: 'steps', count: 1, position: 'end' } });
+        if (timeMs === boundary) add(storyTime - holdDuration,
+          { property: track.property, value, easing: { kind: 'keyword', value: 'linear' } });
+      }
+      continue;
+    }
+    for (const [index, frame] of sourceFrames.entries()) {
+      const next = sourceFrames[index + 1];
+      add(warpTime(frame.timeMs, boundary, holdDuration), {
+        property: track.property, value: frame.value, easing: frame.easing ?? slotEasing,
+      });
+      if (!next || boundary <= frame.timeMs || boundary >= next.timeMs) continue;
+      const fraction = (boundary - frame.timeMs) / (next.timeMs - frame.timeMs);
+      const easing = frame.easing ?? slotEasing;
+      if (track.interpolation === 'continuous') {
+        const split = splitTimingFunction(easing, fraction);
+        const value = interpolateCssValue(frame.value, next.value, split.progress);
+        const startOffset = (warpTime(frame.timeMs, boundary, holdDuration) - storyDelay) / storyDuration;
+        const prior = blocks.get(startOffset)?.find((candidate) => candidate.property === track.property);
+        if (prior) prior.easing = split.before;
+        add(boundary, { property: track.property, value,
+          easing: { kind: 'keyword', value: 'linear' } });
+        add(boundary + holdDuration, { property: track.property, value, easing: split.after });
+      } else {
+        const value = valueAtDiscreteBoundary(sourceFrames, boundary);
+        add(boundary, { property: track.property, value,
+          easing: { kind: 'keyword', value: 'linear' } });
+        add(boundary + holdDuration, { property: track.property, value, easing });
+      }
+    }
+  }
+  const rendered = [...blocks.entries()].sort(([a], [b]) => a - b).map(([offset, declarations]) => {
+    const lines = declarations.map((declaration) => [
+      `    ${declaration.property}: ${declaration.value};`,
+      declaration.easing
+        ? `    animation-timing-function: ${formatTimingFunction(declaration.easing)};` : '',
+    ].filter(Boolean).join('\n'));
+    return `  ${formatOffset(offset)} {\n${lines.join('\n')}\n  }`;
+  });
+  return `@keyframes ${name} {\n${rendered.join('\n')}\n}`;
+}
+
+function warpTime(timeMs: number, boundary: number, duration: number): number {
+  return timeMs >= boundary ? timeMs + duration : timeMs;
+}
+
+function valueAtDiscreteBoundary(
+  frames: Array<{ timeMs: number; value: string }>,
+  boundary: number,
+): string {
+  return [...frames].reverse().find((frame) => frame.timeMs <= boundary)?.value ?? frames[0]!.value;
+}
+
+function interpolateCssValue(from: string, to: string, progress: number): string {
+  const numberPattern = /-?(?:\d+\.?\d*|\.\d+)/g;
+  const fromNumbers = [...from.matchAll(numberPattern)].map((match) => Number(match[0]));
+  const toNumbers = [...to.matchAll(numberPattern)].map((match) => Number(match[0]));
+  const fromShape = from.replace(numberPattern, '#');
+  const toShape = to.replace(numberPattern, '#');
+  if (fromShape !== toShape || fromNumbers.length !== toNumbers.length) {
+    if (progress === 0) return from;
+    if (progress === 1) return to;
+    throw new Error('COMPILER_HOLD_INTERPOLATION_UNSUPPORTED');
+  }
+  let index = 0;
+  return from.replace(numberPattern, () => formatNumber(
+    fromNumbers[index]! + (toNumbers[index]! - fromNumbers[index++]!) * progress,
+  ));
+}
+
+function splitTimingFunction(
+  timing: TimingFunction,
+  timeFraction: number,
+): { progress: number; before: TimingFunction; after: TimingFunction } {
+  if (timing.kind === 'keyword' && timing.value === 'linear') {
+    return { progress: timeFraction, before: timing, after: timing };
+  }
+  const points = timing.kind === 'cubic-bezier'
+    ? [timing.x1, timing.y1, timing.x2, timing.y2] as const
+    : timing.kind === 'keyword' && timing.value === 'ease-in-out'
+      ? [0.42, 0, 0.58, 1] as const : null;
+  if (!points) throw new Error('COMPILER_HOLD_EASING_UNSUPPORTED');
+  const parameter = solveBezierParameter(timeFraction, points[0], points[2]);
+  const [x1, y1, x2, y2] = points;
+  const ax = lerp(0, x1, parameter); const ay = lerp(0, y1, parameter);
+  const bx = lerp(x1, x2, parameter); const by = lerp(y1, y2, parameter);
+  const cx = lerp(x2, 1, parameter); const cy = lerp(y2, 1, parameter);
+  const dx = lerp(ax, bx, parameter); const dy = lerp(ay, by, parameter);
+  const ex = lerp(bx, cx, parameter); const ey = lerp(by, cy, parameter);
+  const splitX = lerp(dx, ex, parameter); const splitY = lerp(dy, ey, parameter);
+  const before = { kind: 'cubic-bezier' as const,
+    x1: ax / splitX, y1: ay / splitY, x2: dx / splitX, y2: dy / splitY };
+  const after = { kind: 'cubic-bezier' as const,
+    x1: (ex - splitX) / (1 - splitX), y1: (ey - splitY) / (1 - splitY),
+    x2: (cx - splitX) / (1 - splitX), y2: (cy - splitY) / (1 - splitY) };
+  return { progress: splitY, before, after };
+}
+
+function solveBezierParameter(x: number, x1: number, x2: number): number {
+  let low = 0; let high = 1;
+  for (let iteration = 0; iteration < 60; iteration += 1) {
+    const mid = (low + high) / 2;
+    const value = cubicBezier(mid, x1, x2);
+    if (value < x) low = mid; else high = mid;
+  }
+  return (low + high) / 2;
+}
+
+function cubicBezier(t: number, p1: number, p2: number): number {
+  const inverse = 1 - t;
+  return 3 * inverse * inverse * t * p1 + 3 * inverse * t * t * p2 + t * t * t;
+}
+
+function lerp(from: number, to: number, progress: number): number {
+  return from + (to - from) * progress;
 }
 
 function assertNoOpaqueMotion(css: string): void {

@@ -138,6 +138,54 @@ test('renders exact compiled output and controls native animations without mutat
   expect(consoleErrors).toEqual([]);
 });
 
+test('inserts the fixed hold from Time, ripples native preview and timeline, then reverses exactly', async ({ page }) => {
+  await page.goto(editorUrl);
+  await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  const before = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  await expect(page.getByRole('button', { name: 'Insert 600 ms hold' })).toBeEnabled();
+  await page.getByRole('button', { name: 'Insert 600 ms hold' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText(
+    '600 ms hold inserted before Pair crosses. Revision 1.',
+  );
+  await expect(page.locator('[data-hold-status]')).toHaveText(
+    '600 ms hold inserted · Pair crosses at 3470 ms · duration 5260 ms',
+  );
+  await expect(page.getByRole('button', { name: 'Insert 600 ms hold' })).toBeDisabled();
+  await expect(page.locator('[data-duration]')).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Add midpoint' })).toBeDisabled();
+  expect(await page.locator('[data-timeline]').getAttribute('data-duration-ms')).toBe('5260');
+  expect((await page.locator('[data-cue-id]').evaluateAll((nodes) => nodes.map((node) => ({
+    id: (node as HTMLElement).dataset.cueId, timeMs: Number((node as HTMLElement).dataset.timeMs),
+  })))).filter((cue) => ['cue_pair', 'cue_hold', 'cue_rest'].includes(cue.id ?? ''))).toEqual([
+    { id: 'cue_pair', timeMs: 3470 }, { id: 'cue_hold', timeMs: 4910 },
+    { id: 'cue_rest', timeMs: 5260 },
+  ]);
+  const held = await page.evaluate(() => {
+    const editor = window.__motionEditor;
+    const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    return {
+      state: editor.inspectAuthoring(), projection: editor.canonicalProjection,
+      exactOutput: iframe.srcdoc === editor.compiledHtml,
+      native: iframe.contentDocument!.getAnimations().every((animation) =>
+        animation.constructor.name === 'CSSAnimation'),
+      scriptFree: !/<script|requestAnimationFrame|setTimeout/i.test(editor.compiledHtml),
+    };
+  });
+  expect(held.exactOutput).toBe(true); expect(held.native).toBe(true); expect(held.scriptFree).toBe(true);
+  expect(held.projection.holds).toEqual([expect.objectContaining({
+    cueId: 'cue_pair', sourceTimeMs: 2870, durationMs: 600,
+  })]);
+  await page.getByRole('button', { name: 'Undo' }).click();
+  await expect(page.locator('[data-hold-status]')).toHaveText('No hold inserted · Pair crosses at 2870 ms');
+  const undone = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  expect(undone.contentDigest).toBe(before.contentDigest);
+  expect(undone.exportDigest).toBe(before.exportDigest);
+  await page.getByRole('button', { name: 'Redo' }).click();
+  const redone = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  expect(redone.contentDigest).toBe(held.state.contentDigest);
+  expect(redone.exportDigest).toBe(held.state.exportDigest);
+});
+
 test('guides a first-time author through truthful creation, timing, focus, and exact history', async ({ page }) => {
   const failedRequests: string[] = [];
   page.on('requestfailed', (request) => failedRequests.push(request.failure()?.errorText ?? 'failed'));

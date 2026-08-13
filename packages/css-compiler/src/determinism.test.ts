@@ -12,6 +12,30 @@ const fixturePath = fileURLToPath(
 );
 
 describe('deterministic pure HTML/CSS compiler', () => {
+  test('emits deterministic compiler-native source-to-story hold CSS', async () => {
+    const imported = importMotionHtml(await readFile(
+      new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8'));
+    imported.document!.cues = [
+      { schemaVersion: 'motion.cue.v1', id: 'cue_pair', label: 'Pair crosses', timeMs: 2870 },
+      { schemaVersion: 'motion.cue.v1', id: 'cue_hold', label: 'Hold inspected', timeMs: 4310 },
+      { schemaVersion: 'motion.cue.v1', id: 'cue_rest', label: 'Rest', timeMs: 4660 },
+    ];
+    const initial = createAuthoringState(imported.document!);
+    const held = dispatchAuthoringOperation(initial, {
+      schemaVersion: 'motion.operation.v1', operationId: 'compiler:hold',
+      documentId: initial.document.documentId, expectedRevision: 0,
+      kind: 'motion.hold.insert', payload: { cueId: 'cue_pair', durationMs: 600 },
+    });
+    expect(held.ok).toBe(true); if (!held.ok) throw new Error(held.diagnostic.code);
+    const runs = [0, 1, 2].map(() => compileMotionDocument(held.state.document));
+    expect(runs.map((run) => run.html)).toEqual(Array(3).fill(runs[0]!.html));
+    expect(runs.map((run) => run.exportDigest)).toEqual(Array(3).fill(runs[0]!.exportDigest));
+    expect(runs[0]!.css).toContain('4900ms');
+    expect(runs[0]!.css).toContain('cubic-bezier(');
+    expect(runs[0]!.css).toContain('steps(1, end)');
+    expect(runs[0]!.html).not.toMatch(/<script|requestAnimationFrame|setTimeout/i);
+  });
+
   test('reconstructs rule, application, slot, track, and keyframe motion from canonical records', async () => {
     const imported = importMotionHtml(await readFile(fixturePath, 'utf8'));
     expect(imported.document).not.toBeNull();

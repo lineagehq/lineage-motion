@@ -1,4 +1,4 @@
-import type { MotionCue, MotionDocument, TimingFunction } from '../../domain/src/index.js';
+import type { MotionCue, MotionDocument, MotionHold, TimingFunction } from '../../domain/src/index.js';
 
 export type TimelineCue = MotionCue;
 
@@ -27,6 +27,7 @@ export type TimelineModel = {
   durationMs: number;
   rows: TimelineRow[];
   cues: TimelineCue[];
+  holds?: MotionHold[];
   reducedMotion: MotionDocument['reducedMotion'];
 };
 
@@ -86,6 +87,9 @@ export class NativePreviewController {
 }
 
 export function buildTimeline(document: MotionDocument): TimelineModel {
+  const sourceToStory = (timeMs: number): number => (document.holds ?? []).reduce(
+    (storyTime, hold) => storyTime + (timeMs >= hold.sourceTimeMs ? hold.durationMs : 0), timeMs,
+  );
   const rows = document.tracks.map((track): TimelineRow => {
     const application = document.applications.find((candidate) =>
       candidate.slots.some((slot) => slot.id === track.slotId)
@@ -98,8 +102,9 @@ export function buildTimeline(document: MotionDocument): TimelineModel {
     if (!application || !slot || !binding || !ruleTrack) {
       throw new Error('PREVIEW_TIMELINE_RELATIONSHIP_INVALID');
     }
-    const delayMs = binding.delayOverridesMs[slotIndex];
-    if (delayMs === undefined) throw new Error('PREVIEW_TIMELINE_DELAY_MISSING');
+    const sourceDelayMs = binding.delayOverridesMs[slotIndex];
+    if (sourceDelayMs === undefined) throw new Error('PREVIEW_TIMELINE_DELAY_MISSING');
+    const delayMs = sourceToStory(sourceDelayMs);
     return {
       trackId: track.id,
       elementId: track.elementId,
@@ -116,7 +121,7 @@ export function buildTimeline(document: MotionDocument): TimelineModel {
         offset: keyframe.offset,
         value: keyframe.value,
         easing: keyframe.easing ?? null,
-        timeMs: delayMs + keyframe.offset * slot.durationMs,
+        timeMs: sourceToStory(sourceDelayMs + keyframe.offset * slot.durationMs),
       })),
     };
   });
@@ -125,6 +130,7 @@ export function buildTimeline(document: MotionDocument): TimelineModel {
     durationMs: document.durationMs,
     rows,
     cues: document.cues.map((cue) => ({ ...cue })),
+    ...(document.holds ? { holds: document.holds.map((hold) => ({ ...hold })) } : {}),
     reducedMotion: { ...document.reducedMotion },
   };
 }

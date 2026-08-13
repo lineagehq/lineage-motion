@@ -62,6 +62,11 @@ document.body.innerHTML = `
             <div class="timing-control"><output data-applied-delay>Applied — create a track first</output><label><span>Delay draft <em hidden>Not applied</em></span><input data-delay type="number" min="0" step="1" value="610"></label><button type="button" data-set-delay>Apply delay</button></div>
             <div class="timing-control"><output data-applied-easing>Applied — create a track first</output><label><span>Easing draft <em hidden>Not applied</em></span><select data-easing><option value="linear">linear</option><option value="ease-in-out">ease-in-out</option></select></label><button type="button" data-set-easing>Apply easing</button></div>
           </div>
+          <div class="hold-control" data-hold-control>
+            <div><strong>Extend the reveal beat</strong><span>Insert one fixed 600 ms hold before Pair crosses. Every later cue and motion beat ripples together.</span></div>
+            <button type="button" data-insert-hold>Insert 600 ms hold</button>
+            <output data-hold-status>No hold inserted · Pair crosses at 2870 ms</output>
+          </div>
         </section>
         <section class="workflow-footer" aria-label="Change history">
           <div class="history"><button type="button" data-undo>Undo</button><button type="button" data-redo>Redo</button></div>
@@ -117,6 +122,8 @@ const previewSelectionLabel = required<HTMLElement>('[data-preview-selection-lab
 const appliedDuration = required<HTMLOutputElement>('[data-applied-duration]');
 const appliedDelay = required<HTMLOutputElement>('[data-applied-delay]');
 const appliedEasing = required<HTMLOutputElement>('[data-applied-easing]');
+const insertHoldButton = required<HTMLButtonElement>('[data-insert-hold]');
+const holdStatus = required<HTMLOutputElement>('[data-hold-status]');
 
 for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="creation-target"]')) {
   radio.addEventListener('change', () => {
@@ -181,6 +188,10 @@ setEasingButton.addEventListener('click', () => void withCreatedTrack((track) =>
   ...operationEnvelope(), kind: 'motion.slot-easing.set', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   payload: { easing: required<HTMLSelectElement>('[data-easing]').value as 'linear' | 'ease-in-out' },
 })));
+insertHoldButton.addEventListener('click', () => void dispatch({
+  ...operationEnvelope(), kind: 'motion.hold.insert',
+  payload: { cueId: 'cue_pair', durationMs: 600 },
+}, '[data-undo]'));
 removeMidpointButton.addEventListener('click', () => void withCreatedTrack((track) => ({
   ...operationEnvelope(), kind: 'motion.keyframe.remove', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   keyframeId: track.keyframes.find((keyframe) => keyframe.offset === 0.5)?.id ?? '',
@@ -363,6 +374,7 @@ function renderProjection(): void {
   const timeline = buildTimeline(authoring.document);
   const timelineElement = required<HTMLElement>('[data-timeline]');
   timelineElement.dataset.durationMs = String(timeline.durationMs);
+  scrubber.max = String(timeline.durationMs);
   timelineElement.replaceChildren(...timeline.rows.map(renderTrack));
   required('[data-track-count]').textContent = `${timeline.rows.length} tracks`;
   const cues = required('[data-cues]');
@@ -376,6 +388,12 @@ function renderProjection(): void {
     cues.append(button);
   }
   required('[data-cue-count]').textContent = String(timeline.cues.length);
+  const hold = timeline.holds?.[0];
+  insertHoldButton.disabled = Boolean(hold);
+  holdStatus.value = hold
+    ? `600 ms hold inserted · Pair crosses at ${hold.sourceTimeMs + hold.durationMs} ms · duration ${timeline.durationMs} ms`
+    : 'No hold inserted · Pair crosses at 2870 ms';
+  required<HTMLElement>('[data-hold-control]').dataset.active = String(Boolean(hold));
   for (const [button, unavailable] of [[undoButton, authoring.undo.length === 0],
     [redoButton, authoring.redo.length === 0]] as const) {
     button.removeAttribute('aria-disabled');
@@ -386,29 +404,31 @@ function renderProjection(): void {
 }
 
 function updateStructuralControls(rows: TimelineRow[]): void {
+  const locked = (authoring.document.holds ?? []).length > 0;
   const track = findCreatedTrack(rows);
   const hasTrack = Boolean(track);
   const hasMidpoint = Boolean(track?.keyframes.some((keyframe) => keyframe.offset === 0.5));
   for (const choice of creationChoices) {
     const eligibility = projectTrackCreationEligibility(authoring.document, choice.elementId, 'opacity');
     const radio = required<HTMLInputElement>(`input[name="creation-target"][value="${choice.elementId}"]`);
-    radio.disabled = !eligibility.available && selectedCreationElementId !== choice.elementId;
+    radio.disabled = locked || (!eligibility.available && selectedCreationElementId !== choice.elementId);
     required(`[data-choice-reason="${choice.elementId}"]`).textContent = eligibility.available
       ? 'Available' : eligibilityReason(eligibility.reason);
   }
   const selectedEligibility = selectedCreationElementId
     ? projectTrackCreationEligibility(authoring.document, selectedCreationElementId, 'opacity') : null;
-  createTrackButton.disabled = !selectedEligibility?.available;
+  createTrackButton.disabled = locked || !selectedEligibility?.available;
   createTrackButton.textContent = selectedCreationElementId
     ? `Create ${creationChoices.find((choice) => choice.elementId === selectedCreationElementId)!.label} opacity track`
     : 'Select an element';
-  addMidpointButton.disabled = !hasTrack || hasMidpoint;
-  removeMidpointButton.disabled = !hasMidpoint;
+  addMidpointButton.disabled = locked || !hasTrack || hasMidpoint;
+  removeMidpointButton.disabled = locked || !hasMidpoint;
   for (const control of [durationInput, delayInput, easingInput, setDurationButton, setDelayButton, setEasingButton]) {
-    control.disabled = !hasTrack;
+    control.disabled = locked || !hasTrack;
   }
   hydrateTimingControls(track);
-  required('[data-structural-status]').textContent = !selectedCreationElementId
+  required('[data-structural-status]').textContent = locked
+    ? 'Hold inserted. Undo the hold before making another edit.' : !selectedCreationElementId
     ? 'Select an available element to begin.'
     : !hasTrack && selectedEligibility?.available
       ? `${creationChoices.find((choice) => choice.elementId === selectedCreationElementId)!.label} is ready to animate.`
@@ -480,6 +500,7 @@ function diagnosticMessage(code: string): string {
     AUTHORING_DURATION_INVALID: 'Enter a whole-number duration greater than 0.',
     AUTHORING_DELAY_INVALID: 'Enter a whole-number delay of 0 or greater.',
     AUTHORING_TRACK_NOT_FOUND: 'Create the cursor opacity track first.',
+    AUTHORING_HOLD_LOCKED: 'Undo the hold before making another edit.',
   };
   return messages[code] ?? 'That change could not be applied.';
 }
@@ -492,6 +513,7 @@ function successMessage(kind: AuthoringOperation['kind']): string {
     'motion.binding-delay.set': 'Delay updated.',
     'motion.slot-easing.set': 'Easing updated.',
     'motion.keyframe.remove': 'Midpoint removed.',
+    'motion.hold.insert': '600 ms hold inserted before Pair crosses.',
     'motion.history.undo': 'Undid the last change.',
     'motion.history.redo': 'Redid the change.',
   };
@@ -503,10 +525,11 @@ function updateSelection(): void {
     ? buildTimeline(authoring.document).rows.find((candidate) => candidate.trackId === selectedTrackId) : undefined;
   const keyframe = row?.keyframes.find((candidate) => candidate.id === selectedKeyframeId);
   if (!row || !keyframe) clearKeyframeSelection();
-  valueInput.disabled = !hasExplicitKeyframeSelection;
-  timeInput.disabled = !hasExplicitKeyframeSelection;
-  valueButton.disabled = !hasExplicitKeyframeSelection;
-  timeButton.disabled = !hasExplicitKeyframeSelection;
+  const locked = (authoring.document.holds ?? []).length > 0;
+  valueInput.disabled = locked || !hasExplicitKeyframeSelection;
+  timeInput.disabled = locked || !hasExplicitKeyframeSelection;
+  valueButton.disabled = locked || !hasExplicitKeyframeSelection;
+  timeButton.disabled = locked || !hasExplicitKeyframeSelection;
   if (!hasExplicitKeyframeSelection) {
     required('[data-selection]').innerHTML = `<div class="selection-summary"><strong>No keyframe selected</strong><span>Open Inspect all tracks and choose a keyframe for exact editing.</span></div>`;
     previewSelectionLabel.textContent = selectedCreationElementId ? 'Element chosen' : '';

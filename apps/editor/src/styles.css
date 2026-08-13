@@ -53,6 +53,13 @@ input[aria-invalid="true"] { border-color: #ff9d9d; box-shadow: 0 0 0 2px rgba(2
 .timing-control em { color: #a899bf; font-size: 9px; font-style: normal; }
 .timing-control[data-draft="true"] em { color: #facf74; font-weight: 700; }
 .timing-control button { font-size: 11px; }
+.hold-control { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 8px 12px; margin: 12px 0 0 39px; padding: 11px; border: 1px solid #3a4659; border-radius: 10px; background: #121924; }
+.hold-control > div { display: grid; gap: 3px; }
+.hold-control strong { font-size: 12px; }
+.hold-control span { color: #9da9bd; font-size: 10px; line-height: 1.4; }
+.hold-control output { grid-column: 1 / -1; color: #94a1b8; font-size: 10px; }
+.hold-control[data-active="true"] { border-color: #4c8279; background: #13222a; }
+.hold-control[data-active="true"] output { color: #81d8c9; }
 .workflow-footer { display: grid; gap: 9px; padding: 12px 16px; }
 .history { display: flex; gap: 8px; }
 .operation-status { min-height: 18px; color: #81d8c9; font-size: 12px; }
@@ -115,7 +122,7 @@ iframe { display: block; width: 100%; height: 450px; border: 0; background: #101
   .editor-shell { padding: 12px; }
   .workflow-card { padding: 13px; }
   .target-choices, .timing-controls, .keyframe-fields, .cue-list { grid-template-columns: 1fr; }
-  .timing-controls, .shape-actions, .authoring-panel { margin-left: 0; }
+  .timing-controls, .shape-actions, .authoring-panel, .hold-control { margin-left: 0; }
   .shape-actions { flex-wrap: wrap; }
   .transport { grid-template-columns: auto auto 1fr; }
   .transport label { grid-column: 1 / -1; grid-row: 2; }
