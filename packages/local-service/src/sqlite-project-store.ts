@@ -23,6 +23,9 @@ export class SqliteProjectStore implements ProjectStore {
   }
   private migrate(): void {
     this.database.exec('CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, checksum TEXT NOT NULL, applied_order INTEGER NOT NULL UNIQUE)');
+    const newest = this.database.prepare('SELECT MAX(version) version FROM schema_migrations').get() as { version: number | null };
+    const supportedVersion = MIGRATIONS.at(-1)?.version ?? 0;
+    if (newest.version !== null && newest.version > supportedVersion) throw new Error('UNSUPPORTED_SCHEMA_VERSION');
     for (const migration of MIGRATIONS) {
       const row = this.database.prepare('SELECT checksum FROM schema_migrations WHERE version=?').get(migration.version) as { checksum: string } | undefined;
       if (row) { if (row.checksum !== migration.checksum) throw new Error('MIGRATION_CHECKSUM_MISMATCH'); continue; }

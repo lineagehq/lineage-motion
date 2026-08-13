@@ -85,3 +85,28 @@ test('an open editor refreshes from CLI commit via metadata-only SSE and immutab
   expect(eventResponses).toEqual([expect.objectContaining({ status: 200, contentType: expect.stringContaining('text/event-stream') })]);
   expect(pageErrors).toEqual([]); expect(consoleErrors).toEqual([]); expect(failedRequests).toEqual([]);
 });
+
+test('a same-revision CLI race cannot leave a stale editor after its local command is rejected', async ({ page }) => {
+  let releaseCommand!: () => void; let markIntercepted!: () => void;
+  const commandIntercepted = new Promise<void>((resolveIntercepted) => { markIntercepted = resolveIntercepted; });
+  const commandRelease = new Promise<void>((resolveRelease) => { releaseCommand = resolveRelease; });
+  await page.route('**/api/v1/commands', async (route) => {
+    markIntercepted(); await commandRelease; await route.continue();
+  });
+  await page.goto(editorUrl); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await page.getByRole('radio', { name: /Orb/ }).click();
+  await page.getByRole('button', { name: 'Create Orb opacity track' }).click();
+  await commandIntercepted;
+  const seed = createPhase3Seed(resolve(import.meta.dirname, '../../..'));
+  expect(await runCli(['track-create', '--service', serviceUrl, '--operation-id', 'cli-wins-race', '--document-id', seed.documentId,
+    '--expected-revision', '0', '--element-id', 'el_a2849ff826f3e167'], { stdout: () => undefined, stderr: () => undefined })).toBe(0);
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().lastCommit?.revision)).toBe(1);
+  releaseCommand();
+  await expect(page.locator('[data-operation-status]')).toContainText('refreshed to revision 1');
+  const proof = await page.evaluate(() => { const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    return { state: window.__motionEditor.inspectAuthoring(), exact: iframe.srcdoc === window.__motionEditor.compiledHtml };
+  });
+  expect(proof.state).toMatchObject({ revision: 1, immutableRefetchCount: 1,
+    lastCommit: { revision: 1, kind: 'motion.track.create' } });
+  expect(proof.exact).toBe(true);
+});

@@ -1133,12 +1133,15 @@ function applyEdit(
   return { ok: true, document: nextDocument, inverse };
 }
 
+export function isValidAuthoringOperationId(value: unknown): value is string {
+  return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
+}
+
 function parseOperation(input: unknown): AuthoringOperation | null {
   if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
   const value = input as Record<string, unknown>;
   if (value.schemaVersion !== 'motion.operation.v1'
-    || typeof value.operationId !== 'string'
-    || !/^[A-Za-z0-9._:-]{1,128}$/.test(value.operationId)
+    || !isValidAuthoringOperationId(value.operationId)
     || typeof value.documentId !== 'string' || value.documentId.length === 0
     || !Number.isSafeInteger(value.expectedRevision) || (value.expectedRevision as number) < 0
     || !['motion.keyframe-value.set', 'motion.keyframe-time.set', 'motion.track.create',

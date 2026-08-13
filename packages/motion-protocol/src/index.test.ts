@@ -11,6 +11,10 @@ describe('motion.protocol.v1', () => {
     expect(parseCommand({ ...command, selector: '.private' })).toEqual({ ok: false, code: 'VALIDATION' });
     expect(parseCommand({ ...command, expectedRevision: 1 })).toEqual({ ok: false, code: 'VALIDATION' });
     expect(parseCommand({ ...command, protocolVersion: 'motion.protocol.v2' })).toEqual({ ok: false, code: 'UNSUPPORTED_VERSION' });
+    expect(parseCommand({ ...command, operationId: 'contains space', command: { ...command.command, operationId: 'contains space' } }))
+      .toEqual({ ok: false, code: 'VALIDATION' });
+    expect(() => makeTrackCreateCommand({ operationId: 'contains space', documentId: 'doc', expectedRevision: 0,
+      elementId: 'el_2dbee68b1ea318c8' })).toThrow();
   });
   test('runtime-validates exact responses, immutable revisions with matching digests, and metadata-only events', () => {
     const document = createPhase3Seed(); const canonicalDigest = sha256Hex(canonicalBytes(document));

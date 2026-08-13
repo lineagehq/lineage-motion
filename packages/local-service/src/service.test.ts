@@ -4,6 +4,7 @@ import { describe, expect, test } from 'vitest';
 import { canonicalJson } from '../../domain/src/index.ts';
 import { MotionServiceClient } from '../../motion-protocol/src/index.ts';
 import { startLocalMotionService } from './index.ts';
+import { SqliteProjectStore } from './sqlite-project-store.ts';
 import { phase3Command, phase3Seed, temporaryStore } from './test-support.ts';
 
 describe('loopback sole-writer service', () => {
@@ -67,5 +68,17 @@ describe('loopback sole-writer service', () => {
     const replacement = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
     expect((await fetch(`${replacement.url}/health`)).ok).toBe(true);
     await replacement.close(); await service.close(); await temporary.cleanup();
+  });
+
+  test('fails closed before listening when the store schema is newer than this binary supports', async () => {
+    const temporary = await temporaryStore(); const seed = phase3Seed();
+    const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
+    (service.store as SqliteProjectStore).database
+      .prepare('INSERT INTO schema_migrations(version,checksum,applied_order) VALUES(?,?,?)')
+      .run(2, 'future-schema', 2);
+    await service.close();
+    await expect(startLocalMotionService({ databasePath: temporary.databasePath, seed }))
+      .rejects.toThrow('UNSUPPORTED_SCHEMA_VERSION');
+    await temporary.cleanup();
   });
 });

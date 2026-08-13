@@ -274,8 +274,18 @@ async function dispatch(
       documentId: operation.documentId, expectedRevision: operation.expectedRevision, elementId: operation.elementId }));
     if (!response.ok) {
       pendingRevision = null;
+      if (response.code === 'STALE_REVISION') {
+        const immutable = await serviceClient.head(operation.documentId);
+        immutableRefetchCount += 1;
+        authoring = createAuthoringState(immutable.document);
+        compiled = compileMotionDocument(authoring.document);
+        await controller.mount(compiled.html);
+        renderProjection();
+      }
       const code = response.code === 'STALE_REVISION' ? 'AUTHORING_STALE_REVISION' : `SERVICE_${response.code}`;
-      status.value = `${diagnosticMessage(code)} (${code}) Revision ${authoring.document.revision} unchanged.`;
+      status.value = response.code === 'STALE_REVISION'
+        ? `${diagnosticMessage(code)} (${code}) Local operation not applied; refreshed to revision ${authoring.document.revision}.`
+        : `${diagnosticMessage(code)} (${code}) Revision ${authoring.document.revision} unchanged.`;
       status.dataset.kind = 'error'; return { ok: false, code };
     }
     const immutable = await serviceClient.revision(response.documentId, response.resultingRevision);

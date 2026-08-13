@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-import { canonicalBytes, canonicalJson, sha256Hex, validateMotionDocument, type MotionDocument } from '../../domain/src/index.ts';
+import { canonicalBytes, canonicalJson, isValidAuthoringOperationId, sha256Hex, validateMotionDocument,
+  type MotionDocument } from '../../domain/src/index.ts';
 
 export const PROTOCOL_VERSION = 'motion.protocol.v1' as const;
 export const MAIN_BRANCH_ID = 'main' as const;
@@ -8,7 +9,7 @@ export const MAIN_BRANCH_ID = 'main' as const;
 const trackCreate = z.object({
   schemaVersion: z.literal('motion.operation.v1'),
   kind: z.literal('motion.track.create'),
-  operationId: z.string().min(1),
+  operationId: z.string().refine(isValidAuthoringOperationId),
   documentId: z.string().min(1),
   expectedRevision: z.number().int().nonnegative().safe(),
   elementId: z.enum(['el_a2849ff826f3e167', 'el_2dbee68b1ea318c8']),
@@ -20,7 +21,7 @@ const trackCreate = z.object({
 
 export const commandSchema = z.object({
   protocolVersion: z.literal(PROTOCOL_VERSION),
-  operationId: z.string().min(1),
+  operationId: z.string().refine(isValidAuthoringOperationId),
   documentId: z.string().min(1),
   branchId: z.literal(MAIN_BRANCH_ID),
   expectedRevision: z.number().int().nonnegative().safe(),
@@ -134,6 +135,6 @@ export function makeTrackCreateCommand(input: { operationId: string; documentId:
     operationId: input.operationId, documentId: input.documentId, expectedRevision: input.expectedRevision,
     elementId: input.elementId, payload: { property: 'opacity' as const, durationMs: 1000 as const,
       delayMs: 610 as const, easing: 'linear' as const, startValue: 0 as const, endValue: 1 as const } };
-  return { protocolVersion: PROTOCOL_VERSION, operationId: input.operationId, documentId: input.documentId,
-    branchId: MAIN_BRANCH_ID, expectedRevision: input.expectedRevision, command };
+  return commandSchema.parse({ protocolVersion: PROTOCOL_VERSION, operationId: input.operationId, documentId: input.documentId,
+    branchId: MAIN_BRANCH_ID, expectedRevision: input.expectedRevision, command });
 }

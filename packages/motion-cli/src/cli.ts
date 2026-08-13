@@ -1,4 +1,4 @@
-import { canonicalJson } from '../../domain/src/index.ts';
+import { canonicalJson, isValidAuthoringOperationId } from '../../domain/src/index.ts';
 import { MotionServiceClient, makeTrackCreateCommand } from '../../motion-protocol/src/index.ts';
 
 export async function runCli(argv: string[], io: { stdout(value: string): void; stderr(value: string): void } = {
@@ -22,7 +22,7 @@ function parseArgs(argv: string[]) {
   const service = read('--service'), operationId = read('--operation-id'), documentId = read('--document-id'),
     expected = read('--expected-revision'), elementId = read('--element-id');
   const expectedRevision = Number(expected);
-  if (!service || !operationId || !documentId || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0
+  if (!service || !isValidAuthoringOperationId(operationId) || !documentId || !Number.isSafeInteger(expectedRevision) || expectedRevision < 0
     || (elementId !== 'el_a2849ff826f3e167' && elementId !== 'el_2dbee68b1ea318c8')) return null;
   return { service, operationId, documentId, expectedRevision,
     elementId: elementId as 'el_a2849ff826f3e167' | 'el_2dbee68b1ea318c8' };
