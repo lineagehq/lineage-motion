@@ -14,10 +14,20 @@ import {
   NativePreviewController,
   type TimelineRow,
 } from '../../../packages/preview-runtime/src/index.js';
+import { MotionServiceClient, makeTrackCreateCommand, type CommitMetadata } from '../../../packages/motion-protocol/src/index.ts';
 import './styles.css';
 
 let authoring = createAuthoringState(payload.document);
 let compiled = payload.compiled;
+const serviceClient = payload.serviceBacked ? new MotionServiceClient('') : null;
+let lastCommit: CommitMetadata | null = null;
+let immutableRefetchCount = 0;
+let pendingRevision: number | null = null;
+if (serviceClient) {
+  const head = await serviceClient.head(payload.document.documentId);
+  authoring = createAuthoringState(head.document);
+  compiled = compileMotionDocument(head.document);
+}
 let operationSequence = 0;
 const creationChoices = [
   { elementId: 'el_a2849ff826f3e167', label: 'Cursor' },
@@ -238,6 +248,9 @@ window.__motionEditor = {
     selectedTrackId: selectedTrackId as string,
     selectedKeyframeId: selectedKeyframeId as string,
     selectedCreationElementId,
+    serviceBacked: Boolean(serviceClient),
+    immutableRefetchCount,
+    lastCommit,
   }),
   dispatch,
 };
@@ -249,7 +262,28 @@ async function dispatch(
 ): Promise<{ ok: boolean; code?: string }> {
   const beforeCreated = findCreatedTrack(buildTimeline(authoring.document).rows);
   const beforeHasMidpoint = beforeCreated?.keyframes.some((keyframe) => keyframe.offset === 0.5) ?? false;
-  const result = dispatchAuthoringOperation(authoring, operation);
+  if (serviceClient && operation.kind !== 'motion.track.create') {
+    const code = 'SERVICE_OPERATION_UNSUPPORTED';
+    status.value = `This durable editor currently supports track creation only. (${code}) Revision ${authoring.document.revision} unchanged.`;
+    status.dataset.kind = 'error'; return { ok: false, code };
+  }
+  let result = dispatchAuthoringOperation(authoring, operation);
+  if (serviceClient && operation.kind === 'motion.track.create') {
+    pendingRevision = operation.expectedRevision + 1;
+    const response = await serviceClient.dispatch(makeTrackCreateCommand({ operationId: operation.operationId,
+      documentId: operation.documentId, expectedRevision: operation.expectedRevision, elementId: operation.elementId }));
+    if (!response.ok) {
+      pendingRevision = null;
+      const code = response.code === 'STALE_REVISION' ? 'AUTHORING_STALE_REVISION' : `SERVICE_${response.code}`;
+      status.value = `${diagnosticMessage(code)} (${code}) Revision ${authoring.document.revision} unchanged.`;
+      status.dataset.kind = 'error'; return { ok: false, code };
+    }
+    const immutable = await serviceClient.revision(response.documentId, response.resultingRevision);
+    immutableRefetchCount += 1;
+    authoring = createAuthoringState(immutable.document);
+    pendingRevision = null;
+    result = { ok: true, state: authoring };
+  }
   if (!result.ok) {
     if (operation.kind === 'motion.slot-duration.set') {
       required<HTMLInputElement>('[data-duration]').setAttribute('aria-invalid', 'true');
@@ -320,6 +354,19 @@ async function dispatch(
     }
   }
   return { ok: true };
+}
+
+if (serviceClient) {
+  serviceClient.events(authoring.document.documentId, async (event) => {
+    if (event.revision <= authoring.document.revision || event.revision === pendingRevision) { lastCommit = event; return; }
+    const immutable = await serviceClient.revision(event.documentId, event.revision);
+    immutableRefetchCount += 1; lastCommit = event;
+    authoring = createAuthoringState(immutable.document);
+    compiled = compileMotionDocument(authoring.document);
+    await controller.mount(compiled.html);
+    renderProjection();
+    status.value = `Revision ${authoring.document.revision} refreshed from committed service state.`;
+  });
 }
 
 function clearKeyframeSelection(): void {

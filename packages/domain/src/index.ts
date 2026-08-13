@@ -458,6 +458,11 @@ export function canonicalBytes(document: MotionDocument): Uint8Array {
   return new TextEncoder().encode(`${stableStringify(document)}\n`);
 }
 
+/** Canonical JSON for durable protocol and store boundaries. */
+export function canonicalJson(value: unknown): string {
+  return `${stableStringify(value)}\n`;
+}
+
 /** Revision-neutral bytes for comparing canonical content across undo/redo revisions. */
 export function canonicalContentBytes(document: MotionDocument): Uint8Array {
   const { revision: _revision, ...content } = document;

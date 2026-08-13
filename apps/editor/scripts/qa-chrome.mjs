@@ -8,8 +8,7 @@ import { chromium } from '@playwright/test';
 const root = resolve(import.meta.dirname, '../../..');
 const port = 41739;
 const url = `http://127.0.0.1:${port}`;
-const server = spawn(process.execPath, [
-  resolve(root, 'node_modules/vite/bin/vite.js'),
+const server = spawn('npm', ['exec', '--', 'vite',
   '--config', resolve(root, 'apps/editor/vite.config.ts'),
   '--host', '127.0.0.1',
   '--port', String(port),

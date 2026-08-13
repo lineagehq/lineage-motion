@@ -1,0 +1,23 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result":"done",
+    "task_id":"T003",
+    "board_path":"docs/goals/phase3-durable-vertical-slice/state.yaml",
+    "decision":"rejected",
+    "full_outcome_complete":false,
+    "rationale":"Focused gates pass, but they do not prove the persistence/browser boundary. The pre-migration copy is not SQLite-consistent under WAL, the lock is held by an unmonitored helper process, and protocol responses/SSE are trusted through unchecked casts. Service-backed editor operations outside track creation also present unfetched local revisions as committed. Persistent Chrome tests log errors instead of failing and the advertised aggregate gate omits Chrome, browser, determinism, privacy, typecheck, and build. These are boundary defects and proof gaps, not later branch/claim work.",
+    "evidence":[
+      "Fresh service and recovery tests pass, but the WAL database copy can open with zero tables and crash proof only exercises in-process rollback.",
+      "lock-runner does not fail the service closed if its lockf child exits unexpectedly.",
+      "Protocol success, immutable revision, and SSE payloads use unchecked casts rather than runtime validation.",
+      "Service-backed editor mode locally advances unsupported operations and can present unfetched state as committed.",
+      "Persistent browser assertions can pass with zero animations and only log console/page failures.",
+      "verify:phase3 omits required Chrome, browser, determinism, privacy, typecheck, and build gates.",
+      "Sensitive/private/protected-diff checks pass and no branches or claims were added."
+    ],
+    "parallel_safety":{"one_worker_package_safe":true,"parallel_workers_safe":false,"reason":"Lock, store, protocol, editor, Chrome, and aggregate proof form one coupled persistence-to-preview boundary."},
+    "blocked_tasks":["T999"],
+    "missing_evidence":["SQLite-consistent WAL backup and restoration", "Real subprocess crash/restart and lost-response retry", "Fail-closed unexpected lock loss", "Runtime response/revision/SSE validation", "Service-backed committed-state truth", "Strict persistent Chrome evidence", "Complete verify:phase3 aggregate"],
+    "required_board_updates":["Record T003 rejected and activate one corrective Worker before T999."]
+  }
+}

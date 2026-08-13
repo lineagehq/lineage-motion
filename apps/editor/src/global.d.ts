@@ -14,6 +14,8 @@ declare global {
         undoCount: number; redoCount: number; consumedOperationIds: string[];
         selectedTrackId: string; selectedKeyframeId: string;
         selectedCreationElementId: string | null;
+        serviceBacked: boolean; immutableRefetchCount: number;
+        lastCommit: import('../../../packages/motion-protocol/src/index.ts').CommitMetadata | null;
       };
       dispatch: (operation: AuthoringOperation) => Promise<{ ok: boolean; code?: string }>;
     };
