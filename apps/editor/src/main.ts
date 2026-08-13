@@ -25,55 +25,70 @@ const creationChoices = [
 ] as const;
 const statusCopyElementId = 'el_1f3f2908e4fd2401';
 let selectedCreationElementId: StructuralAuthoringElementId | null = null;
-let selectedTrackId = findEditableTrack().trackId;
-let selectedKeyframeId = findEditableTrack().keyframes[0]!.id;
+let selectedTrackId: string | null = null;
+let selectedKeyframeId: string | null = null;
+let hasExplicitKeyframeSelection = false;
 
 document.body.innerHTML = `
   <main class="editor-shell">
     <header class="topbar">
-      <div><p class="eyebrow">Typed canonical authoring</p><h1>Motion Editor</h1></div>
-      <div class="transport" aria-label="Preview transport">
-        <button type="button" data-play>Play</button><button type="button" data-pause>Pause</button>
-        <label>Master time <input data-scrub type="range" min="0" max="${authoring.document.durationMs}" step="1" value="0"></label>
-        <output data-playhead>0 ms</output>
-      </div>
+      <div><p class="eyebrow">Motion Editor</p><h1>Bring one element into motion</h1><p class="purpose">Choose what moves, shape its opacity, set its timing, then preview the compiled CSS.</p></div>
     </header>
-    <section class="authoring-panel" aria-label="Selected keyframe authoring">
-      <div class="selection" data-selection></div>
-      <form data-value-form><label>Opacity value <input data-value type="number" min="0" max="1" step="0.000001" required></label><button type="submit">Set value</button></form>
-      <form data-time-form><label>Master time (ms) <input data-time type="number" min="0" step="1" required></label><button type="submit">Set time</button></form>
-      <div class="history"><button type="button" data-undo>Undo</button><button type="button" data-redo>Redo</button></div>
-      <output class="operation-status" data-operation-status role="status" aria-live="polite">Revision 0 ready.</output>
-    </section>
-    <section class="structural-panel" aria-label="Bounded opacity track creation">
-      <div class="structural-heading"><strong>Choose an opacity target</strong><span data-structural-status>Select an available target to begin.</span></div>
-      <fieldset class="target-choices" data-target-choices><legend>Target and property</legend>
-        ${creationChoices.map((choice) => `<label><input type="radio" name="creation-target" value="${choice.elementId}"><span><strong>${choice.label} — Opacity</strong><small data-choice-reason="${choice.elementId}">Available</small></span></label>`).join('')}
-        <div class="unavailable-choice" data-status-copy><span><strong>Status copy — Opacity</strong><small data-choice-reason="${statusCopyElementId}">Already has an opacity track.</small></span></div>
-      </fieldset>
-      <div class="structural-step"><span>1 · Create</span><button type="button" data-create-track disabled>Select a target</button></div>
-      <div class="structural-step"><span>2 · Shape</span><button type="button" data-add-midpoint>Add midpoint</button><button type="button" data-remove-midpoint>Remove midpoint</button></div>
-      <div class="structural-step structural-timing"><span>3 · Time</span>
-        <label>Duration (ms) <input data-duration type="number" min="1" step="1" value="1400"></label><button type="button" data-set-duration>Apply</button>
-        <label>Delay (ms) <input data-delay type="number" min="0" step="1" value="700"></label><button type="button" data-set-delay>Apply</button>
-        <label>Easing <select data-easing><option value="linear">linear</option><option value="ease-in-out">ease-in-out</option></select></label><button type="button" data-set-easing>Apply</button>
+    <div class="primary-layout">
+      <div class="workflow" aria-label="Animation workflow">
+        <section class="workflow-card choose-create" aria-labelledby="choose-create-heading">
+          <div class="step-heading"><span>1</span><div><h2 id="choose-create-heading">Choose &amp; Create</h2><p data-structural-status>Select an available element to begin.</p></div></div>
+          <fieldset class="target-choices" data-target-choices><legend>What should fade?</legend>
+            ${creationChoices.map((choice) => `<label><input type="radio" name="creation-target" value="${choice.elementId}"><span><strong>${choice.label}</strong><small>Opacity · <span data-choice-reason="${choice.elementId}">Available</span></small></span></label>`).join('')}
+            <div class="unavailable-choice" data-status-copy><span><strong>Status copy</strong><small>Opacity · <span data-choice-reason="${statusCopyElementId}">Already animated</span></small></span></div>
+          </fieldset>
+          <button class="primary-action" type="button" data-create-track disabled>Select an element</button>
+        </section>
+        <section class="workflow-card shape-card" aria-labelledby="shape-heading">
+          <div class="step-heading"><span>2</span><div><h2 id="shape-heading">Shape</h2><p>Add a midpoint for a softer fade, or edit exact keyframes in Inspect.</p></div></div>
+          <div class="shape-actions"><button type="button" data-add-midpoint>Add midpoint</button><button type="button" data-remove-midpoint>Remove midpoint</button></div>
+          <div class="authoring-panel" aria-label="Selected keyframe authoring">
+            <div class="selection" data-selection></div>
+            <div class="keyframe-fields">
+              <form data-value-form><label>Opacity value <input data-value type="number" min="0" max="1" step="0.000001" required disabled></label><button type="submit" disabled>Set value</button></form>
+              <form data-time-form><label>Master time (ms) <input data-time type="number" min="0" step="1" required disabled></label><button type="submit" disabled>Set time</button></form>
+            </div>
+          </div>
+        </section>
+        <section class="workflow-card timing-card" aria-labelledby="time-heading">
+          <div class="step-heading"><span>3</span><div><h2 id="time-heading">Time</h2><p>Applied values are canonical. Draft fields do not change the preview until applied.</p></div></div>
+          <div class="timing-controls">
+            <div class="timing-control"><output data-applied-duration>Applied — create a track first</output><label><span>Duration draft <em hidden>Not applied</em></span><input data-duration type="number" min="1" step="1" value="1000"></label><button type="button" data-set-duration>Apply duration</button></div>
+            <div class="timing-control"><output data-applied-delay>Applied — create a track first</output><label><span>Delay draft <em hidden>Not applied</em></span><input data-delay type="number" min="0" step="1" value="610"></label><button type="button" data-set-delay>Apply delay</button></div>
+            <div class="timing-control"><output data-applied-easing>Applied — create a track first</output><label><span>Easing draft <em hidden>Not applied</em></span><select data-easing><option value="linear">linear</option><option value="ease-in-out">ease-in-out</option></select></label><button type="button" data-set-easing>Apply easing</button></div>
+          </div>
+        </section>
+        <section class="workflow-footer" aria-label="Change history">
+          <div class="history"><button type="button" data-undo>Undo</button><button type="button" data-redo>Redo</button></div>
+          <output class="operation-status" data-operation-status role="status" aria-live="polite">Revision 0 ready.</output>
+        </section>
       </div>
-    </section>
-    <section class="workspace">
-      <section class="preview-panel" aria-label="Compiled preview">
-        <div class="panel-heading"><span>Compiler output</span><span class="preview-heading-status"><span data-preview-selection-label></span><span class="status">Sandboxed · native CSS</span></span></div>
+      <section class="preview-panel" aria-labelledby="preview-heading">
+        <div class="preview-title"><div><span>4</span><div><h2 id="preview-heading">Preview</h2><p>Exact compiler output · native CSS animation</p></div></div><span data-preview-selection-label></span></div>
         <div class="preview-stage"><iframe data-preview title="Compiled motion preview"></iframe><div class="preview-selection" data-preview-selection hidden><span>Selected element</span></div></div>
+        <div class="transport" aria-label="Preview transport">
+          <button type="button" data-play>Play</button><button type="button" data-pause>Pause</button>
+          <label>Preview time <input data-scrub type="range" min="0" max="${authoring.document.durationMs}" step="1" value="0"></label>
+          <output data-playhead>0 ms</output>
+        </div>
+      </section>
+    </div>
+    <details class="inspect-panel">
+      <summary><span><strong>Inspect all tracks</strong><small>Complete timeline, cues, keyframes, stable IDs, and reduced motion</small></span><span data-track-count></span></summary>
+      <div class="inspection-content">
+        <aside class="cue-panel" aria-label="Narrative cues"><div class="panel-heading"><span>Narrative cues</span><span data-cue-count></span></div><div data-cues class="cue-list"></div></aside>
+        <section class="timeline-panel" aria-label="Master timeline"><div data-timeline class="timeline"></div></section>
         <button class="reduced-toggle" type="button" data-reduced-toggle aria-expanded="false">Inspect reduced motion</button>
         <section data-reduced-motion-panel data-mode="${authoring.document.reducedMotion.mode}" data-css="${authoring.document.reducedMotion.css}" class="reduced-panel" hidden>
           <strong>source-snapshot</strong><p>Inspection only. The canonical document and compiler output remain unchanged.</p><pre></pre>
         </section>
-      </section>
-      <aside class="cue-panel" aria-label="Narrative cues"><div class="panel-heading"><span>Narrative cues</span><span data-cue-count></span></div><div data-cues class="cue-list"></div></aside>
-    </section>
-    <section class="timeline-panel" aria-label="Master timeline">
-      <div class="panel-heading"><span>Stable element / property tracks</span><span data-track-count></span></div>
-      <div data-timeline class="timeline"></div>
-    </section>
+      </div>
+    </details>
   </main>`;
 
 const iframe = required<HTMLIFrameElement>('[data-preview]');
@@ -83,6 +98,8 @@ const playhead = required<HTMLOutputElement>('[data-playhead]');
 const status = required<HTMLOutputElement>('[data-operation-status]');
 const valueInput = required<HTMLInputElement>('[data-value]');
 const timeInput = required<HTMLInputElement>('[data-time]');
+const valueButton = required<HTMLButtonElement>('[data-value-form] button');
+const timeButton = required<HTMLButtonElement>('[data-time-form] button');
 const undoButton = required<HTMLButtonElement>('[data-undo]');
 const redoButton = required<HTMLButtonElement>('[data-redo]');
 const createTrackButton = required<HTMLButtonElement>('[data-create-track]');
@@ -97,6 +114,9 @@ const setEasingButton = required<HTMLButtonElement>('[data-set-easing]');
 const previewStage = required<HTMLElement>('.preview-stage');
 const previewSelection = required<HTMLElement>('[data-preview-selection]');
 const previewSelectionLabel = required<HTMLElement>('[data-preview-selection-label]');
+const appliedDuration = required<HTMLOutputElement>('[data-applied-duration]');
+const appliedDelay = required<HTMLOutputElement>('[data-applied-delay]');
+const appliedEasing = required<HTMLOutputElement>('[data-applied-easing]');
 
 for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="creation-target"]')) {
   radio.addEventListener('change', () => {
@@ -125,20 +145,30 @@ valueInput.addEventListener('invalid', () => announceInvalidInput(valueInput, 'O
 timeInput.addEventListener('invalid', () => announceInvalidInput(timeInput, 'Master time'));
 valueInput.addEventListener('input', () => clearValidationFeedback(valueInput));
 timeInput.addEventListener('input', () => clearValidationFeedback(timeInput));
-undoButton.addEventListener('click', () => void dispatch(makeHistory('motion.history.undo')));
-redoButton.addEventListener('click', () => void dispatch(makeHistory('motion.history.redo')));
+undoButton.addEventListener('click', () => {
+  if (authoring.undo.length === 0) return;
+  void dispatch(makeHistory('motion.history.undo'), '[data-undo]', {
+    viewportTop: undoButton.getBoundingClientRect().top, scrollY,
+  });
+});
+redoButton.addEventListener('click', () => {
+  if (authoring.redo.length === 0) return;
+  void dispatch(makeHistory('motion.history.redo'), '[data-redo]', {
+    viewportTop: redoButton.getBoundingClientRect().top, scrollY,
+  });
+});
 createTrackButton.addEventListener('click', () => {
   if (!selectedCreationElementId) return;
   const elementId = selectedCreationElementId;
   void dispatch({
   ...operationEnvelope(), kind: 'motion.track.create', elementId,
   payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear', startValue: 0, endValue: 1 },
-  } as AuthoringOperation, `[data-element-id="${elementId}"][data-property="opacity"] .keyframe[data-offset="0"]`);
+  } as AuthoringOperation, '[data-add-midpoint]');
 });
 addMidpointButton.addEventListener('click', () => void withCreatedTrack((track) => ({
   ...operationEnvelope(), kind: 'motion.keyframe.add', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   payload: { timeMs: 1110, value: 0.5 },
-}), () => `[data-element-id="${selectedCreationElementId}"][data-property="opacity"] .keyframe[data-offset="0.5"]`));
+}), '[data-value]'));
 setDurationButton.addEventListener('click', () => void withCreatedTrack((track) => ({
   ...operationEnvelope(), kind: 'motion.slot-duration.set', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   payload: { durationMs: Number(required<HTMLInputElement>('[data-duration]').value) },
@@ -154,11 +184,15 @@ setEasingButton.addEventListener('click', () => void withCreatedTrack((track) =>
 removeMidpointButton.addEventListener('click', () => void withCreatedTrack((track) => ({
   ...operationEnvelope(), kind: 'motion.keyframe.remove', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   keyframeId: track.keyframes.find((keyframe) => keyframe.offset === 0.5)?.id ?? '',
-}), () => `[data-element-id="${selectedCreationElementId}"][data-property="opacity"] .keyframe[data-offset="1"]`));
+}), '[data-add-midpoint]'));
 for (const [selector, label] of [['[data-duration]', 'Duration'], ['[data-delay]', 'Delay']] as const) {
   const input = required<HTMLInputElement>(selector);
   input.addEventListener('invalid', () => announceInvalidInput(input, label));
   input.addEventListener('input', () => clearValidationFeedback(input));
+}
+for (const control of [durationInput, delayInput, easingInput]) {
+  control.addEventListener('input', () => updateTimingDraftState(control));
+  control.addEventListener('change', () => updateTimingDraftState(control));
 }
 const reducedToggle = required<HTMLButtonElement>('[data-reduced-toggle]');
 const reducedPanel = required<HTMLElement>('[data-reduced-motion-panel]');
@@ -190,14 +224,20 @@ window.__motionEditor = {
     undoCount: authoring.undo.length,
     redoCount: authoring.redo.length,
     consumedOperationIds: [...authoring.consumedOperationIds],
-    selectedTrackId,
-    selectedKeyframeId,
+    selectedTrackId: selectedTrackId as string,
+    selectedKeyframeId: selectedKeyframeId as string,
     selectedCreationElementId,
   }),
   dispatch,
 };
 
-async function dispatch(operation: AuthoringOperation, focusSelector?: string): Promise<{ ok: boolean; code?: string }> {
+async function dispatch(
+  operation: AuthoringOperation,
+  focusSelector?: string,
+  historyAnchor?: { viewportTop: number; scrollY: number },
+): Promise<{ ok: boolean; code?: string }> {
+  const beforeCreated = findCreatedTrack(buildTimeline(authoring.document).rows);
+  const beforeHasMidpoint = beforeCreated?.keyframes.some((keyframe) => keyframe.offset === 0.5) ?? false;
   const result = dispatchAuthoringOperation(authoring, operation);
   if (!result.ok) {
     if (operation.kind === 'motion.slot-duration.set') {
@@ -212,11 +252,14 @@ async function dispatch(operation: AuthoringOperation, focusSelector?: string): 
   authoring = result.state;
   compiled = compileMotionDocument(authoring.document);
   await controller.mount(compiled.html);
-  const created = findCreatedTrack(buildTimeline(authoring.document).rows);
+  const rows = buildTimeline(authoring.document).rows;
+  const created = findCreatedTrack(rows);
+  const hasMidpoint = created?.keyframes.some((keyframe) => keyframe.offset === 0.5) ?? false;
   if (created) {
     selectedTrackId = created.trackId;
     if (operation.kind === 'motion.keyframe.add') {
       selectedKeyframeId = created.keyframes.find((keyframe) => keyframe.offset === 0.5)!.id;
+      hasExplicitKeyframeSelection = true;
     } else if (operation.kind === 'motion.keyframe.remove') {
       selectedKeyframeId = created.keyframes.at(-1)!.id;
     } else if (operation.kind === 'motion.track.create'
@@ -224,17 +267,54 @@ async function dispatch(operation: AuthoringOperation, focusSelector?: string): 
       selectedKeyframeId = created.keyframes[0]!.id;
     }
   } else {
-    const fallback = findEditableTrack();
-    selectedTrackId = fallback.trackId;
-    if (!fallback.keyframes.some((keyframe) => keyframe.id === selectedKeyframeId)) {
-      selectedKeyframeId = fallback.keyframes[0]!.id;
+    const selectedStillExists = selectedTrackId && selectedKeyframeId
+      && rows.find((row) => row.trackId === selectedTrackId)
+        ?.keyframes.some((keyframe) => keyframe.id === selectedKeyframeId);
+    if (!selectedStillExists) {
+      selectedTrackId = null;
+      selectedKeyframeId = null;
     }
+  }
+  if (operation.kind === 'motion.history.undo'
+    && ((beforeHasMidpoint && !hasMidpoint) || (beforeCreated && !created))) {
+    clearKeyframeSelection();
+  } else if (operation.kind === 'motion.history.redo' && !beforeCreated && created) {
+    selectedTrackId = created.trackId;
+    selectedKeyframeId = created.keyframes[0]!.id;
+    hasExplicitKeyframeSelection = true;
+  } else if (operation.kind === 'motion.history.redo' && !beforeHasMidpoint && hasMidpoint && created) {
+    selectedTrackId = created.trackId;
+    selectedKeyframeId = created.keyframes.find((keyframe) => keyframe.offset === 0.5)!.id;
+    hasExplicitKeyframeSelection = true;
   }
   renderProjection();
   status.value = `${successMessage(operation.kind)} Revision ${authoring.document.revision}.`;
   status.dataset.kind = 'success';
-  if (focusSelector) required<HTMLElement>(focusSelector).focus();
+  if (focusSelector) {
+    const focusTarget = required<HTMLElement>(focusSelector);
+    if (focusTarget instanceof HTMLButtonElement && focusTarget.disabled) {
+      focusTarget.disabled = false;
+      focusTarget.setAttribute('aria-disabled', 'true');
+    }
+    focusTarget.focus({ preventScroll: true });
+    if (historyAnchor) {
+      scrollBy(0, focusTarget.getBoundingClientRect().top - historyAnchor.viewportTop);
+      Object.assign(focusTarget.dataset, {
+        historyViewportTopBefore: String(historyAnchor.viewportTop),
+        historyViewportTopAfter: String(focusTarget.getBoundingClientRect().top),
+        historyScrollBefore: String(historyAnchor.scrollY),
+        historyScrollAfter: String(scrollY),
+        historyMaxScrollAfter: String(document.documentElement.scrollHeight - innerHeight),
+      });
+    }
+  }
   return { ok: true };
+}
+
+function clearKeyframeSelection(): void {
+  selectedTrackId = null;
+  selectedKeyframeId = null;
+  hasExplicitKeyframeSelection = false;
 }
 
 function operationEnvelope() {
@@ -296,8 +376,11 @@ function renderProjection(): void {
     cues.append(button);
   }
   required('[data-cue-count]').textContent = String(timeline.cues.length);
-  undoButton.disabled = authoring.undo.length === 0;
-  redoButton.disabled = authoring.redo.length === 0;
+  for (const [button, unavailable] of [[undoButton, authoring.undo.length === 0],
+    [redoButton, authoring.redo.length === 0]] as const) {
+    button.removeAttribute('aria-disabled');
+    button.disabled = unavailable;
+  }
   updateStructuralControls(timeline.rows);
   updateSelection();
 }
@@ -318,18 +401,59 @@ function updateStructuralControls(rows: TimelineRow[]): void {
   createTrackButton.disabled = !selectedEligibility?.available;
   createTrackButton.textContent = selectedCreationElementId
     ? `Create ${creationChoices.find((choice) => choice.elementId === selectedCreationElementId)!.label} opacity track`
-    : 'Select a target';
+    : 'Select an element';
   addMidpointButton.disabled = !hasTrack || hasMidpoint;
   removeMidpointButton.disabled = !hasMidpoint;
   for (const control of [durationInput, delayInput, easingInput, setDurationButton, setDelayButton, setEasingButton]) {
     control.disabled = !hasTrack;
   }
+  hydrateTimingControls(track);
   required('[data-structural-status]').textContent = !selectedCreationElementId
-    ? 'Select an available target to begin.'
+    ? 'Select an available element to begin.'
     : !hasTrack && selectedEligibility?.available
-      ? `${creationChoices.find((choice) => choice.elementId === selectedCreationElementId)!.label} is selected and available.`
+      ? `${creationChoices.find((choice) => choice.elementId === selectedCreationElementId)!.label} is ready to animate.`
       : !hasTrack ? eligibilityReason(selectedEligibility?.reason ?? null)
     : hasMidpoint ? 'Midpoint ready. Adjust timing or remove it.' : 'Track ready. Add a midpoint or adjust timing.';
+}
+
+function hydrateTimingControls(track: TimelineRow | undefined): void {
+  if (!track) {
+    durationInput.value = '1000'; delayInput.value = '610'; easingInput.value = 'linear';
+    appliedDuration.value = 'Applied — create a track first';
+    appliedDelay.value = 'Applied — create a track first';
+    appliedEasing.value = 'Applied — create a track first';
+  } else {
+    const durationMs = track.keyframes.at(-1)!.timeMs - track.keyframes[0]!.timeMs;
+    const easing = track.timing.kind === 'keyword' ? track.timing.value : JSON.stringify(track.timing);
+    durationInput.value = String(durationMs); delayInput.value = String(track.delayMs); easingInput.value = easing;
+    appliedDuration.value = `Applied · ${durationMs} ms`;
+    appliedDelay.value = `Applied · ${track.delayMs} ms`;
+    appliedEasing.value = `Applied · ${easing}`;
+  }
+  for (const control of [durationInput, delayInput, easingInput]) {
+    control.closest('.timing-control')?.setAttribute('data-draft', 'false');
+    required<HTMLElement>('em', control.closest('.timing-control')!).hidden = true;
+  }
+  durationInput.setAttribute('aria-invalid', 'false');
+  delayInput.setAttribute('aria-invalid', 'false');
+}
+
+function updateTimingDraftState(control: HTMLInputElement | HTMLSelectElement): void {
+  const track = findCreatedTrack(buildTimeline(authoring.document).rows);
+  let appliedValue: string | undefined;
+  if (track) {
+    if (control === durationInput) {
+      appliedValue = String(track.keyframes.at(-1)!.timeMs - track.keyframes[0]!.timeMs);
+    } else if (control === delayInput) {
+      appliedValue = String(track.delayMs);
+    } else {
+      appliedValue = track.timing.kind === 'keyword' ? track.timing.value : JSON.stringify(track.timing);
+    }
+  }
+  const differs = appliedValue !== undefined && control.value !== appliedValue;
+  const container = control.closest<HTMLElement>('.timing-control')!;
+  container.dataset.draft = String(differs);
+  required<HTMLElement>('em', container).hidden = !differs;
 }
 
 function eligibilityReason(reason: ReturnType<typeof projectTrackCreationEligibility>['reason']): string {
@@ -375,16 +499,28 @@ function successMessage(kind: AuthoringOperation['kind']): string {
 }
 
 function updateSelection(): void {
-  const row = currentTarget();
-  const keyframe = row.keyframes.find((candidate) => candidate.id === selectedKeyframeId) ?? row.keyframes[0]!;
-  selectedKeyframeId = keyframe.id;
+  const row = selectedTrackId
+    ? buildTimeline(authoring.document).rows.find((candidate) => candidate.trackId === selectedTrackId) : undefined;
+  const keyframe = row?.keyframes.find((candidate) => candidate.id === selectedKeyframeId);
+  if (!row || !keyframe) clearKeyframeSelection();
+  valueInput.disabled = !hasExplicitKeyframeSelection;
+  timeInput.disabled = !hasExplicitKeyframeSelection;
+  valueButton.disabled = !hasExplicitKeyframeSelection;
+  timeButton.disabled = !hasExplicitKeyframeSelection;
+  if (!hasExplicitKeyframeSelection) {
+    required('[data-selection]').innerHTML = `<div class="selection-summary"><strong>No keyframe selected</strong><span>Open Inspect all tracks and choose a keyframe for exact editing.</span></div>`;
+    previewSelectionLabel.textContent = selectedCreationElementId ? 'Element chosen' : '';
+    schedulePreviewSelection();
+    return;
+  }
+  selectedKeyframeId = keyframe!.id;
   required('[data-selection]').innerHTML = `
-    <div class="selection-summary"><strong>Selected ${row.property} keyframe</strong><span>Revision ${authoring.document.revision}</span></div>
-    <div class="selection-chips"><span class="preview-link">Linked to preview</span><code title="${row.elementId}">Element ${shortId(row.elementId)}</code><code title="${keyframe.id}">Keyframe ${shortId(keyframe.id)}</code></div>
-    <details class="canonical-ids"><summary>Canonical IDs</summary><code>Element · ${row.elementId}</code><code>Track · ${row.trackId}</code><code>Keyframe · ${keyframe.id}</code></details>`;
-  previewSelectionLabel.textContent = `Selected element · ${row.property}`;
-  valueInput.value = keyframe.value;
-  timeInput.value = String(keyframe.timeMs);
+    <div class="selection-summary"><strong>Selected ${row!.property} keyframe</strong><span>Revision ${authoring.document.revision}</span></div>
+    <div class="selection-chips"><span class="preview-link">Linked to preview</span></div>
+    <details class="canonical-ids"><summary>Canonical IDs</summary><code>Element · ${row!.elementId}</code><code>Track · ${row!.trackId}</code><code>Keyframe · ${keyframe!.id}</code></details>`;
+  previewSelectionLabel.textContent = `Selected element · ${row!.property}`;
+  valueInput.value = keyframe!.value;
+  timeInput.value = String(keyframe!.timeMs);
   valueInput.setAttribute('aria-invalid', 'false');
   timeInput.setAttribute('aria-invalid', 'false');
   schedulePreviewSelection();
@@ -401,8 +537,12 @@ function findEditableTrack(): TimelineRow {
 }
 
 function currentTarget(): TimelineRow {
-  return buildTimeline(authoring.document).rows.find((row) => row.trackId === selectedTrackId)
-    ?? findEditableTrack();
+  const selected = selectedTrackId
+    ? buildTimeline(authoring.document).rows.find((row) => row.trackId === selectedTrackId) : undefined;
+  if (!selected || !selectedKeyframeId || !selected.keyframes.some((keyframe) => keyframe.id === selectedKeyframeId)) {
+    throw new Error('EDITOR_KEYFRAME_SELECTION_MISSING');
+  }
+  return selected;
 }
 
 function scrub(timeMs: number): void {
@@ -438,7 +578,7 @@ function renderTrack(row: TimelineRow): HTMLElement {
     marker.setAttribute('aria-pressed', String(editable && selectedKeyframeId === keyframe.id));
     Object.assign(marker.dataset, { keyframeId: keyframe.id, offset: String(keyframe.offset), value: keyframe.value, easing: JSON.stringify(keyframe.easing), timeMs: String(keyframe.timeMs) });
     marker.innerHTML = `<strong>${keyframe.timeMs} ms</strong><code>${keyframe.id}</code><span>${keyframe.offset * 100}% · ${keyframe.value} · easing ${keyframe.easing ? JSON.stringify(keyframe.easing) : 'inherited'}</span>`;
-    marker.addEventListener('click', () => { selectedTrackId = row.trackId; selectedKeyframeId = keyframe.id; renderProjection(); valueInput.focus(); });
+    marker.addEventListener('click', () => { selectedTrackId = row.trackId; selectedKeyframeId = keyframe.id; hasExplicitKeyframeSelection = true; renderProjection(); valueInput.focus({ preventScroll: true }); });
     keyframeList.append(marker);
   }
   return article;
@@ -465,8 +605,13 @@ function schedulePreviewSelection(): void {
 }
 
 function updatePreviewSelection(): void {
-  const row = currentTarget();
-  const targetElementId = selectedCreationElementId ?? row.elementId;
+  const selectedRow = selectedTrackId
+    ? buildTimeline(authoring.document).rows.find((row) => row.trackId === selectedTrackId) : undefined;
+  const targetElementId = selectedCreationElementId ?? selectedRow?.elementId;
+  if (!targetElementId) {
+    previewSelection.hidden = true;
+    return;
+  }
   const target = iframe.contentDocument?.querySelector<HTMLElement>(`[data-motion-id="${targetElementId}"]`);
   if (!target) {
     previewSelection.hidden = true;
@@ -482,12 +627,8 @@ function updatePreviewSelection(): void {
   previewSelection.hidden = false;
 }
 
-function shortId(id: string): string {
-  return `…${id.slice(-6)}`;
-}
-
-function required<T extends Element = HTMLElement>(selector: string): T {
-  const element = document.querySelector<T>(selector);
+function required<T extends Element = HTMLElement>(selector: string, root: ParentNode = document): T {
+  const element = root.querySelector<T>(selector);
   if (!element) throw new Error('EDITOR_ELEMENT_MISSING');
   return element;
 }

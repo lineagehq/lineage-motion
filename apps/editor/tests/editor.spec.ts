@@ -106,6 +106,7 @@ test('renders exact compiled output and controls native animations without mutat
   }));
   expect(renderedProjection).toEqual(proof.canonicalProjection);
 
+  await page.locator('.inspect-panel').getByText('Inspect all tracks', { exact: true }).click();
   for (const cueId of proof.cueIds) {
     await page.locator(`[data-cue-id="${cueId}"]`).click();
     const state = await page.evaluate(() => window.__motionEditor.readState());
@@ -137,20 +138,25 @@ test('renders exact compiled output and controls native animations without mutat
   expect(consoleErrors).toEqual([]);
 });
 
-test('selects Orb by keyboard and completes exact creation and six-step history', async ({ page }) => {
+test('guides a first-time author through truthful creation, timing, focus, and exact history', async ({ page }) => {
   const failedRequests: string[] = [];
   page.on('requestfailed', (request) => failedRequests.push(request.failure()?.errorText ?? 'failed'));
+  await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(editorUrl);
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Select a target' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Select an element' })).toBeDisabled();
+  await expect(page.getByText('No keyframe selected', { exact: true })).toBeVisible();
+  await expect(page.getByText('Selected opacity keyframe', { exact: true })).toHaveCount(0);
+  await expect(page.locator('.inspect-panel')).not.toHaveAttribute('open', '');
+  await expect(page.locator('code:visible')).toHaveCount(0);
   const selectionBefore = await page.evaluate(() => {
     const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
     Object.assign(iframe.contentWindow!, { __selectionSentinel: 'unchanged' });
     return window.__motionEditor.inspectAuthoring();
   });
-  await page.getByRole('radio', { name: /Orb — Opacity/ }).focus();
+  await page.getByRole('radio', { name: /Orb/ }).focus();
   await page.keyboard.press('Space');
-  await expect(page.getByRole('radio', { name: /Orb — Opacity/ })).toBeChecked();
+  await expect(page.getByRole('radio', { name: /Orb/ })).toBeChecked();
   await expect(page.getByRole('button', { name: 'Create Orb opacity track' })).toBeEnabled();
   const selectionAfter = await page.evaluate(() => ({
     state: window.__motionEditor.inspectAuthoring(),
@@ -164,26 +170,57 @@ test('selects Orb by keyboard and completes exact creation and six-step history'
   await expect(page.locator('[data-duration]')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Remove midpoint' })).toBeDisabled();
   const states = [await page.evaluate(() => window.__motionEditor.inspectAuthoring())];
-  for (const [index, name] of ['Create Orb opacity track', 'Add midpoint', 'Apply', 'Apply'].entries()) {
-    const button = name === 'Apply' ? page.locator(index === 2 ? '[data-set-duration]' : '[data-set-delay]')
-      : page.getByRole('button', { name });
-    await button.focus();
-    await page.keyboard.press('Enter');
-    await expect(page.locator('[data-operation-status]')).toContainText(`Revision ${states.length}`);
-    states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
-    if (index === 0) await expect(page.locator(`[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"] .keyframe[data-offset="0"]`)).toBeFocused();
-    if (index === 1) await expect(page.locator(`[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"] .keyframe[data-offset="0.5"]`)).toBeFocused();
-  }
+  const beforeCreateScroll = await page.evaluate(() => scrollY);
+  await page.getByRole('button', { name: 'Create Orb opacity track' }).press('Enter');
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 1');
+  states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  await expect(page.getByRole('button', { name: 'Add midpoint' })).toBeFocused();
+  expect(await page.evaluate(() => scrollY)).toBe(beforeCreateScroll);
+  await expect(page.locator('[data-duration]')).toHaveValue('1000');
+  await expect(page.locator('[data-delay]')).toHaveValue('610');
+  await expect(page.locator('select[data-easing]')).toHaveValue('linear');
+  await expect(page.locator('[data-applied-duration]')).toHaveText('Applied · 1000 ms');
+  await expect(page.locator('[data-applied-delay]')).toHaveText('Applied · 610 ms');
+  await expect(page.locator('[data-applied-easing]')).toHaveText('Applied · linear');
+  await expect(page.locator('.timing-control em:visible')).toHaveCount(0);
+  const beforeMidpointScroll = await page.evaluate(() => scrollY);
+  await page.getByRole('button', { name: 'Add midpoint' }).press('Enter');
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 2');
+  states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  await expect(page.locator('input[data-value]')).toBeEnabled();
+  await expect(page.locator('input[data-time]')).toBeEnabled();
+  await expect(page.locator('input[data-value]')).toBeFocused();
+  await expect(page.getByText('Selected opacity keyframe', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => scrollY)).toBe(beforeMidpointScroll);
+  expect(states.at(-1)!.selectedKeyframeId).toBe(await page.locator(
+    `[data-element-id="el_2dbee68b1ea318c8"] .keyframe[data-offset="0.5"]`).getAttribute('data-keyframe-id'));
+  await page.locator('[data-duration]').fill('1400');
+  await expect(page.locator('[data-applied-duration]')).toHaveText('Applied · 1000 ms');
+  await expect(page.locator('.timing-control:has([data-duration]) em')).toBeVisible();
+  await page.getByRole('button', { name: 'Apply duration' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 3');
+  states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  await expect(page.locator('[data-applied-duration]')).toHaveText('Applied · 1400 ms');
+  await expect(page.locator('.timing-control:has([data-duration]) em')).toBeHidden();
+  await page.locator('[data-delay]').fill('700');
+  await expect(page.locator('[data-applied-delay]')).toHaveText('Applied · 610 ms');
+  await expect(page.locator('.timing-control:has([data-delay]) em')).toBeVisible();
+  await page.getByRole('button', { name: 'Apply delay' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 4');
+  states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  await expect(page.locator('[data-applied-delay]')).toHaveText('Applied · 700 ms');
+  await expect(page.locator('.timing-control:has([data-delay]) em')).toBeHidden();
   await page.locator('select[data-easing]').selectOption('ease-in-out');
-  await page.locator('[data-set-easing]').focus();
-  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-applied-easing]')).toHaveText('Applied · linear');
+  await expect(page.locator('.timing-control:has([data-easing]) em')).toBeVisible();
+  await page.getByRole('button', { name: 'Apply easing' }).click();
   await expect(page.locator('[data-operation-status]')).toContainText('Revision 5');
   states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
-  await page.getByRole('button', { name: 'Remove midpoint' }).focus();
-  await page.keyboard.press('Enter');
+  await expect(page.locator('.timing-control:has([data-easing]) em')).toBeHidden();
+  await page.getByRole('button', { name: 'Remove midpoint' }).press('Enter');
   await expect(page.locator('[data-operation-status]')).toContainText('Revision 6');
   states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
-  await expect(page.locator(`[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"] .keyframe[data-offset="1"]`)).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Add midpoint' })).toBeFocused();
   expect(states.at(-1)!.revision).toBe(6);
   const created = page.locator(`[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"]`);
   await expect(created).toHaveCount(1);
@@ -195,7 +232,7 @@ test('selects Orb by keyboard and completes exact creation and six-step history'
     return iframe.srcdoc === window.__motionEditor.compiledHtml
       && iframe.contentDocument!.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
   })).toBe(true);
-  await expect(page.getByRole('radio', { name: /Cursor — Opacity/ })).toBeDisabled();
+  await expect(page.getByRole('radio', { name: /Cursor/ })).toBeDisabled();
   await expect(page.locator('[data-choice-reason="el_a2849ff826f3e167"]'))
     .toHaveText('One created track is allowed in this document.');
   await page.locator('[data-duration]').fill('1400.5');
@@ -203,28 +240,103 @@ test('selects Orb by keyboard and completes exact creation and six-step history'
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-duration]')).toHaveAttribute('aria-invalid', 'true');
   await expect(page.locator('[data-operation-status]')).toContainText('AUTHORING_DURATION_INVALID');
+  await expect(page.locator('[data-applied-duration]')).toHaveText('Applied · 1400 ms');
+  await expect(page.locator('[data-duration]')).toHaveValue('1400.5');
+  await expect(page.locator('.timing-control:has([data-duration]) em')).toBeVisible();
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toEqual(states.at(-1));
   for (let index = 0; index < 6; index += 1) {
+    if (index === 5) await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     await page.getByRole('button', { name: 'Undo' }).click();
+    await expect(page.locator('[data-operation-status]')).toContainText(`Revision ${7 + index}.`);
+    await expect(page.getByRole('button', { name: 'Undo' })).toBeFocused();
+    const anchor = await page.getByRole('button', { name: 'Undo' }).evaluate((button) => ({
+      topBefore: Number(button.dataset.historyViewportTopBefore),
+      topAfter: Number(button.dataset.historyViewportTopAfter),
+      scrollBefore: Number(button.dataset.historyScrollBefore),
+      scrollAfter: Number(button.dataset.historyScrollAfter),
+      maxScrollAfter: Number(button.dataset.historyMaxScrollAfter),
+    }));
+    const anchoredOrMaxClamped = Math.abs(anchor.topAfter - anchor.topBefore) < .1
+      || (anchor.scrollAfter === anchor.maxScrollAfter && anchor.topAfter > anchor.topBefore);
+    expect(anchoredOrMaxClamped, `Undo ${index + 1} must preserve its viewport anchor or prove max clamp`).toBe(true);
+    if (index === 5) {
+      expect(anchor.topAfter).toBeCloseTo(anchor.topBefore, 1);
+    }
+    await expect(page.locator('.timing-control em:visible')).toHaveCount(0);
+    await expect(page.locator('[data-duration]')).toHaveAttribute('aria-invalid', 'false');
+    await expect(page.locator('[data-delay]')).toHaveAttribute('aria-invalid', 'false');
     const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
     expect(current.revision).toBe(7 + index);
     expect(current.contentDigest).toBe(states[5 - index]!.contentDigest);
     expect(current.exportDigest).toBe(states[5 - index]!.exportDigest);
+    if (index >= 4) {
+      expect(current.selectedTrackId).toBeNull();
+      expect(current.selectedKeyframeId).toBeNull();
+      expect(await page.locator('[data-track-id][data-selected="true"]').count()).toBe(0);
+      expect(current.selectedCreationElementId).toBe('el_2dbee68b1ea318c8');
+      await expect(page.getByText('No keyframe selected', { exact: true })).toBeVisible();
+      await expect(page.locator('input[data-value]')).toBeDisabled();
+      await expect(page.locator('input[data-time]')).toBeDisabled();
+      await expect(page.getByRole('button', { name: 'Set value' })).toBeDisabled();
+      await expect(page.getByRole('button', { name: 'Set time' })).toBeDisabled();
+    }
+    if (index === 5) {
+      const beforeAttempt = current;
+      await page.getByRole('button', { name: 'Set value' })
+        .evaluate((button) => (button as HTMLButtonElement).click());
+      expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toEqual(beforeAttempt);
+    }
   }
+  await expect(page.getByRole('button', { name: 'Undo' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.locator('[data-applied-duration]')).toHaveText('Applied — create a track first');
+  await expect(page.locator('.timing-control em:visible')).toHaveCount(0);
   for (let index = 0; index < 6; index += 1) {
     await page.getByRole('button', { name: 'Redo' }).click();
+    await expect(page.locator('[data-operation-status]')).toContainText(`Revision ${13 + index}.`);
+    await expect(page.getByRole('button', { name: 'Redo' })).toBeFocused();
+    const anchor = await page.getByRole('button', { name: 'Redo' }).evaluate((button) => ({
+      topBefore: Number(button.dataset.historyViewportTopBefore),
+      topAfter: Number(button.dataset.historyViewportTopAfter),
+      scrollBefore: Number(button.dataset.historyScrollBefore),
+      scrollAfter: Number(button.dataset.historyScrollAfter),
+      maxScrollAfter: Number(button.dataset.historyMaxScrollAfter),
+    }));
+    const anchoredOrMaxClamped = Math.abs(anchor.topAfter - anchor.topBefore) < .1
+      || (anchor.scrollAfter === anchor.maxScrollAfter && anchor.topAfter > anchor.topBefore);
+    expect(anchoredOrMaxClamped, `Redo ${index + 1} must preserve its viewport anchor or prove max clamp`).toBe(true);
+    if (index === 0) expect(anchor.topAfter).toBeCloseTo(anchor.topBefore, 1);
+    await expect(page.locator('.timing-control em:visible')).toHaveCount(0);
+    await expect(page.locator('[data-duration]')).toHaveAttribute('aria-invalid', 'false');
+    await expect(page.locator('[data-delay]')).toHaveAttribute('aria-invalid', 'false');
     const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
     expect(current.revision).toBe(13 + index);
     expect(current.contentDigest).toBe(states[index + 1]!.contentDigest);
     expect(current.exportDigest).toBe(states[index + 1]!.exportDigest);
+    if (index <= 1) {
+      await expect(page.locator('[data-track-id][data-selected="true"]'))
+        .toHaveAttribute('data-element-id', 'el_2dbee68b1ea318c8');
+      expect(current.selectedTrackId).toBe(states[1]!.selectedTrackId);
+      await expect(page.getByText('Selected opacity keyframe', { exact: true })).toBeVisible();
+      await expect(page.locator('input[data-value]')).toBeEnabled();
+      await expect(page.locator('input[data-time]')).toBeEnabled();
+      const expectedOffset = index === 0 ? '0' : '0.5';
+      expect(current.selectedKeyframeId).toBe(await page.locator(
+        `[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"] .keyframe[data-offset="${expectedOffset}"]`)
+        .getAttribute('data-keyframe-id'));
+    }
   }
+  await expect(page.getByRole('button', { name: 'Redo' })).toHaveAttribute('aria-disabled', 'true');
+  await expect(page.locator('[data-duration]')).toHaveValue('1400');
+  await expect(page.locator('[data-delay]')).toHaveValue('700');
+  await expect(page.locator('select[data-easing]')).toHaveValue('ease-in-out');
+  await expect(page.locator('.timing-control em:visible')).toHaveCount(0);
   expect(failedRequests).toEqual([]);
 });
 
 test('selects Cursor by pointer and creates a distinct deterministic contained bundle', async ({ page }) => {
   await page.goto(editorUrl);
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
-  await page.getByRole('radio', { name: /Cursor — Opacity/ }).click();
+  await page.getByRole('radio', { name: /Cursor/ }).click();
   const before = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
   await page.getByRole('button', { name: 'Create Cursor opacity track' }).click();
   const after = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
@@ -232,7 +344,7 @@ test('selects Cursor by pointer and creates a distinct deterministic contained b
   expect(after.selectedCreationElementId).toBe('el_a2849ff826f3e167');
   expect(after.contentDigest).not.toBe(before.contentDigest);
   await expect(page.locator('[data-element-id="el_a2849ff826f3e167"][data-property="opacity"]')).toHaveCount(1);
-  await expect(page.getByRole('radio', { name: /Orb — Opacity/ })).toBeDisabled();
+  await expect(page.getByRole('radio', { name: /Orb/ })).toBeDisabled();
   expect(await page.evaluate(() => {
     const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
     const target = iframe.contentDocument!.querySelector('[data-motion-id="el_a2849ff826f3e167"]');
@@ -252,6 +364,7 @@ test('authors value and time through canonical operations with atomic history an
   await expect(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
 
   const editable = page.locator('.keyframe:not(:disabled)');
+  await page.locator('.inspect-panel').getByText('Inspect all tracks', { exact: true }).click();
   await expect(editable).toHaveCount(2);
   await editable.first().click();
   const s0 = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
@@ -331,4 +444,33 @@ test('authors value and time through canonical operations with atomic history an
   await expect(page.locator('[data-reduced-motion-panel]')).toBeVisible();
   expect(consoleErrors).toEqual([]);
   expect(failedRequests).toEqual([]);
+});
+
+test('keeps the workflow responsive with overflow local to the track inspection', async ({ page }) => {
+  for (const width of [1440, 1099, 768, 390]) {
+    await page.setViewportSize({ width, height: 1000 });
+    await page.goto(editorUrl);
+    await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+    const layout = await page.evaluate(() => {
+      const workflow = document.querySelector('.workflow')!.getBoundingClientRect();
+      const preview = document.querySelector('.preview-panel')!.getBoundingClientRect();
+      return { documentWidth: document.documentElement.scrollWidth, viewportWidth: innerWidth,
+        workflowTop: workflow.top, workflowLeft: workflow.left, previewTop: preview.top, previewLeft: preview.left };
+    });
+    expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth);
+    if (width === 1440) {
+      expect(Math.abs(layout.workflowTop - layout.previewTop)).toBeLessThan(2);
+      expect(layout.previewLeft).toBeGreaterThan(layout.workflowLeft);
+    } else {
+      expect(layout.previewTop).toBeGreaterThan(layout.workflowTop);
+    }
+    if (width <= 768) {
+      await page.locator('.inspect-panel').getByText('Inspect all tracks', { exact: true }).click();
+      const overflow = await page.locator('.timeline-panel').evaluate((node) => ({
+        local: node.scrollWidth > node.clientWidth,
+        document: document.documentElement.scrollWidth <= innerWidth,
+      }));
+      expect(overflow).toEqual({ local: true, document: true });
+    }
+  }
 });
