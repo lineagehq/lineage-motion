@@ -14,20 +14,25 @@ import {
   NativePreviewController,
   type TimelineRow,
 } from '../../../packages/preview-runtime/src/index.js';
-import { MotionServiceClient, makeTrackCreateCommand, type CommitMetadata } from '../../../packages/motion-protocol/src/index.ts';
+import { MotionServiceClient, makeBranchCreateCommand, makeClaimControlCommand, makeTrackCreateCommand,
+  type CommitMetadata } from '../../../packages/motion-protocol/src/index.ts';
 import './styles.css';
 
 let authoring = createAuthoringState(payload.document);
 let compiled = payload.compiled;
-const serviceClient = payload.serviceBacked ? new MotionServiceClient('') : null;
+const serviceClient = payload.serviceBacked && payload.humanCapability
+  ? new MotionServiceClient('', (...args) => fetch(...args), { actor: 'human', capability: payload.humanCapability })
+  : payload.serviceBacked ? (() => { throw new Error('EDITOR_CAPABILITY_REQUIRED'); })() : null;
 let lastCommit: CommitMetadata | null = null;
 let immutableRefetchCount = 0;
 let pendingRevision: number | null = null;
+let activeBranchId = 'main';
 if (serviceClient) {
   const head = await serviceClient.head(payload.document.documentId);
   authoring = createAuthoringState(head.document);
   compiled = compileMotionDocument(head.document);
 }
+const operationClientId = crypto.randomUUID();
 let operationSequence = 0;
 const creationChoices = [
   { elementId: 'el_a2849ff826f3e167', label: 'Cursor' },
@@ -43,6 +48,11 @@ document.body.innerHTML = `
   <main class="editor-shell">
     <header class="topbar">
       <div><p class="eyebrow">Motion Editor</p><h1>Bring one element into motion</h1><p class="purpose">Choose what moves, shape its opacity, set its timing, then preview the compiled CSS.</p></div>
+      ${serviceClient ? `<section class="branch-controls" aria-label="Branches and claims">
+        <label>Active branch <select data-active-branch><option value="main">main</option></select></label>
+        <form data-branch-form><label>New branch <input data-new-branch value="feature" pattern="[A-Za-z0-9_]+"></label><button type="submit">Create branch</button></form>
+        <form data-revoke-form><label>Claim ID <input data-claim-id placeholder="claim_…"></label><label>Lease version <input data-lease-version type="number" min="1" value="1"></label><button type="submit">Revoke claim</button></form>
+      </section>` : ''}
     </header>
     <div class="primary-layout">
       <div class="workflow" aria-label="Animation workflow">
@@ -128,6 +138,15 @@ const setDelayButton = required<HTMLButtonElement>('[data-set-delay]');
 const setEasingButton = required<HTMLButtonElement>('[data-set-easing]');
 const previewStage = required<HTMLElement>('.preview-stage');
 const previewSelection = required<HTMLElement>('[data-preview-selection]');
+const branchSelect = document.querySelector<HTMLSelectElement>('[data-active-branch]');
+const branchForm = document.querySelector<HTMLFormElement>('[data-branch-form]');
+const revokeForm = document.querySelector<HTMLFormElement>('[data-revoke-form]');
+
+branchSelect?.addEventListener('change', () => void switchBranch(branchSelect.value));
+branchForm?.addEventListener('submit', (event) => { event.preventDefault(); void createBranch(
+  required<HTMLInputElement>('[data-new-branch]').value); });
+revokeForm?.addEventListener('submit', (event) => { event.preventDefault(); void revokeClaim(
+  required<HTMLInputElement>('[data-claim-id]').value, Number(required<HTMLInputElement>('[data-lease-version]').value)); });
 const previewSelectionLabel = required<HTMLElement>('[data-preview-selection-label]');
 const appliedDuration = required<HTMLOutputElement>('[data-applied-duration]');
 const appliedDelay = required<HTMLOutputElement>('[data-applied-delay]');
@@ -249,10 +268,12 @@ window.__motionEditor = {
     selectedKeyframeId: selectedKeyframeId as string,
     selectedCreationElementId,
     serviceBacked: Boolean(serviceClient),
+    activeBranchId,
     immutableRefetchCount,
     lastCommit,
   }),
   dispatch,
+  switchBranch,
 };
 
 async function dispatch(
@@ -271,11 +292,11 @@ async function dispatch(
   if (serviceClient && operation.kind === 'motion.track.create') {
     pendingRevision = operation.expectedRevision + 1;
     const response = await serviceClient.dispatch(makeTrackCreateCommand({ operationId: operation.operationId,
-      documentId: operation.documentId, expectedRevision: operation.expectedRevision, elementId: operation.elementId }));
+      documentId: operation.documentId, branchId: activeBranchId, expectedRevision: operation.expectedRevision, elementId: operation.elementId }));
     if (!response.ok) {
       pendingRevision = null;
       if (response.code === 'STALE_REVISION') {
-        const immutable = await serviceClient.head(operation.documentId);
+        const immutable = await serviceClient.head(operation.documentId, activeBranchId);
         immutableRefetchCount += 1;
         authoring = createAuthoringState(immutable.document);
         compiled = compileMotionDocument(authoring.document);
@@ -368,8 +389,10 @@ async function dispatch(
 
 if (serviceClient) {
   serviceClient.events(authoring.document.documentId, async (event) => {
-    if (event.revision <= authoring.document.revision || event.revision === pendingRevision) { lastCommit = event; return; }
-    const immutable = await serviceClient.revision(event.documentId, event.revision);
+    if (event.branchId !== activeBranchId || event.revision === authoring.document.revision || event.revision === pendingRevision) { lastCommit = event; return; }
+    const immutable = event.kind === 'motion.track.create'
+      ? await serviceClient.revision(event.documentId, event.revision)
+      : await serviceClient.head(event.documentId, event.branchId);
     immutableRefetchCount += 1; lastCommit = event;
     authoring = createAuthoringState(immutable.document);
     compiled = compileMotionDocument(authoring.document);
@@ -377,6 +400,37 @@ if (serviceClient) {
     renderProjection();
     status.value = `Revision ${authoring.document.revision} refreshed from committed service state.`;
   });
+}
+
+async function switchBranch(branchId: string): Promise<void> {
+  if (!serviceClient) return; const immutable = await serviceClient.head(authoring.document.documentId, branchId);
+  activeBranchId = branchId; authoring = createAuthoringState(immutable.document); compiled = compileMotionDocument(authoring.document);
+  immutableRefetchCount += 1; clearKeyframeSelection(); await controller.mount(compiled.html); renderProjection();
+  status.value = `Branch ${branchId} head revision ${authoring.document.revision} loaded.`;
+}
+
+async function createBranch(branchId: string): Promise<void> {
+  if (!serviceClient) return;
+  try {
+    const response = await serviceClient.dispatch(makeBranchCreateCommand({ operationId: nextOperationId(),
+      documentId: authoring.document.documentId, sourceBranchId: activeBranchId,
+      expectedRevision: authoring.document.revision, branchId }));
+    if (!response.ok) { status.value = `Branch creation rejected (${response.code}).`; status.dataset.kind = 'error'; return; }
+    if (branchSelect && ![...branchSelect.options].some((option) => option.value === branchId)) branchSelect.add(new Option(branchId, branchId));
+    if (branchSelect) branchSelect.value = branchId; await switchBranch(branchId); status.dataset.kind = 'success';
+  } catch { status.value = 'Branch creation rejected (VALIDATION).'; status.dataset.kind = 'error'; }
+}
+
+async function revokeClaim(claimId: string, leaseVersion: number): Promise<void> {
+  if (!serviceClient) return;
+  try {
+    const documentRevision = await serviceClient.documentRevision(authoring.document.documentId);
+    const response = await serviceClient.dispatch(makeClaimControlCommand({ kind: 'motion.claim.revoke', operationId: nextOperationId(),
+      documentId: authoring.document.documentId, branchId: activeBranchId, expectedRevision: documentRevision.revision,
+      claimId, leaseVersion }));
+    status.value = response.ok ? `Claim ${response.claimId} revoked at lease version ${response.leaseVersion}.`
+      : `Claim revocation rejected (${response.code}).`; status.dataset.kind = response.ok ? 'success' : 'error';
+  } catch { status.value = 'Claim revocation rejected (VALIDATION).'; status.dataset.kind = 'error'; }
 }
 
 function clearKeyframeSelection(): void {
@@ -424,7 +478,7 @@ function makeHistory(kind: 'motion.history.undo' | 'motion.history.redo'): Autho
 
 function nextOperationId(): string {
   operationSequence += 1;
-  return `editor:${operationSequence}`;
+  return `editor:${operationClientId}:${operationSequence}`;
 }
 
 function renderProjection(): void {

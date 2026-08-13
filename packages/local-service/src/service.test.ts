@@ -42,9 +42,10 @@ describe('loopback sole-writer service', () => {
     const temporary = await temporaryStore(); const seed = phase3Seed();
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
     const command = phase3Command('retry');
-    const firstRaw = await fetch(`${service.url}/api/v1/commands`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: canonicalJson(command) });
+    const authHeaders = { 'content-type': 'application/json', authorization: 'Bearer human-editor', 'x-motion-actor': 'human' };
+    const firstRaw = await fetch(`${service.url}/api/v1/commands`, { method: 'POST', headers: authHeaders, body: canonicalJson(command) });
     const first = await firstRaw.text();
-    const retry = await fetch(`${service.url}/api/v1/commands`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: canonicalJson(command) });
+    const retry = await fetch(`${service.url}/api/v1/commands`, { method: 'POST', headers: authHeaders, body: canonicalJson(command) });
     expect(await retry.text()).toBe(first);
     const conflict = await new MotionServiceClient(service.url).dispatch({ ...command,
       command: { ...command.command, elementId: 'el_a2849ff826f3e167' } });
@@ -75,7 +76,7 @@ describe('loopback sole-writer service', () => {
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
     (service.store as SqliteProjectStore).database
       .prepare('INSERT INTO schema_migrations(version,checksum,applied_order) VALUES(?,?,?)')
-      .run(2, 'future-schema', 2);
+      .run(3, 'future-schema', 3);
     await service.close();
     await expect(startLocalMotionService({ databasePath: temporary.databasePath, seed }))
       .rejects.toThrow('UNSUPPORTED_SCHEMA_VERSION');

@@ -5,7 +5,7 @@ goal:
   slug: phase3-branches-claims
   kind: existing_plan
   tranche: "Implement and prove only the approved Phase 3 Slice 2 minimum branch and claim vertical slice."
-  status: active
+  status: done
   oracle:
     signal: "A synthetic editor/CLI walkthrough and exact tests prove branch creation/head reads plus atomic claim acquire, renew, release, revocation, authorization, and revision interaction through the sole-writer service."
     cadence: "after the Worker package and at final audit"
@@ -63,7 +63,7 @@ visual_board:
     url: "http://goalbuddy.localhost:41737/phase3-branches-claims/"
     command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase3-branches-claims"
 
-active_task: T002
+active_task: null
 
 tasks:
   - id: T001
@@ -171,7 +171,7 @@ tasks:
   - id: T002
     type: worker
     assignee: Worker
-    status: active
+    status: done
     reasoning_hint: medium
     objective: "Implement and prove the complete Phase 3 Slice 2 minimum branches-and-claims path. Add strict branch creation and immutable branch-head reads; authenticated CLI-agent document or exact-branch claim acquire, renew, release, and claimed authoring; authenticated human branch creation, authoring, and claim revocation; client-retained high-entropy claim secrets with verifier-only SQLite storage; common idempotent control events; document-global revision allocation with branch-head compare-and-swap; and a minimal editor branch/revoke surface using the same versioned client as the CLI. Preserve exact compiler-backed native CSS preview, stable canonical IDs, deterministic exports/receipts, reduced-motion inspection, and the existing locked sole writer. Do not add claim listing, merge/review, annotations, broad collaboration, per-control crash matrices, SSE replay, dirty-draft reconciliation, MCP, Lineage integration, publication, or Phase 4+."
     allowed_files:
@@ -241,11 +241,75 @@ tasks:
       - "The editor or CLI would open SQLite, persist canonical documents or secrets, use a separate reducer/interpolator, address by CSS selector, or bypass the shared protocol client."
       - "Existing deterministic, compiler-native, reduced-motion, browser, privacy, or private-ignore proof must be weakened, skipped, or replaced."
       - "A focused verification command fails twice for the same unresolved product cause."
-    receipt: null
+    receipt:
+      result: done
+      changed_files:
+        - package.json
+        - apps/editor/src/main.ts
+        - apps/editor/src/global.d.ts
+        - apps/editor/src/styles.css
+        - apps/editor/tests/phase3.spec.ts
+        - apps/editor/scripts/qa-chrome.mjs
+        - packages/domain/src/index.ts
+        - packages/domain/src/authoring.test.ts
+        - packages/motion-protocol/src/index.ts
+        - packages/motion-protocol/src/index.test.ts
+        - packages/project-store/src/index.ts
+        - packages/local-service/src/auth.ts
+        - packages/local-service/src/index.ts
+        - packages/local-service/src/migrations.ts
+        - packages/local-service/src/sqlite-project-store.ts
+        - packages/local-service/src/service.test.ts
+        - packages/local-service/src/branch-claim.test.ts
+        - packages/local-service/src/branch-claim-recovery.test.ts
+        - packages/motion-cli/src/cli.ts
+        - packages/motion-cli/src/cli.test.ts
+        - packages/phase3-proof/src/branch-claim-parity.test.ts
+      commands:
+        - command: "npm run test:phase3:service"
+          status: pass
+        - command: "npm run test:phase3:recovery"
+          status: pass
+        - command: "npm run test:phase3:parity"
+          status: pass
+        - command: "npm run test:phase3:browser"
+          status: pass
+        - command: "npm run qa:chrome"
+          status: pass
+          detail: "Chrome 151"
+        - command: "focused 17-file Vitest sequence"
+          status: pass
+          detail: "162 tests"
+        - command: "npm run verify:determinism"
+          status: pass
+        - command: "npm run test:browser"
+          status: pass
+          detail: "10 tests"
+        - command: "npm run typecheck"
+          status: pass
+        - command: "npm run build"
+          status: pass
+        - command: "npm run verify:phase3"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+        - command: "npm run check:private-ignore"
+          status: pass
+        - command: "git diff --check"
+          status: pass
+        - command: "protected-path diff check"
+          status: pass
+        - command: "git status --short"
+          status: pass
+          detail: "Only allowed implementation and GoalBuddy control files changed."
+      summary: "Implemented the complete Slice 2 path: strict shared branch/claim commands, authenticated human/agent contexts, transactional v2 migration, global revisions with branch-head CAS, verifier-only claims, acquire/renew/release/revoke and authorization, CLI and editor controls, parity/recovery/privacy/browser proof, and installed-Chrome QA. All prescribed verification passed, including 162 focused tests, 10 browser tests, Chrome 151 QA, aggregate verify:phase3, determinism, build, sensitive scan, private-ignore, and diff boundaries."
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
   - id: T003
     type: judge
     assignee: Judge
-    status: queued
+    status: done
     reasoning_hint: high
     objective: "Adversarially review the implemented Slice 2 package and prescribe one bounded correction if any contract or proof gap remains."
     inputs:
@@ -259,11 +323,312 @@ tasks:
       - "complete | not_complete"
       - "Accepted/rejected findings with exact evidence"
       - "One corrective Worker contract if needed"
-    receipt: null
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "A diverged-head falsification proved document-scope control metadata can redirect an editor to another branch's revision, and shared success-response validation accepts contradictory receipts."
+      evidence:
+        - "Fresh service, recovery, parity/privacy, browser, Chrome 151, typecheck, build, determinism, sensitive, private-ignore, and diff gates passed."
+        - "A main-tagged document-claim event at global revision 2 carried the feature branch digest, not the main head digest."
+        - "parseCommandResponse accepted contradictory top-level and nested receipt identity, revision, and digest fields."
+        - "Full real-CLI lifecycle and diverged-head restart coverage remain missing."
+      blocked_tasks:
+        - T999
+      missing_evidence:
+        - "Diverged-head control-event and editor-isolation regression."
+        - "Strict response receipt-equality validation."
+        - "Real CLI lifecycle and restart proof."
+      required_board_updates:
+        - "Run one bounded corrective Worker before T999."
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Correct and prove the complete Slice 2 boundary without expanding scope. Make every persisted and published control event carry a stable revision/digest coherent with its tagged branch even when document-global and addressed branch revisions diverge; ensure editor control traffic can never load another branch's immutable revision; return coherent stale revision/digest pairs; restore strict kind-specific response schemas with exact top-level/receipt equality and required claim fields; and add real-CLI acquire/retry/renew/release plus human revoke, verifier-only privacy, diverged-head restart, lease-state restart, idempotency, rollback, compiler-preview, and installed-Chrome falsification coverage."
+    allowed_files:
+      - apps/editor/src/main.ts
+      - apps/editor/tests/phase3.spec.ts
+      - apps/editor/scripts/qa-chrome.mjs
+      - packages/motion-protocol/src/index.ts
+      - packages/motion-protocol/src/index.test.ts
+      - packages/project-store/src/index.ts
+      - packages/local-service/src/index.ts
+      - packages/local-service/src/sqlite-project-store.ts
+      - packages/local-service/src/branch-claim.test.ts
+      - packages/local-service/src/branch-claim-recovery.test.ts
+      - packages/motion-cli/src/cli.ts
+      - packages/motion-cli/src/cli.test.ts
+      - packages/phase3-proof/src/branch-claim-parity.test.ts
+      - packages/phase3-proof/src/privacy.test.ts
+    verify:
+      - npm exec vitest -- run packages/motion-protocol/src/index.test.ts packages/local-service/src/branch-claim.test.ts packages/local-service/src/branch-claim-recovery.test.ts packages/motion-cli/src/cli.test.ts packages/phase3-proof/src/branch-claim-parity.test.ts packages/phase3-proof/src/privacy.test.ts --sequence.concurrent false
+      - npm run test:phase3:service
+      - npm run test:phase3:recovery
+      - npm run test:phase3:parity
+      - npm run test:phase3:browser
+      - npm run qa:chrome
+      - npm run verify:determinism
+      - npm run test:browser
+      - npm run typecheck
+      - npm run build
+      - npm run verify:phase3
+      - npm run check:sensitive
+      - npm run check:private-ignore
+      - git diff --check
+      - git status --short
+    stop_if:
+      - "Coherent control-event revision/digest semantics require editing migration v2 or adding v3."
+      - "Correction requires any Slice 3+ behavior or file outside allowed_files."
+      - "Strict response validation cannot enforce receipt equality while accepting stored idempotent responses."
+      - "A document-scope control on diverged heads can still redirect an editor to another branch's revision."
+      - "Any rejected or faulted operation changes durable or notification state."
+      - "Claim proof requires secret exposure in persistence, browser storage, URLs, logs, receipts, events, snapshots, or evidence."
+      - "A focused verification fails twice for the same unresolved product cause."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/scripts/qa-chrome.mjs
+        - apps/editor/src/main.ts
+        - apps/editor/tests/phase3.spec.ts
+        - packages/motion-protocol/src/index.ts
+        - packages/motion-protocol/src/index.test.ts
+        - packages/local-service/src/sqlite-project-store.ts
+        - packages/local-service/src/branch-claim.test.ts
+        - packages/local-service/src/branch-claim-recovery.test.ts
+        - packages/motion-cli/src/cli.test.ts
+        - packages/phase3-proof/src/branch-claim-parity.test.ts
+        - packages/phase3-proof/src/privacy.test.ts
+      commands:
+        - command: "focused corrective Vitest sequence"
+          status: pass
+          detail: "17 tests"
+        - command: "npm run test:phase3:service"
+          status: pass
+          detail: "10 tests"
+        - command: "npm run test:phase3:recovery"
+          status: pass
+          detail: "12 tests"
+        - command: "npm run test:phase3:parity"
+          status: pass
+          detail: "11 tests"
+        - command: "npm run test:phase3:browser"
+          status: pass
+          detail: "5 tests"
+        - command: "npm run qa:chrome"
+          status: pass
+          detail: "Chrome 151, diverged control isolated, zero console errors"
+        - command: "npm run verify:determinism"
+          status: pass
+          detail: "26 tests"
+        - command: "npm run test:browser"
+          status: pass
+          detail: "11 tests"
+        - command: "npm run typecheck"
+          status: pass
+        - command: "npm run build"
+          status: pass
+        - command: "npm run verify:phase3"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+          detail: "Zero findings"
+        - command: "npm run check:private-ignore"
+          status: pass
+        - command: "git diff --check"
+          status: pass
+        - command: "git status --short"
+          status: pass
+          detail: "Only allowed implementation and PM-owned board files changed"
+      summary: "Corrected diverged-head control metadata so tagged events always identify their branch head while document-scope stale pairs identify the coherent global revision. Added strict per-kind success schemas and exact receipt equality. Added real CLI lifecycle, human revoke, restart, rollback, idempotency, privacy, editor isolation, compiler-native preview, and Chrome 151 evidence. Migration v2 and Slice 3 exclusions were unchanged."
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+  - id: T005
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Replace repository-known/default capabilities with required high-entropy service/client capability provisioning; make diverged document-claim human revocation usable with the document-global CAS while preserving branch-coherent event metadata; add same-branch overlap and full diverged acquire/renew/release/revoke tests through the real CLI and two editor pages. Preserve verifier-only claim proofs, strict response equality, atomicity, compiler-native preview, and all Slice 3+ exclusions."
+    allowed_files:
+      - apps/editor/scripts/serve-editor.mjs
+      - apps/editor/vite.config.ts
+      - apps/editor/src/main.ts
+      - apps/editor/src/global.d.ts
+      - apps/editor/src/virtual.d.ts
+      - apps/editor/tests/phase3.spec.ts
+      - apps/editor/scripts/qa-chrome.mjs
+      - packages/motion-protocol/src/index.ts
+      - packages/motion-protocol/src/index.test.ts
+      - packages/local-service/src/auth.ts
+      - packages/local-service/src/index.ts
+      - packages/local-service/src/sqlite-project-store.ts
+      - packages/local-service/src/branch-claim.test.ts
+      - packages/local-service/src/branch-claim-recovery.test.ts
+      - packages/motion-cli/src/cli.ts
+      - packages/motion-cli/src/cli.test.ts
+      - packages/phase3-proof/src/branch-claim-parity.test.ts
+      - packages/phase3-proof/src/privacy.test.ts
+      - package.json
+    verify:
+      - npm exec vitest -- run packages/motion-protocol/src/index.test.ts packages/local-service/src/branch-claim.test.ts packages/local-service/src/branch-claim-recovery.test.ts packages/motion-cli/src/cli.test.ts packages/phase3-proof/src/branch-claim-parity.test.ts packages/phase3-proof/src/privacy.test.ts --sequence.concurrent false
+      - npm run test:phase3:service
+      - npm run test:phase3:recovery
+      - npm run test:phase3:parity
+      - npm run test:phase3:browser
+      - npm run qa:chrome
+      - npm run verify:determinism
+      - npm run test:browser
+      - npm run typecheck
+      - npm run build
+      - npm run verify:phase3
+      - npm run check:sensitive
+      - npm run check:private-ignore
+      - git diff --check
+      - git diff --exit-code -- package-lock.json AGENTS.md docs/architecture/phase3-persistence-boundary.md docs/incubation-plan.md fixtures packages/css-import packages/css-compiler packages/preview-runtime packages/visual-proof scripts
+      - git status --short
+    stop_if:
+      - "Correction requires a migration, persisted/browser-storage/query-string credentials, or a second writer."
+      - "Correction weakens strict response parsing, atomicity, verifier-only claim secrets, branch-coherent metadata, or compiler-native preview."
+      - "Any file outside allowed_files or a new dependency is required."
+      - "Correction requires Slice 3+ recovery/replay/dirty-draft, merge/review, MCP, Lineage, publication, or Phase 4+ behavior."
+      - "A focused verification fails twice for the same unresolved product cause."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/scripts/serve-editor.mjs
+        - apps/editor/vite.config.ts
+        - apps/editor/src/main.ts
+        - apps/editor/src/global.d.ts
+        - apps/editor/src/virtual.d.ts
+        - apps/editor/tests/phase3.spec.ts
+        - apps/editor/scripts/qa-chrome.mjs
+        - packages/motion-protocol/src/index.ts
+        - packages/local-service/src/auth.ts
+        - packages/local-service/src/index.ts
+        - packages/local-service/src/sqlite-project-store.ts
+        - packages/local-service/src/branch-claim.test.ts
+        - packages/motion-cli/src/cli.ts
+        - packages/motion-cli/src/cli.test.ts
+        - packages/phase3-proof/src/branch-claim-parity.test.ts
+      commands:
+        - command: "focused corrective Vitest sequence"
+          status: pass
+          detail: "20 tests"
+        - command: "npm run test:phase3:service"
+          status: pass
+          detail: "12 tests"
+        - command: "npm run test:phase3:recovery"
+          status: pass
+          detail: "12 tests"
+        - command: "npm run test:phase3:parity"
+          status: pass
+          detail: "12 tests"
+        - command: "npm run test:phase3:browser"
+          status: pass
+          detail: "6 tests including two diverged editors and full lifecycle"
+        - command: "npm run qa:chrome"
+          status: pass
+          detail: "Superseded by T006; original Chrome ordering passed after the cross-editor operation-ID correction."
+        - command: "node apps/editor/scripts/qa-chrome.mjs"
+          status: pass
+          detail: "Superseded by T006; Chrome 151 confirmed collision-free two-editor revoke."
+      summary: "Implemented runtime capability provisioning, fail-closed authentication, coherent lagging-branch revoke, same-branch one-winner proof, real CLI lifecycle, and two-editor isolation. Its Chrome-discovered cross-editor ID collision was corrected and fully reverified by T006; the original blocked receipt remains in notes as historical evidence."
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
+  - id: T006
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Replace page-local editor:sequence operation IDs with collision-resistant per-client IDs plus a monotonic suffix, while preserving one generated ID per dispatched command and exact service idempotency; add a cross-editor branch-create/revoke regression; keep the existing Chrome ordering so it proves the real collision is gone; rewrite scanner-triggering synthetic secret literals without weakening their length/privacy assertions."
+    allowed_files:
+      - apps/editor/src/main.ts
+      - apps/editor/tests/phase3.spec.ts
+      - apps/editor/scripts/qa-chrome.mjs
+      - packages/motion-cli/src/cli.test.ts
+    verify:
+      - npm exec vitest -- run packages/motion-protocol/src/index.test.ts packages/local-service/src/branch-claim.test.ts packages/local-service/src/branch-claim-recovery.test.ts packages/motion-cli/src/cli.test.ts packages/phase3-proof/src/branch-claim-parity.test.ts packages/phase3-proof/src/privacy.test.ts --sequence.concurrent false
+      - npm run test:phase3:service
+      - npm run test:phase3:recovery
+      - npm run test:phase3:parity
+      - npm run test:phase3:browser
+      - npm run qa:chrome
+      - npm run verify:determinism
+      - npm run test:browser
+      - npm run typecheck
+      - npm run build
+      - npm run verify:phase3
+      - npm run check:sensitive
+      - npm run check:private-ignore
+      - git diff --check
+      - git diff --exit-code -- package-lock.json AGENTS.md docs/architecture/phase3-persistence-boundary.md docs/incubation-plan.md fixtures packages/css-import packages/css-compiler packages/preview-runtime packages/visual-proof scripts
+      - git status --short
+    stop_if:
+      - "The fix merely reorders or waits in the Chrome harness or suppresses OPERATION_ID_CONFLICT."
+      - "The fix persists client IDs or credentials in browser storage or changes service idempotency semantics."
+      - "The fix requires files outside allowed_files, a dependency, capability/claim leakage, or Slice 3+ behavior."
+      - "A focused verification fails twice for the same unresolved product cause."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/src/main.ts
+        - apps/editor/tests/phase3.spec.ts
+        - apps/editor/scripts/qa-chrome.mjs
+        - packages/motion-cli/src/cli.test.ts
+      commands:
+        - command: "focused corrective Vitest sequence"
+          status: pass
+          detail: "20 tests"
+        - command: "npm run test:phase3:service"
+          status: pass
+          detail: "12 tests"
+        - command: "npm run test:phase3:recovery"
+          status: pass
+          detail: "12 tests"
+        - command: "npm run test:phase3:parity"
+          status: pass
+          detail: "12 tests"
+        - command: "npm run test:phase3:browser"
+          status: pass
+          detail: "6 tests after one test-only setup correction"
+        - command: "npm run qa:chrome"
+          status: pass
+          detail: "Chrome 151, original sequence, four unique IDs across two clients"
+        - command: "npm run verify:determinism"
+          status: pass
+          detail: "26 tests"
+        - command: "npm run test:browser"
+          status: pass
+          detail: "12 tests"
+        - command: "npm run typecheck"
+          status: pass
+        - command: "npm run build"
+          status: pass
+        - command: "npm run verify:phase3"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+          detail: "Zero generic and private findings"
+        - command: "npm run check:private-ignore"
+          status: pass
+        - command: "git diff --check"
+          status: pass
+        - command: "protected-path diff check"
+          status: pass
+        - command: "git status --short"
+          status: pass
+          detail: "Only allowed implementation and PM board files changed"
+      summary: "Replaced page-local editor IDs with secure per-page UUIDs plus monotonic suffixes, without persistence or service changes. Added direct two-page branch-create/revoke assertions proving distinct IDs and successful revocation while Chrome retained original ordering. Rewrote only scanner-triggering synthetic secret literals; privacy assertions remain intact and sensitive findings are zero."
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
   - id: T999
     type: judge
     assignee: Judge
-    status: queued
+    status: done
     reasoning_hint: high
     objective: "Audit whether Phase 3 Slice 2—not all of Phase 3—satisfies the owner-facing oracle and is safe for architecture review."
     inputs:
@@ -279,7 +644,26 @@ tasks:
       - "full_outcome_complete: true | false for Slice 2"
       - "User-facing claim, top three realistic failure modes, and exact evidence"
       - "Architecture-review handoff and explicitly deferred work"
-    receipt: null
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      rationale: "Phase 3 Slice 2—not the aggregate Phase 3 gate—is complete and safe for architecture review. Fresh focused, aggregate, browser, Chrome, privacy, protected-path, typecheck, build, and sensitive-content gates prove the full bounded outcome."
+      evidence:
+        - "Chrome 151 passed the original two-editor branch and document-claim lifecycle with native previews and zero console errors."
+        - "Ephemeral UUID page prefixes plus monotonic suffixes produced collision-free operation IDs without persistence."
+        - "Service 12/12 and recovery 12/12 passed global allocation, branch CAS, stale/fault atomicity, overlaps, and one-winner behavior."
+        - "Diverged lifecycle preserved main/feature isolation and branch-coherent event revision/digest metadata."
+        - "Externally supplied high-entropy capabilities fail closed; repository-known impersonation is rejected before event creation."
+        - "Verifier-only claim secrets are absent from public, persisted, browser, and evidence surfaces."
+        - "Strict protocol/CLI/privacy parity passed 12/12 and the complete focused sequence passed 171/171."
+        - "verify:phase3, determinism 26/26, full browser 12/12, typecheck, and build passed."
+        - "Sensitive scan found zero; private-ignore passed 3/3; protected-path and diff checks passed."
+        - "Slice 3+, the aggregate Phase 3 exit gate, merge/review, MCP, Lineage, and publication remain deferred."
+      blocked_tasks: []
+      missing_evidence: []
+      required_board_updates:
+        - "Stop for architecture review and do not activate Slice 3 without separate authority."
 
 checks:
   dirty_fingerprint: unknown

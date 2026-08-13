@@ -1,0 +1,52 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T002",
+    "board_path": "docs/goals/phase3-branches-claims/state.yaml",
+    "changed_files": [
+      "package.json",
+      "apps/editor/src/main.ts",
+      "apps/editor/src/global.d.ts",
+      "apps/editor/src/styles.css",
+      "apps/editor/tests/phase3.spec.ts",
+      "apps/editor/scripts/qa-chrome.mjs",
+      "packages/domain/src/index.ts",
+      "packages/domain/src/authoring.test.ts",
+      "packages/motion-protocol/src/index.ts",
+      "packages/motion-protocol/src/index.test.ts",
+      "packages/project-store/src/index.ts",
+      "packages/local-service/src/auth.ts",
+      "packages/local-service/src/index.ts",
+      "packages/local-service/src/migrations.ts",
+      "packages/local-service/src/sqlite-project-store.ts",
+      "packages/local-service/src/service.test.ts",
+      "packages/local-service/src/branch-claim.test.ts",
+      "packages/local-service/src/branch-claim-recovery.test.ts",
+      "packages/motion-cli/src/cli.ts",
+      "packages/motion-cli/src/cli.test.ts",
+      "packages/phase3-proof/src/branch-claim-parity.test.ts"
+    ],
+    "commands": [
+      { "command": "npm run test:phase3:service", "status": "pass" },
+      { "command": "npm run test:phase3:recovery", "status": "pass" },
+      { "command": "npm run test:phase3:parity", "status": "pass" },
+      { "command": "npm run test:phase3:browser", "status": "pass" },
+      { "command": "npm run qa:chrome", "status": "pass", "detail": "Chrome 151" },
+      { "command": "focused 17-file Vitest sequence", "status": "pass", "detail": "162 tests" },
+      { "command": "npm run verify:determinism", "status": "pass" },
+      { "command": "npm run test:browser", "status": "pass", "detail": "10 tests" },
+      { "command": "npm run typecheck", "status": "pass" },
+      { "command": "npm run build", "status": "pass" },
+      { "command": "npm run verify:phase3", "status": "pass" },
+      { "command": "npm run check:sensitive", "status": "pass" },
+      { "command": "npm run check:private-ignore", "status": "pass" },
+      { "command": "git diff --check", "status": "pass" },
+      { "command": "protected-path diff check", "status": "pass" },
+      { "command": "git status --short", "status": "pass", "detail": "Only allowed implementation and GoalBuddy control files changed." }
+    ],
+    "summary": "Implemented the complete Slice 2 path: strict shared branch/claim commands, authenticated human/agent contexts, transactional v2 migration, global revisions with branch-head CAS, verifier-only claims, acquire/renew/release/revoke and authorization, CLI and editor controls, parity/recovery/privacy/browser proof, and installed-Chrome QA. All prescribed verification passed, including 162 focused tests, 10 browser tests, Chrome 151 QA, aggregate verify:phase3, determinism, build, sensitive scan, private-ignore, and diff boundaries.",
+    "remaining_blockers": [],
+    "verification_attempts": 2,
+    "stopped_because": null
+  }
+}

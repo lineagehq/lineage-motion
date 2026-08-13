@@ -21,6 +21,7 @@ function compiledMotionPlugin() {
         document: motionDocument,
         compiled: compileMotionDocument(motionDocument),
         serviceBacked: Boolean(process.env.PHASE3_SERVICE_URL),
+        humanCapability: process.env.PHASE3_HUMAN_CAPABILITY ?? null,
       })}`;
     },
   };

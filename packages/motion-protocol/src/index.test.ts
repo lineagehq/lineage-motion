@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { canonicalBytes, sha256Hex } from '../../domain/src/index.ts';
 import { createPhase3Seed } from '../../local-service/src/seed.ts';
-import { makeTrackCreateCommand, parseCommand, parseCommandResponse, parseCommitMetadata, parseImmutableRevision } from './index.ts';
+import { makeBranchCreateCommand, makeClaimAcquireCommand, makeTrackCreateCommand, parseCommand,
+  parseCommandResponse, parseCommitMetadata, parseImmutableRevision } from './index.ts';
 
 describe('motion.protocol.v1', () => {
   test('shares one strict canonical-ID command and rejects selector addressing or envelope drift', () => {
@@ -15,6 +16,15 @@ describe('motion.protocol.v1', () => {
       .toEqual({ ok: false, code: 'VALIDATION' });
     expect(() => makeTrackCreateCommand({ operationId: 'contains space', documentId: 'doc', expectedRevision: 0,
       elementId: 'el_2dbee68b1ea318c8' })).toThrow();
+  });
+  test('keeps branch and claim controls strict and claim-secret free', () => {
+    const branch = makeBranchCreateCommand({ operationId: 'branch', documentId: 'doc', expectedRevision: 0, branchId: 'feature' });
+    const claim = makeClaimAcquireCommand({ operationId: 'claim', documentId: 'doc', branchId: 'feature',
+      expectedRevision: 0, scope: 'branch' });
+    expect(parseCommand(branch)).toEqual({ ok: true, command: branch }); expect(parseCommand(claim)).toEqual({ ok: true, command: claim });
+    expect(JSON.stringify(claim)).not.toContain('secret');
+    expect(parseCommand({ ...claim, command: { ...claim.command, payload: { ...claim.command.payload, branchId: 'other' } } }))
+      .toEqual({ ok: false, code: 'VALIDATION' });
   });
   test('runtime-validates exact responses, immutable revisions with matching digests, and metadata-only events', () => {
     const document = createPhase3Seed(); const canonicalDigest = sha256Hex(canonicalBytes(document));
@@ -32,5 +42,33 @@ describe('motion.protocol.v1', () => {
     expect(parseCommitMetadata(metadata)).toEqual(metadata);
     for (const leak of ['document', 'payload', 'selector', 'url']) expect(() => parseCommitMetadata({ ...metadata, [leak]: 'x' }))
       .toThrow('PROTOCOL_EVENT_INVALID');
+  });
+  test('enforces kind-specific success fields and exact top-level/receipt equality', () => {
+    const identity = { ok: true, protocolVersion: 'motion.protocol.v1', operationId: 'strict-response', documentId: 'doc',
+      branchId: 'main', expectedRevision: 2, resultingRevision: 1, operationDigest: '1'.repeat(64) } as const;
+    const control = { schemaVersion: 'motion.control-receipt.v1', protocolVersion: 'motion.protocol.v1', documentId: 'doc',
+      branchId: 'main', expectedRevision: 2, resultingRevision: 1, operationDigest: '1'.repeat(64) } as const;
+    const branch = { ...identity, receipt: { ...control, kind: 'motion.branch.create' } };
+    const acquire = { ...identity, claimId: 'claim_1234567890abcdef12345678', leaseVersion: 1, expiresAt: 60_000,
+      receipt: { ...control, kind: 'motion.claim.acquire', claimId: 'claim_1234567890abcdef12345678', leaseVersion: 1 } };
+    const renew = { ...acquire, receipt: { ...acquire.receipt, kind: 'motion.claim.renew' } };
+    const release = { ...identity, claimId: acquire.claimId, leaseVersion: 2,
+      receipt: { ...control, kind: 'motion.claim.release', claimId: acquire.claimId, leaseVersion: 2 } };
+    const revoke = { ...release, receipt: { ...release.receipt, kind: 'motion.claim.revoke' } };
+    for (const response of [branch, acquire, renew, release, revoke]) expect(parseCommandResponse(response)).toEqual(response);
+    for (const response of [
+      { ...branch, claimId: acquire.claimId },
+      { ...acquire, expiresAt: undefined },
+      { ...release, expiresAt: 60_000 },
+      { ...revoke, receipt: { ...revoke.receipt, leaseVersion: 3 } },
+      { ...renew, documentId: 'other' },
+      { ...acquire, resultingRevision: 2 },
+    ]) expect(() => parseCommandResponse(response)).toThrow('PROTOCOL_RESPONSE_INVALID');
+    expect(parseCommandResponse({ ok: false, code: 'STALE_REVISION', currentRevision: 2,
+      currentDigest: '2'.repeat(64) })).toBeTruthy();
+    expect(() => parseCommandResponse({ ok: false, code: 'STALE_REVISION', currentRevision: 2 }))
+      .toThrow('PROTOCOL_RESPONSE_INVALID');
+    expect(() => parseCommandResponse({ ok: false, code: 'UNAUTHORIZED_CLAIM', currentRevision: 2,
+      currentDigest: '2'.repeat(64) })).toThrow('PROTOCOL_RESPONSE_INVALID');
   });
 });
