@@ -1,0 +1,148 @@
+version: 2
+
+goal:
+  title: "Phase 3 minimum branches and claims"
+  slug: phase3-branches-claims
+  kind: existing_plan
+  tranche: "Implement and prove only the approved Phase 3 Slice 2 minimum branch and claim vertical slice."
+  status: active
+  oracle:
+    signal: "A synthetic editor/CLI walkthrough and exact tests prove branch creation/head reads plus atomic claim acquire, renew, release, revocation, authorization, and revision interaction through the sole-writer service."
+    cadence: "after the Worker package and at final audit"
+    final_proof: "Receipt-backed protocol, persistence, concurrency, recovery, parity, Chrome, determinism, and privacy evidence with full_outcome_complete: true for Slice 2."
+  intake:
+    original_request: "After merging PR #2, create a fresh worktree and prepare the bounded GoalBuddy board for Phase 3 Slice 2."
+    interpreted_outcome: "A ready-to-run, rigorously bounded board for minimum branches and claims, without implementing it during prep."
+    input_shape: existing_plan
+    audience: "motion editor owner"
+    authority: approved
+    proof_type: test
+    completion_proof: "Final Judge accepts exact automated and Chrome evidence for every approved Slice 2 branch/claim contract and no deferred behavior."
+    likely_misfire: "Building a generalized collaboration/review system or stopping after schemas without a complete editor/CLI/service/SQLite path."
+    blind_spots_considered:
+      - "Claim-secret leakage in storage, logs, URLs, receipts, or browser state"
+      - "Stale revision and lease-version races that partially mutate state"
+      - "Branch/claim controls diverging between editor and CLI"
+      - "Pulling merge, review, annotations, replay hardening, MCP, or Lineage integration forward"
+    existing_plan_facts:
+      - "PR #2 merged Phase 3 Slice 1 at merge commit c647d59791467479b5447305a5efe4ac5aeee593."
+      - "The approved architecture orders Slice 2 as minimum branch creation/head reads and CLI-agent document or branch leases."
+      - "Lease controls include acquire, renew, release, human revocation, client-retained secrets, verifier-only storage, idempotency, authorization failures, and atomic revision interaction."
+      - "No merge or review behavior belongs in this slice."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/phase3-branches-claims/"
+    command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase3-branches-claims"
+
+active_task: T001
+
+tasks:
+  - id: T001
+    type: judge
+    assignee: Judge
+    status: active
+    reasoning_hint: high
+    objective: "Validate the merged Slice 1 baseline and turn the approved Slice 2 architecture into one largest-safe vertical Worker contract."
+    inputs:
+      - "docs/architecture/phase3-persistence-boundary.md"
+      - "docs/goals/phase3-branches-claims/goal.md"
+      - "Merged Slice 1 protocol, store, service, CLI, editor, proof, and tests"
+    constraints:
+      - "Read-only; do not implement."
+      - "Preserve the sole-writer, shared-operation, expected-revision, stable-ID, deterministic export, compiler-preview, and reduced-motion invariants."
+      - "Exclude merge, review, annotations, broad collaboration, replay hardening, MCP, Lineage integration, publication, and Phase 4+."
+    expected_output:
+      - "Grounded contract matrix for branch and claim operations, state transitions, stable errors, and secrets"
+      - "Largest safe coherent Worker objective"
+      - "Exact allowed_files, verify commands, stop_if conditions, and synthetic QA walkthrough"
+      - "Top three realistic failure modes and adversarial proof requirements"
+    receipt: null
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: medium
+    objective: "Implement the complete minimum branches-and-claims vertical slice selected by T001."
+    allowed_files: []
+    verify: []
+    stop_if:
+      - "T001 has not supplied exact allowed_files and verification."
+      - "The work requires merge/review behavior, SSE replay hardening, MCP, Lineage integration, or Phase 4+."
+      - "Claim secrets would enter persistent plaintext, URLs, logs, receipts, screenshots, or tracked evidence."
+      - "A branch or claim mutation cannot remain atomic under stale revision, stale lease version, collision, retry, and concurrent acquisition."
+      - "Verification fails twice for the same product reason."
+    receipt: null
+  - id: T003
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Adversarially review the implemented Slice 2 package and prescribe one bounded correction if any contract or proof gap remains."
+    inputs:
+      - "T001 and T002 receipts"
+      - "Complete Slice 2 diff and verification output"
+    constraints:
+      - "Read-only; do not implement."
+      - "Reject cosmetic or schema-only completion."
+      - "Require editor and CLI to dispatch the same typed operations through the sole writer."
+    expected_output:
+      - "complete | not_complete"
+      - "Accepted/rejected findings with exact evidence"
+      - "One corrective Worker contract if needed"
+    receipt: null
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Audit whether Phase 3 Slice 2—not all of Phase 3—satisfies the owner-facing oracle and is safe for architecture review."
+    inputs:
+      - "All completed task receipts"
+      - "Fresh focused and aggregate verification"
+      - "Complete diff and sensitive-content scan"
+    constraints:
+      - "Do not implement."
+      - "Reject completion while required Worker work or corrective work remains."
+      - "Do not claim Slice 3 refresh/recovery hardening or the aggregate Phase 3 exit gate."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false for Slice 2"
+      - "User-facing claim, top three realistic failure modes, and exact evidence"
+      - "Architecture-review handoff and explicitly deferred work"
+    receipt: null
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: unknown
+    task: null
+    commands: []
