@@ -16,6 +16,8 @@ test('sanitized aggregate receipts prove every exact acceptance threshold', asyn
   const visual = JSON.parse(visualText);
   const chrome = JSON.parse(chromeText);
   const privateImport = JSON.parse(importText);
+  const aggregateText = await readFile(`${repositoryRoot}docs/evidence/t002-phase3-aggregate.json`, 'utf8');
+  const aggregate = JSON.parse(aggregateText);
 
   expect(visual).toMatchObject({
     schemaVersion: 'motion.visual-proof-receipt.v1',
@@ -43,6 +45,10 @@ test('sanitized aggregate receipts prove every exact acceptance threshold', asyn
       nativeAnimationsOnly: true,
       playPauseNative: true,
       noConsoleErrors: true,
+      noPageErrors: true,
+      noFailedRequests: true,
+      noUnexpectedNetwork: true,
+      noHttpErrors: true,
     },
   });
   expect(privateImport).toMatchObject({
@@ -50,7 +56,17 @@ test('sanitized aggregate receipts prove every exact acceptance threshold', asyn
     inventory: { ruleCount: 9, applicationCount: 8, unsupportedCount: 0, missingCount: 0 },
     determinism: { runCount: 3, byteIdentical: true },
   });
-  for (const text of [visualText, chromeText, importText]) {
+  expect(aggregate).toMatchObject({
+    schemaVersion: 'motion.phase3-aggregate-proof.v1',
+    passed: true,
+    repetitions: { runCount: 2, editorCliByteIdentical: true, repeatedRunByteIdentical: true },
+    privacy: { bannedFieldCount: 0, bannedValueCount: 0 },
+  });
+  expect(aggregate.invariantMatrix).toHaveLength(10);
+  expect(aggregate.invariantMatrix).toEqual(expect.arrayContaining(
+    Array.from({ length: 10 }, (_, index) => expect.objectContaining({ invariant: index + 1, passed: true })),
+  ));
+  for (const text of [visualText, chromeText, importText, aggregateText]) {
     expect(text).not.toMatch(/\/Users\/|[A-Za-z]:\\|sourcePath|selectorHint|presigned/i);
   }
 });

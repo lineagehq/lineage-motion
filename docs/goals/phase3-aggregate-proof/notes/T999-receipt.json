@@ -1,0 +1,32 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T999",
+    "board_path": "docs/goals/phase3-aggregate-proof/state.yaml",
+    "decision": "complete",
+    "full_outcome_complete": true,
+    "rationale": "The complete Phase 3 oracle is proven. Two fresh full gates from the same current bytes passed every required suite, installed-Chrome scenario, private/visual check, compiler/build check, and repository scan. Editor/CLI and repeated-run artifacts are byte-identical; all ten invariants have direct test coverage; protected product paths remain identical to f4e1368; and no private, database, screenshot, dependency, migration, or Phase 4 material entered scope. Phase 3 may close, but Phase 4 must not begin without separate authorization.",
+    "evidence": [
+      {"claim":"Owner-facing Phase 3 exit claim","proof":"From identical synthetic bases, editor and CLI produced equal canonical documents, compiled native HTML/CSS, exports, compiler receipts, and revision receipts. Rejected writes remained atomic, browser refresh remained compiler-backed, and the complete gate passed twice."},
+      {"claim":"Fresh complete verification","proof":"Two independent verify:phase3 executions passed service 14, recovery 34, parity 14, Phase 3 browser 13 twice, unit 196, determinism 26, visual 2, authoring visual 1, private acceptance 2, receipt verification 1, full browser 20, typecheck, build, sensitive, private-ignore, diff, and protected-path gates."},
+      {"claim":"Environment and installed browser","proof":"Node v22.22.3 on Darwin arm64; installed Google Chrome 151.0.7922.138; controlled visual proof used Playwright 1.62.1 with Chromium 151.0.7922.34."},
+      {"claim":"Installed-Chrome acceptance","proof":"Both runs passed exact compiler output, native animations, ordered reconnect/refetch, visible dirty-draft conflict, canonical-ID selection, branch/claim isolation, and reduced motion. Console, page-error, failed-request, unexpected-network, and failed-HTTP counts were zero; one intentional SSE abort was allowlisted."},
+      {"claim":"Deterministic aggregate bytes","proof":"Both full runs emitted aggregate receipt SHA-256 59aaa1b84dd52abd4110c4d91acb828533d0c70f7786b896e8b0b0f77c4f9dfe and direct regeneration compared byte-for-byte equal. The historical Phase 2 receipt remained at SHA-256 7c67ddbd1963656d0b18182610dcb986e6fff4ae0bd82c5416cb53afe2d5a5bd."},
+      {"claim":"Deterministic artifact digests","proof":"Canonical 5bafad9d4e5b11c297509fcde29dcec510245e7d9c3bfa529c331a6f0f3934ee; HTML 7ec6b2c97b447f2eefb3827680fa75e1fef9d5af63695e5f7e4490aa361265b1; CSS 220c3bf703323cdfbf4c3b3572058b7d3edf075e879d5ff2dd57fbcd505331e1; export c180e78c5b790ce7583c5e6bd29f69df5d07ce39edfd1752284827d85cf87605; compiler receipt 263d8bb299a8a340416cf3f26845e25096a83eb060ba9523a087404ff424e2d4; revision receipt 9bbff1e4d85886e00832f9e8fb286f2e477d0961e802782afe5d7fa99b4168ef."},
+      {"claim":"Invariants 1-5","proof":"Shared typed operation parity, sole SQLite writer, atomic expected revisions, claim-bounded agent writes, and selector-independent canonical identity all passed fresh protocol, service, recovery, parity, and browser evidence."},
+      {"claim":"Invariants 6-10","proof":"Fail-closed imports, byte-identical equal revisions, compiler-backed preview, browser-native HTML/CSS output, and intentional reduced motion all passed fresh import, determinism, visual, browser, and installed-Chrome evidence."},
+      {"claim":"Private and discrete visual proof","proof":"The ignored manifest remained a regular two-field local file. Private compilation repeated three times with identical digests. Visual proof replayed 70 samples three times with equal hashes and zero pixel/channel difference; hold/ripple covered both sides of discrete boundaries with seven zero-difference samples."},
+      {"claim":"Failure mode 1 — omitted or simulated gate falsified","proof":"verify:phase3 invokes every required Phase 0-3 suite, real service/CLI/browser paths, installed Chrome, private/visual gates, receipt checks, compiler/build, and repository scans; both complete runs passed."},
+      {"claim":"Failure mode 2 — deterministic drift falsified","proof":"Full canonical, HTML/CSS, export, and receipt strings matched across editor, CLI, private repetitions, and two complete aggregate gates."},
+      {"claim":"Failure mode 3 — leakage or scope expansion falsified","proof":"Sensitive scans found zero; private-ignore was 3/3 with zero tracked private targets; banned-field/value scans passed; protected product paths and package-lock match f4e1368; no database, WAL, backup, discovery file, or proof screenshot exists."},
+      {"claim":"Complete diff and phase boundary","proof":"Only GoalBuddy control/evidence, aggregate proof, package command wiring, Chrome diagnostics, and visual-proof harness corrections changed. Product source, schemas, migrations, dependencies, architecture, fixtures, and Phase 4 surfaces remain unchanged."}
+    ],
+    "blocked_tasks": [],
+    "missing_evidence": [],
+    "required_board_updates": [
+      "Mark T999 done with this receipt.",
+      "Set the phase3-aggregate-proof goal status to complete.",
+      "Stop at the Phase 3 exit gate; require separate owner authorization before any Phase 4 work."
+    ]
+  }
+}

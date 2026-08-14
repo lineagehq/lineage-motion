@@ -1,7 +1,8 @@
 import { createHash } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { createRequire } from 'node:module';
+import { dirname, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { describe, expect, test } from 'vitest';
 import { chromium, type Browser } from '@playwright/test';
@@ -24,6 +25,9 @@ const controlledChromiumArgs = ['--disable-threaded-animation'] as const;
 const streakPath = resolve('artifacts/t002-target-selection-streak.json');
 const proofVersion = 't002-target-selection-controlled.v1';
 const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
+const playwrightPackagePath = require.resolve('@playwright/test/package.json');
+const browsersManifestPath = resolve(dirname(require.resolve('playwright-core/package.json')), 'browsers.json');
 
 describe('Phase 2 controlled authoring proof', () => {
   test('contains intentional pixels and restores every undo/redo visual state', async () => {
@@ -168,9 +172,7 @@ describe('Phase 2 controlled authoring proof', () => {
     expect(outsideChangedPixels).toBe(0);
     expect(nonTargetPropertiesEqual).toBe(true);
 
-    const playwrightPackage = JSON.parse(await readFile(
-      new URL('../../../node_modules/@playwright/test/package.json', import.meta.url), 'utf8',
-    )) as { version: string };
+    const playwrightPackage = JSON.parse(await readFile(playwrightPackagePath, 'utf8')) as { version: string };
     const completedStreak = priorStreak + 1;
 
     const receipt = {
@@ -233,7 +235,7 @@ describe('Phase 2 controlled authoring proof', () => {
         }))),
     };
     await finishFocusedRun(completedStreak);
-    if (completedStreak >= 3) {
+    if (completedStreak >= 3 && process.env.PHASE3_AGGREGATE_PROOF !== '1') {
       await mkdir(resolve('docs/evidence'), { recursive: true });
       await writeFile(resolve('docs/evidence/t002-phase2-target-selection.json'), `${JSON.stringify(receipt, null, 2)}\n`);
     }
@@ -399,9 +401,7 @@ async function attestBrowserProcess(browser: Browser, browserVersion: string) {
     argument === controlledChromiumArgs[0]).length;
   if (flagOccurrenceCount !== 1) throw new Error('AUTHORING_CONTROLLED_FLAG_COUNT_INVALID');
 
-  const browsersManifest = JSON.parse(await readFile(
-    new URL('../../../node_modules/playwright-core/browsers.json', import.meta.url), 'utf8',
-  )) as { browsers: Array<{
+  const browsersManifest = JSON.parse(await readFile(browsersManifestPath, 'utf8')) as { browsers: Array<{
     name: string; revision: string; installByDefault: boolean; browserVersion: string;
   }> };
   const pinned = browsersManifest.browsers.find((candidate) =>

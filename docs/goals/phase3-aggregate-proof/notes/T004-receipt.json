@@ -1,0 +1,29 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T004",
+    "board_path": "docs/goals/phase3-aggregate-proof/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "An existing owner-authorized manifest is safely reusable. The completed Phase 0 worktree and five completed Phase 2 worktrees hold byte-identical ignored manifests; each has exactly the two expected fields, references existing regular source/lock files, and resolves four unique confined resources whose recorded digests match. The aggregate worktree alone lacks the manifest. Approve one replacement Worker that restores the Phase 0 manifest byte-for-byte as an ignored regular local file, validates it without printing values, and then executes the complete unchanged T002 proof vertical. No corpus expansion, private copying, product behavior, dependency, or Phase 4 work is authorized.",
+    "evidence": [
+      {"claim":"Reusable manifest provenance","proof":"The completed Phase 0 worktree contains an ignored regular manifest previously accepted by completed private-import, visual, receipt, ignore, and sensitive-content gates."},
+      {"claim":"Cross-worktree identity","proof":"Six completed Phase 0/2 worktrees contain byte-identical manifests with identical referenced source and resource-lock digests; the primary and Phase 3 worktrees do not contain one."},
+      {"claim":"Manifest and resource validity","proof":"Each reusable manifest has exactly sourcePath and resourceLockPath string fields; both targets are existing regular files. The lock resolves four unique resources confined beneath its lock directory, and every recorded resource digest matches current bytes."},
+      {"claim":"Local-only safety","proof":"Repository policy ignores .private-corpus/, .motion/, and artifacts/; the tracked inventory contains none of those paths. Prior reuse receipts report zero sensitive findings and no copied private source or resources."}
+    ],
+    "parallel_safety": {"safe":false,"reason":"Use one Worker. Manifest provisioning and aggregate proof share one provenance chain, command expansion, and deterministic receipt; splitting them would make the private-input and repeated-run evidence ambiguous."},
+    "blocked_tasks": ["T003","T999"],
+    "missing_evidence": [
+      "The reusable manifest has not yet been restored in the aggregate worktree.",
+      "No replacement Worker diff or fresh complete acceptance run exists.",
+      "No byte-identical two-run aggregate receipt or independently reviewed ten-invariant matrix exists.",
+      "Installed-Chrome diagnostic strengthening and worktree-local Playwright metadata correction remain unimplemented and unverified."
+    ],
+    "required_board_updates": [
+      "Mark T004 done with this receipt.",
+      "Supersede blocked T002 with one active replacement Worker using the exact package in this receipt; keep T002 as historical blocked evidence.",
+      "Keep T003 and T999 queued until the replacement Worker completes, and point T003 at the replacement Worker diff, receipts, and fresh command outputs."
+    ]
+  }
+}

@@ -1,0 +1,176 @@
+{
+  "schemaVersion": "motion.phase3-aggregate-proof.v1",
+  "passed": true,
+  "environment": {
+    "node": "v22.22.3",
+    "platform": "darwin",
+    "architecture": "arm64"
+  },
+  "repetitions": {
+    "runCount": 2,
+    "editorCliByteIdentical": true,
+    "repeatedRunByteIdentical": true,
+    "canonicalDigest": "5bafad9d4e5b11c297509fcde29dcec510245e7d9c3bfa529c331a6f0f3934ee",
+    "compiledHtmlDigest": "7ec6b2c97b447f2eefb3827680fa75e1fef9d5af63695e5f7e4490aa361265b1",
+    "compiledCssDigest": "220c3bf703323cdfbf4c3b3572058b7d3edf075e879d5ff2dd57fbcd505331e1",
+    "exportDigest": "c180e78c5b790ce7583c5e6bd29f69df5d07ce39edfd1752284827d85cf87605",
+    "compilerReceiptDigest": "263d8bb299a8a340416cf3f26845e25096a83eb060ba9523a087404ff424e2d4",
+    "revisionReceiptDigest": "9bbff1e4d85886e00832f9e8fb286f2e477d0961e802782afe5d7fa99b4168ef"
+  },
+  "acceptance": {
+    "commands": [
+      "test:phase3:service",
+      "test:phase3:recovery",
+      "test:phase3:parity",
+      "test:phase3:browser",
+      "qa:chrome",
+      "test:unit",
+      "verify:determinism",
+      "test:visual",
+      "test:visual:authoring",
+      "test:private-acceptance",
+      "verify:receipts",
+      "test:browser",
+      "typecheck",
+      "build",
+      "check:sensitive",
+      "check:private-ignore"
+    ],
+    "assertionCounts": {
+      "service": 14,
+      "recovery": 34,
+      "parity": 14,
+      "phase3Browser": 13,
+      "determinism": 26,
+      "fullBrowser": 20,
+      "invariantCount": 10
+    }
+  },
+  "invariantMatrix": [
+    {
+      "invariant": 1,
+      "claim": "human and CLI authoring share one typed operation language",
+      "evidence": [
+        "test:phase3:parity",
+        "test:phase3:browser"
+      ],
+      "passed": true
+    },
+    {
+      "invariant": 2,
+      "claim": "the local service is the sole persistent writer",
+      "evidence": [
+        "test:phase3:service",
+        "test:phase3:recovery"
+      ],
+      "passed": true
+    },
+    {
+      "invariant": 3,
+      "claim": "mutations require expected revisions and reject stale writes atomically",
+      "evidence": [
+        "test:phase3:service",
+        "test:phase3:recovery",
+        "qa:chrome"
+      ],
+      "passed": true
+    },
+    {
+      "invariant": 4,
+      "claim": "agent writes are bounded by document or branch claims",
+      "evidence": [
+        "test:phase3:service",
+        "test:phase3:recovery",
+        "qa:chrome"
+      ],
+      "passed": true
+    },
+    {
+      "invariant": 5,
+      "claim": "source bindings do not replace canonical identity",
+      "evidence": [
+        "test:unit",
+        "test:phase3:browser"
+      ],
+      "passed": true
+    },
+    {
+      "invariant": 6,
+      "claim": "unsupported import behavior remains visible and fail-closed",
+      "evidence": [
+        "test:unit",
+        "test:private-acceptance"
+      ],
+      "passed": true
+    },
+    {
+      "invariant": 7,
+      "claim": "equal revisions produce byte-identical exports and receipts",
+      "evidence": [
+        "verify:determinism",
+        "test:phase3:parity",
+        "verify:receipts"
+      ],
+      "passed": true
+    },
+    {
+      "invariant": 8,
+      "claim": "preview renders exact compiler output",
+      "evidence": [
+        "test:phase3:browser",
+        "qa:chrome",
+        "test:visual:authoring"
+      ],
+      "passed": true
+    },
+    {
+      "invariant": 9,
+      "claim": "production output is browser-native HTML and CSS",
+      "evidence": [
+        "verify:determinism",
+        "test:visual",
+        "qa:chrome"
+      ],
+      "passed": true
+    },
+    {
+      "invariant": 10,
+      "claim": "reduced motion remains inspectable and intentional",
+      "evidence": [
+        "test:phase3:browser",
+        "qa:chrome"
+      ],
+      "passed": true
+    }
+  ],
+  "browserThresholds": {
+    "consoleErrors": 0,
+    "pageErrors": 0,
+    "failedRequests": 0,
+    "unexpectedNetwork": 0,
+    "failedHttpResponses": 0,
+    "installedChromeRequired": true
+  },
+  "importThresholds": {
+    "unsupportedCount": 0,
+    "missingCount": 0,
+    "deterministicRunCount": 3
+  },
+  "visualThresholds": {
+    "changedPixels": 0,
+    "maximumChannelDelta": 0,
+    "repeatedBaselineCount": 3,
+    "discreteBoundarySidesRequired": true
+  },
+  "repositoryThresholds": {
+    "sensitiveFindings": 0,
+    "trackedPrivateTargets": 0,
+    "trackedDatabases": 0,
+    "trackedRasterArtifacts": 0,
+    "productFileChanges": 0
+  },
+  "privacy": {
+    "bannedFieldCount": 0,
+    "bannedValueCount": 0
+  }
+}

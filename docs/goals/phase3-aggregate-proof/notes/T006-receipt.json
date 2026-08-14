@@ -1,0 +1,24 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T006",
+    "board_path": "docs/goals/phase3-aggregate-proof/state.yaml",
+    "changed_files": [
+      "package.json",
+      "docs/evidence/t002-phase2-target-selection.json",
+      "docs/evidence/t002-phase3-aggregate.json"
+    ],
+    "commands": [
+      {"cmd":"historical Phase 2 receipt comparison against f4e1368","status":"pass"},
+      {"cmd":"npm run test:unit and post-run historical receipt comparison","status":"pass","detail":"196 tests; historical receipt unchanged"},
+      {"cmd":"two complete verify:phase3 runs, historical receipt comparisons, and aggregate SHA-256 identity","status":"pass","detail":"Both aggregate receipts equal 59aaa1b84dd52abd4110c4d91acb828533d0c70f7786b896e8b0b0f77c4f9dfe"},
+      {"cmd":"sensitive, private-ignore, and diff checks","status":"pass"},
+      {"cmd":"protected product-path diff check against f4e1368","status":"pass"},
+      {"cmd":"complete changed-file and status inventory","status":"pass"}
+    ],
+    "summary": "Restored the historical Phase 2 receipt byte-for-byte and excluded all *.visual.test.ts evidence writers from unit discovery. Unit passed 196 tests without changing the receipt. Two complete Phase 3 aggregate runs passed Chrome, browser, service, recovery, parity, visual, private, receipt, typecheck, build, privacy, and protected-path gates. Both aggregate receipts matched each other and the accepted SHA-256 59aaa1b84dd52abd4110c4d91acb828533d0c70f7786b896e8b0b0f77c4f9dfe. No new out-of-scope change appeared.",
+    "remaining_blockers": [],
+    "verification_attempts": 1,
+    "stopped_because": null
+  }
+}
