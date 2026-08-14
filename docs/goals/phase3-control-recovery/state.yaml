@@ -1,0 +1,150 @@
+version: 2
+
+goal:
+  title: "Phase 3 control recovery and refresh hardening"
+  slug: phase3-control-recovery
+  kind: existing_plan
+  tranche: "Implement and prove only approved Phase 3 Slice 3."
+  status: active
+  oracle:
+    signal: "A real CLI commit, crash/lost-response matrix, and two-editor Chrome walkthrough prove durable recovery, ordered reconnect, immutable refetch, stable-ID reconciliation, and visible dirty-draft conflicts without silent overwrite."
+    cadence: "after the Worker package and at final audit"
+    final_proof: "Receipt-backed recovery, service, parity, browser, Chrome, determinism, integrity, migration, and privacy evidence with full_outcome_complete: true for Slice 3."
+  intake:
+    original_request: "Create a fresh worktree and implement Phase 3 Slice 3 control recovery and refresh hardening, then stop for architecture review."
+    interpreted_outcome: "The existing durable branch-and-claim editor safely recovers from control crashes and lost responses and reconciles ordered remote CLI changes without silently overwriting local drafts."
+    input_shape: existing_plan
+    audience: "motion editor owner"
+    authority: approved
+    proof_type: test
+    completion_proof: "Final Judge accepts the exact crash, recovery, refresh, Chrome, privacy, and scope evidence for Slice 3 only."
+    likely_misfire: "Adding generic collaboration or merely reconnecting SSE without proving dirty-draft safety, stable identity, and durable control recovery."
+    blind_spots_considered:
+      - "Event gaps, duplicate delivery, reconnect ordering, and explicit-refetch fallback"
+      - "Dirty drafts whose target changes or disappears during remote refresh"
+      - "Crash and lost-response atomicity across every branch and claim control"
+      - "Migration rollback, corruption refusal, and branch-head digest verification"
+      - "Capability or claim-secret leakage through recovery logs and browser state"
+    existing_plan_facts:
+      - "Slice 1 durable authoring and Slice 2 minimum branches/claims are merged at e07a187."
+      - "The approved architecture assigns the full control crash matrix, SSE replay/refetch, stable-ID reconciliation, dirty-draft conflicts, integrity checks, and migration failure behavior to Slice 3."
+      - "Slice 4 owns aggregate Phase 3 proof and must not be pulled forward as product scope."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/phase3-control-recovery/"
+    command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase3-control-recovery"
+
+active_task: T001
+
+tasks:
+  - id: T001
+    type: judge
+    assignee: Judge
+    status: active
+    reasoning_hint: high
+    objective: "Validate the merged Slice 2 baseline and ground one largest-safe Slice 3 Worker contract from the approved architecture."
+    inputs:
+      - "docs/architecture/phase3-persistence-boundary.md"
+      - "Merged Slice 2 implementation and receipts"
+    constraints:
+      - "Read-only; do not implement."
+      - "Ground current implementation truth instead of assuming the architecture is already implemented."
+      - "Preserve the sole-writer, strict protocol, expected-revision, verifier-only secret, stable-ID, compiler-preview, determinism, and reduced-motion invariants."
+      - "Exclude Slice 4, merge/review, annotations, claim listing, generalized collaboration, MCP, Lineage, publication, Phase 4+, and dependency additions."
+    expected_output:
+      - "Baseline implementation and evidence gap map"
+      - "Exact crash/lost-response matrix and durable replay/refetch contract"
+      - "Largest-safe coherent Worker objective"
+      - "Exact allowed_files, verify commands, stop_if conditions, and Chrome walkthrough"
+      - "Top three realistic failure modes and direct falsification requirements"
+    receipt: null
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: medium
+    objective: "Implement the complete Slice 3 control-recovery and refresh-hardening vertical package selected by T001."
+    allowed_files: []
+    verify: []
+    stop_if:
+      - "Implementation needs a file outside the Judge-approved allowed_files."
+      - "Implementation needs a new dependency, a second writer, browser persistence, event-payload state reconstruction, or a migration not explicitly approved by the Judge."
+      - "A dirty draft cannot remain visible and unsubmitted after a conflicting remote refresh."
+      - "A crash, rollback, stale control, lost response, duplicate replay, or gap can partially mutate or silently redirect state."
+      - "The work requires Slice 4 aggregate proof as product scope, merge/review, MCP, Lineage, publication, or Phase 4+."
+      - "A focused verification command fails twice for the same unresolved product cause."
+    receipt: null
+  - id: T003
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Adversarially review the implemented Slice 3 package and prescribe one bounded correction if any recovery, refresh, browser, privacy, or scope gap remains."
+    inputs:
+      - "T001 and T002 receipts"
+      - "Complete Slice 3 diff and fresh verification"
+    constraints:
+      - "Read-only; do not implement."
+      - "Reject helper-only, API-only, or Chrome-mocked completion."
+      - "Require the real CLI, shared protocol client, sole-writer service, immutable refetch, compiler preview, and visible dirty-draft path."
+    expected_output:
+      - "complete | not_complete"
+      - "Accepted and rejected claims with exact evidence"
+      - "One largest-safe corrective Worker contract if needed"
+    receipt: null
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Audit whether Phase 3 Slice 3—not all of Phase 3—satisfies the owner-facing oracle and is safe for architecture review."
+    inputs:
+      - "All completed receipts"
+      - "Fresh focused and aggregate verification"
+      - "Complete diff, recovery matrix, Chrome evidence, and sensitive-content scan"
+    constraints:
+      - "Do not implement."
+      - "Reject completion while required Worker or corrective work remains."
+      - "Do not claim Slice 4 or the aggregate Phase 3 exit gate."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false for Slice 3"
+      - "Owner-facing claim, top three realistic failure modes, and exact evidence"
+      - "Architecture-review handoff and explicitly deferred work"
+    receipt: null
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: unknown
+    task: null
+    commands: []
