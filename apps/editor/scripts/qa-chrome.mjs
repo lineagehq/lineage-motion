@@ -28,10 +28,12 @@ try {
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const consoleErrors = [];
+  const pageErrors = [];
+  const failedRequests = [];
+  const unexpectedNetwork = [];
+  const httpErrors = [];
+  monitorPage(page, [url], { consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors });
   let editorCommandRequestCount = 0;
-  page.on('console', (message) => {
-    if (message.type() === 'error') consoleErrors.push(message.text());
-  });
   page.on('request', (request) => {
     if (request.url().endsWith('/api/v1/commands')) editorCommandRequestCount += 1;
   });
@@ -347,6 +349,7 @@ try {
       && iframe.contentDocument.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
   });
   const cursorPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
+  monitorPage(cursorPage, [url], { consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors });
   await cursorPage.goto(url);
   await cursorPage.locator('[data-editor-ready="true"]').waitFor();
   await cursorPage.getByRole('radio', { name: /Cursor/ }).click();
@@ -368,6 +371,7 @@ try {
   const responsive = {};
   for (const width of [1440, 1099, 768, 390]) {
     const responsivePage = await browser.newPage({ viewport: { width, height: 1000 } });
+    monitorPage(responsivePage, [url], { consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors });
     await responsivePage.goto(url);
     await responsivePage.locator('[data-editor-ready="true"]').waitFor();
     responsive[width] = await responsivePage.evaluate(() => {
@@ -442,7 +446,16 @@ try {
       persistence.once('exit', (code) => { clearTimeout(timer); reject(new Error(`PERSISTENCE_CHROME_EXIT_${code}`)); });
     });
     await waitForServer(addresses.editorUrl);
-    const persistencePage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); const persistenceErrors = [];
+    const persistencePage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    const persistenceErrors = []; const persistencePageErrors = []; const persistenceFailedRequests = [];
+    const expectedFailedRequests = []; let allowExpectedEventAbort = false;
+    const persistenceUnexpectedNetwork = []; const persistenceHttpErrors = [];
+    const persistenceDiagnostics = { consoleErrors: persistenceErrors, pageErrors: persistencePageErrors,
+      failedRequests: persistenceFailedRequests, unexpectedNetwork: persistenceUnexpectedNetwork,
+      httpErrors: persistenceHttpErrors, expectedFailedRequests,
+      allowFailedRequest: (request) => allowExpectedEventAbort
+        && request.url().endsWith('/events') && request.failure()?.errorText === 'net::ERR_ABORTED' };
+    monitorPage(persistencePage, [addresses.editorUrl, addresses.serviceUrl], persistenceDiagnostics);
     const editorOperationIds = []; const eventCursors = [];
     const captureEditorOperationId = (request) => {
       if (!request.url().endsWith('/api/v1/commands')) return;
@@ -453,14 +466,13 @@ try {
     persistencePage.on('request', captureEditorOperationId);
     persistencePage.on('request', (request) => { if (request.url().endsWith('/events'))
       eventCursors.push(request.headers()['last-event-id'] ?? 'missing'); });
-    persistencePage.on('console', (message) => { if (message.type() === 'error') persistenceErrors.push(message.text()); });
     await persistencePage.goto(addresses.editorUrl); await persistencePage.locator('[data-editor-ready="true"]').waitFor();
     await persistencePage.locator('[data-new-branch]').fill('chromefeature');
     await persistencePage.locator('[data-branch-form] button').click();
     await persistencePage.waitForFunction(() => document.querySelector('[data-operation-status]').textContent.includes('Branch chromefeature head revision 0 loaded'));
     const mainEditorPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    monitorPage(mainEditorPage, [addresses.editorUrl, addresses.serviceUrl], persistenceDiagnostics);
     mainEditorPage.on('request', captureEditorOperationId);
-    mainEditorPage.on('console', (message) => { if (message.type() === 'error') persistenceErrors.push(message.text()); });
     await mainEditorPage.goto(addresses.editorUrl); await mainEditorPage.locator('[data-editor-ready="true"]').waitFor();
     const documentId = await persistencePage.evaluate(() => window.__motionEditor.inspectAuthoring().documentId);
     const secret = ['chrome', 'claim', 'proof', '0123456789', 'abcdefghijklmnopqrstuvwxyz'].join('-');
@@ -478,7 +490,10 @@ try {
     await persistencePage.waitForFunction(() => window.__motionEditor.inspectAuthoring().lastCommitSeq >= 3);
     await persistencePage.getByRole('radio', { name: /Orb/ }).click();
     await persistencePage.locator('[data-new-branch]').fill('');
+    allowExpectedEventAbort = true;
     await persistencePage.evaluate(() => window.__motionEditor.disconnectEvents());
+    await persistencePage.waitForTimeout(50);
+    allowExpectedEventAbort = false;
     const cliFeature = await runRealCli(['track-create', '--service', addresses.serviceUrl, '--operation-id', 'chrome-cli-feature',
       '--document-id', documentId, '--branch-id', 'chromefeature', '--expected-revision', '0',
       '--element-id', 'el_2dbee68b1ea318c8', '--capability', humanCapability]);
@@ -557,7 +572,16 @@ try {
     persistenceChecks.collisionFreeEditorOperationIds = editorOperationIds.length === 3
       && editorOperationIds.every((operationId) => /^editor:[0-9a-f-]{36}:[1-3]$/.test(operationId))
       && new Set(editorOperationIds).size === editorOperationIds.length;
-    persistenceChecks.consoleErrors = persistenceErrors; persistenceChecks.noConsoleErrors = persistenceErrors.length === 0;
+    persistenceChecks.consoleErrors = persistenceErrors; persistenceChecks.pageErrors = persistencePageErrors;
+    persistenceChecks.failedRequests = persistenceFailedRequests;
+    persistenceChecks.expectedDisconnectAbortCount = expectedFailedRequests.length;
+    persistenceChecks.unexpectedNetwork = persistenceUnexpectedNetwork;
+    persistenceChecks.httpErrors = persistenceHttpErrors;
+    persistenceChecks.noConsoleErrors = persistenceErrors.length === 0;
+    persistenceChecks.noPageErrors = persistencePageErrors.length === 0;
+    persistenceChecks.noFailedRequests = persistenceFailedRequests.length === 0;
+    persistenceChecks.noUnexpectedNetwork = persistenceUnexpectedNetwork.length === 0;
+    persistenceChecks.noHttpErrors = persistenceHttpErrors.length === 0;
     await persistencePage.close(); await mainEditorPage.close();
   } finally {
     persistence.kill('SIGTERM'); if (persistence.exitCode === null) await new Promise((resolveExit) => persistence.once('exit', resolveExit));
@@ -608,8 +632,15 @@ try {
     cursorDistinct,
     persistentBranchClaimPath: persistenceChecks.branch === 'chromefeature' && persistenceChecks.exactCompilerOutput
       && persistenceChecks.nativeAnimations && persistenceChecks.divergedControlIsolated
-      && persistenceChecks.combinedReconnectDraft && persistenceChecks.collisionFreeEditorOperationIds && persistenceChecks.noConsoleErrors,
+      && persistenceChecks.combinedReconnectDraft && persistenceChecks.collisionFreeEditorOperationIds
+      && persistenceChecks.noConsoleErrors && persistenceChecks.noPageErrors
+      && persistenceChecks.noFailedRequests && persistenceChecks.expectedDisconnectAbortCount === 1
+      && persistenceChecks.noUnexpectedNetwork && persistenceChecks.noHttpErrors,
     noConsoleErrors: consoleErrors.length === 0,
+    noPageErrors: pageErrors.length === 0,
+    noFailedRequests: failedRequests.length === 0,
+    noUnexpectedNetwork: unexpectedNetwork.length === 0,
+    noHttpErrors: httpErrors.length === 0,
   };
   const receipt = {
     schemaVersion: 'motion.target-selection-chrome-qa.v1',
@@ -621,6 +652,10 @@ try {
       cueCount: initial.cueIds.length,
       trackCount: initial.trackIds.length,
       consoleErrorCount: consoleErrors.length,
+      pageErrorCount: pageErrors.length,
+      failedRequestCount: failedRequests.length,
+      unexpectedNetworkCount: unexpectedNetwork.length,
+      httpErrorCount: httpErrors.length,
     },
     nativeTiming: {
       tolerance,
@@ -665,6 +700,30 @@ async function waitForServer(target) {
 
 function roundTimes(values) {
   return values.map((value) => value === null ? null : Math.round(value * 1000) / 1000);
+}
+
+function monitorPage(page, allowedBaseUrls, diagnostics) {
+  const allowedOrigins = new Set(allowedBaseUrls.map((value) => new URL(value).origin));
+  page.on('console', (message) => {
+    if (message.type() === 'error') diagnostics.consoleErrors.push(message.text());
+  });
+  page.on('pageerror', (error) => diagnostics.pageErrors.push(error.message));
+  page.on('requestfailed', (request) => {
+    const evidence = { method: request.method(), resourceType: request.resourceType(),
+      failure: request.failure()?.errorText ?? 'unknown' };
+    if (diagnostics.allowFailedRequest?.(request)) diagnostics.expectedFailedRequests.push(evidence);
+    else diagnostics.failedRequests.push(evidence);
+  });
+  page.on('request', (request) => {
+    const target = request.url();
+    if (!/^https?:/i.test(target)) return;
+    if (!allowedOrigins.has(new URL(target).origin)) diagnostics.unexpectedNetwork.push({
+      method: request.method(), resourceType: request.resourceType(),
+    });
+  });
+  page.on('response', (response) => {
+    if (!response.ok()) diagnostics.httpErrors.push({ status: response.status(), resourceType: response.request().resourceType() });
+  });
 }
 
 async function runRealCli(args) {

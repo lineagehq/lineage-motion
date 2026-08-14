@@ -1,0 +1,44 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T001",
+    "board_path": "docs/goals/phase3-aggregate-proof/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "The f4e1368 product baseline is strong but not exit-ready. Fresh approved Phase 3 commands pass, including installed Chrome 151, yet verify:phase3 omits unit, visual, private-acceptance, and aggregate-receipt gates. No fresh two-run aggregate receipt or complete invariant matrix exists; Chrome QA does not assert page errors, failed requests, or unexpected network traffic; and worktree-local visual proof currently fails on a hard-coded node_modules path. Approve one proof-only vertical slice that repairs those harness gaps, generates byte-stable sanitized evidence, and changes no product behavior.",
+    "evidence": [
+      {"claim":"Baseline identity and scope","proof":"Product implementation is unchanged from f4e1368; HEAD 5b9d419 adds only the aggregate GoalBuddy board. git status --short and git diff --check were clean."},
+      {"claim":"Approved service command","proof":"Fresh npm run test:phase3:service passed 2 files and 14 tests, covering sole-writer lock, SQLite boundary, CAS concurrency, rejection atomicity, idempotency, branch/claim controls, and post-commit metadata."},
+      {"claim":"Approved recovery command","proof":"Fresh npm run test:phase3:recovery passed 2 files and 34 tests, including authoring/control kill points, lost responses, migrations, integrity, unsupported schema, and claim-secret retry."},
+      {"claim":"Approved parity command","proof":"Fresh npm run test:phase3:parity passed 5 files and 13 tests. It proves shared protocol behavior and equal-store CLI/editor parity, but not two complete clean aggregate repetitions."},
+      {"claim":"Approved browser and Chrome commands","proof":"Fresh npm run test:phase3:browser passed 13 tests. Fresh npm run qa:chrome passed using installed Google Chrome 151.0.7922.138 and reran 13 browser tests; compiler-native output, native CSSAnimation, reconnect/refetch, dirty-draft conflict, branches/claims, and reduced-motion inspection passed."},
+      {"claim":"Approved aggregate command","proof":"Fresh npm run verify:phase3 passed service 14, recovery 34, parity 13, browser 13, installed-Chrome QA, determinism 26, browser 20, typecheck, build, sensitive scan, private-ignore scan, and its current diff guard."},
+      {"claim":"Invariant 1 — shared operation language","proof":"motion-protocol strict shared commands, CLI tests, parity.test.ts, branch-claim-parity.test.ts, and Phase 3 browser durable dispatch passed fresh."},
+      {"claim":"Invariant 2 — sole persistent writer","proof":"service.test.ts passed second-lock rejection, node:sqlite import-boundary inspection, WAL/FULL/foreign-key configuration, and lock-holder death closure."},
+      {"claim":"Invariant 3 — expected-revision atomicity","proof":"Fresh service/recovery suites passed same-base race, stale/invalid unchanged snapshots, injected faults, control CAS, and restart pre/post-state assertions."},
+      {"claim":"Invariant 4 — claim-bounded agent writes","proof":"Fresh branch-claim and branch-claim-recovery suites passed capability, overlap, scope, expiry/revoke, lifecycle, concurrency, and verifier-only persistence cases."},
+      {"claim":"Invariant 5 — selectors are bindings","proof":"Fresh protocol tests rejected selector addressing; import tests proved identity survives selector renaming; browser tests preserved selection by canonical IDs across branch availability."},
+      {"claim":"Invariant 6 — unsupported imports fail visibly","proof":"During the supplemental unit run, all 42 css-import tests passed, including atomic unsupported binding, script/external-resource, and orphan-override rejection. The overall unit command later failed in an unrelated visual attestation test."},
+      {"claim":"Invariant 7 — byte-identical equal revisions","proof":"Fresh compiler determinism passed 26 tests, including three-run HTML/CSS/digest/receipt identity, and parity passed equal-store comparisons. Missing: one two-run aggregate editor/CLI artifact and receipt comparison."},
+      {"claim":"Invariant 8 — compiler-backed preview","proof":"Fresh browser and installed-Chrome checks asserted iframe srcdoc equals compiledHtml, immutable refetch occurs after SSE, and native CSSAnimation instances drive playback."},
+      {"claim":"Invariant 9 — browser-native HTML/CSS output","proof":"Fresh compiler determinism, browser, and Chrome checks passed native HTML/CSS output with no alternate interpolator."},
+      {"claim":"Invariant 10 — intentional reduced motion","proof":"Fresh installed-Chrome QA reported reducedMotionInspectable=true; existing browser/compiler verification passed. It must be named explicitly in the aggregate matrix."},
+      {"claim":"Visual and privacy supplemental checks","proof":"npm run test:visual passed its controlled three-replay, discrete-boundary proof. check:sensitive passed with findingCount 0 across 169 tracked files and zero untracked files; check:private-ignore passed 3/3 ignored and zero tracked private targets."},
+      {"claim":"Fresh harness defects","proof":"npm run test:unit produced 197 passes and one failure because authoring.visual.test.ts assumes worktree-local node_modules/playwright-core/browsers.json. npm run verify:receipts failed because the ignored fresh private receipt was absent. Current qa:chrome captures console errors but not pageerror, requestfailed, or unexpected-network evidence."},
+      {"claim":"Top failure mode 1 falsification","proof":"Require verify:phase3 to invoke every approved command plus unit, all visual suites, private acceptance, receipt verification, typecheck/build, scans, and a ten-invariant aggregate receipt; T003 must inspect the command expansion and fresh logs."},
+      {"claim":"Top failure mode 2 falsification","proof":"Run two clean equal-base editor/CLI proof repetitions and compare canonical bytes/digests, compiled HTML and CSS bytes, export digests, sanitized revision/control receipts, and the complete aggregate receipt byte-for-byte."},
+      {"claim":"Top failure mode 3 falsification","proof":"Require installed-Chrome pageerror/requestfailed/network allowlist assertions, banned-field/value receipt assertions, sensitive/private-ignore scans, tracked-artifact inventory, complete f4e1368 diff inspection, and zero SQLite/WAL/screenshots/private payloads."}
+    ],
+    "parallel_safety": {"safe":false,"reason":"Use one Worker. The package touches shared package command wiring and a single aggregate evidence contract; splitting it would make command coverage and receipt provenance ambiguous."},
+    "blocked_tasks": [],
+    "missing_evidence": [
+      "No fresh byte-identical two-run aggregate receipt from identical clean bases.",
+      "verify:phase3 currently omits test:unit, test:visual, Phase 2 visual suites, test:private-acceptance, and verify:receipts.",
+      "Installed-Chrome QA does not directly assert uncaught page errors, failed requests, or an explicit unexpected-network allowlist.",
+      "Worktree execution of authoring.visual.test.ts fails because Playwright metadata is resolved through a nonexistent worktree-local node_modules path.",
+      "The ignored private acceptance manifest/receipt was unavailable in this worktree, so fresh private import and private visual evidence were not produced.",
+      "No single sanitized artifact maps all ten invariants, exact commands, counts, environment, stable digests, Chrome result, and repository/privacy gates."
+    ],
+    "required_board_updates": ["Copy the approved proof-only Worker package onto T002 and activate it as the sole Worker."]
+  }
+}

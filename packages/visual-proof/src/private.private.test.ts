@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from 'vitest';
@@ -14,6 +15,9 @@ import { canonicalBytes } from '../../domain/src/index.js';
 import { deriveSamplePlan, runControlledVisualProof } from './index.js';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const require = createRequire(import.meta.url);
+const playwrightPackagePath = require.resolve('@playwright/test/package.json');
+const browsersManifestPath = resolve(dirname(require.resolve('playwright-core/package.json')), 'browsers.json');
 
 test('private baseline is stable and exactly matches deterministic compiler pixels offline', async () => {
   const manifest = JSON.parse(
@@ -75,12 +79,10 @@ test('private baseline is stable and exactly matches deterministic compiler pixe
   const hash = (value: string | Uint8Array): string =>
     createHash('sha256').update(value).digest('hex');
   const sequenceDigest = (hashes: string[]): string => hash(hashes.join('\n'));
-  const playwrightPackage = JSON.parse(
-    await readFile(`${repositoryRoot}node_modules/@playwright/test/package.json`, 'utf8'),
-  ) as { version: string };
-  const browserDescriptors = JSON.parse(
-    await readFile(`${repositoryRoot}node_modules/playwright-core/browsers.json`, 'utf8'),
-  ) as { browsers: Array<{ name: string; revision: string }> };
+  const playwrightPackage = JSON.parse(await readFile(playwrightPackagePath, 'utf8')) as { version: string };
+  const browserDescriptors = JSON.parse(await readFile(browsersManifestPath, 'utf8')) as {
+    browsers: Array<{ name: string; revision: string }>;
+  };
   const chromiumRevision = browserDescriptors.browsers.find((browser) =>
     browser.name === 'chromium')?.revision;
   expect(chromiumRevision).toBeTruthy();
