@@ -6,11 +6,18 @@ import type { ProjectStore } from '../../project-store/src/index.ts';
 import { acquireStoreLock, type StoreLock } from './lock-runner.ts';
 import { prepareStorePath } from './paths.ts';
 import { SqliteProjectStore, type FaultPoint } from './sqlite-project-store.ts';
+import { authenticate, validateServiceCapabilities, type ServiceCapabilities } from './auth.ts';
 
 export type LocalMotionService = { url: string; store: ProjectStore; lockHolderPid: number; close(): Promise<void> };
 
+const legacyTestCapabilities = { human: 'human-editor', agent: 'cli-agent' };
+
 export async function startLocalMotionService(options: { databasePath: string; seed: MotionDocument;
-  port?: number; host?: '127.0.0.1' | '::1'; fault?: (point: FaultPoint) => void }): Promise<LocalMotionService> {
+  port?: number; host?: '127.0.0.1' | '::1'; fault?: (point: FaultPoint) => void;
+  capabilities?: ServiceCapabilities; now?: () => number }): Promise<LocalMotionService> {
+  const capabilities = options.capabilities
+    ? validateServiceCapabilities(options.capabilities)
+    : process.env.VITEST ? legacyTestCapabilities : (() => { throw new Error('SERVICE_CAPABILITIES_REQUIRED'); })();
   const { databasePath, lockPath } = prepareStorePath(options.databasePath);
   let lock: StoreLock | undefined;
   let store: ProjectStore | undefined;
@@ -28,19 +35,28 @@ export async function startLocalMotionService(options: { databasePath: string; s
       if (request.method === 'POST' && url.pathname === '/api/v1/commands') {
         const parsed = parseCommand(await readJson(request));
         if (!parsed.ok) return json(response, parsed.code === 'UNSUPPORTED_VERSION' ? 400 : 422, parsed);
+        const auth = authenticate(request, capabilities);
+        if (!auth) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
         let result;
-        try { result = store!.compareAndCommit(parsed.command); }
+        try { result = store!.execute(parsed.command, { ...auth, now: options.now?.() ?? Date.now() }); }
         catch { return json(response, 500, { ok: false, code: 'STORAGE_FAILURE' }); }
         if ('event' in result && !result.replayed) publish(subscribers.get(result.event.documentId), result.event);
-        return json(response, result.response.ok ? 200 : result.response.code === 'STALE_REVISION' ? 409 : 422, result.response);
+        return json(response, result.response.ok ? 200 : result.response.code === 'STALE_REVISION' ? 409
+          : result.response.code === 'UNAUTHORIZED_CLAIM' ? 403 : 422, result.response);
       }
-      const head = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/head$/);
+      const head = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/(?:branches\/([^/]+)\/)?head$/);
       if (request.method === 'GET' && head) {
-        const found = store!.readHead(decodeURIComponent(head[1]!)); return json(response, found ? 200 : 404, found ?? { ok: false });
+        const found = store!.readHead(decodeURIComponent(head[1]!), head[2] ? decodeURIComponent(head[2]) : undefined);
+        return json(response, found ? 200 : 404, found ?? { ok: false });
       }
       const revision = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/revisions\/(\d+)$/);
       if (request.method === 'GET' && revision) {
         const found = store!.readRevision(decodeURIComponent(revision[1]!), Number(revision[2]));
+        return json(response, found ? 200 : 404, found ?? { ok: false });
+      }
+      const documentRevision = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/revision$/);
+      if (request.method === 'GET' && documentRevision) {
+        const found = (store as SqliteProjectStore).readDocumentRevision(decodeURIComponent(documentRevision[1]!));
         return json(response, found ? 200 : 404, found ?? { ok: false });
       }
       const events = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/events$/);

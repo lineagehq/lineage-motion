@@ -1,0 +1,25 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T999",
+    "board_path": "docs/goals/phase3-branches-claims/state.yaml",
+    "decision": "not_complete",
+    "full_outcome_complete": false,
+    "rationale": "The Chrome timeout is a real multi-editor operation-ID collision: each page begins at editor:1, so branch creation in one page conflicts with revoke in another. The service correctly returns OPERATION_ID_CONFLICT. The sensitive scan also finds three new generic test-secret literals. T005's substantive security/lifecycle work is accepted and superseded by one smaller correction.",
+    "evidence": [
+      "Instrumented Chrome 151 captured HTTP 422 OPERATION_ID_CONFLICT and the matching visible rejection.",
+      "The revoke used coherent global revision 2, disproving a stale-revision cause.",
+      "Every page initializes operationSequence=0 while SQLite operation IDs are document-global.",
+      "Focused 20 tests and service/recovery/parity/browser subsets pass.",
+      "Fail-closed high-entropy capabilities, same-branch one-winner concurrency, and diverged CLI lifecycle are accepted.",
+      "Sensitive scan finds three generic occurrences from two synthetic secret declarations."
+    ],
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Collision-free cross-editor branch-create/revoke in production Chrome.",
+      "Direct distinct-operation-ID regression.",
+      "Zero-finding sensitive scan and fresh full gates."
+    ],
+    "required_board_updates": ["Keep T005 as superseded historical evidence, activate T006, then rerun T999."]
+  }
+}

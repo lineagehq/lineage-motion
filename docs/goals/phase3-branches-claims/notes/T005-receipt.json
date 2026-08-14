@@ -1,0 +1,29 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T005",
+    "board_path": "docs/goals/phase3-branches-claims/state.yaml",
+    "changed_files": [
+      "apps/editor/scripts/serve-editor.mjs", "apps/editor/vite.config.ts", "apps/editor/src/main.ts",
+      "apps/editor/src/global.d.ts", "apps/editor/src/virtual.d.ts", "apps/editor/tests/phase3.spec.ts",
+      "apps/editor/scripts/qa-chrome.mjs", "packages/motion-protocol/src/index.ts",
+      "packages/local-service/src/auth.ts", "packages/local-service/src/index.ts",
+      "packages/local-service/src/sqlite-project-store.ts", "packages/local-service/src/branch-claim.test.ts",
+      "packages/motion-cli/src/cli.ts", "packages/motion-cli/src/cli.test.ts",
+      "packages/phase3-proof/src/branch-claim-parity.test.ts"
+    ],
+    "commands": [
+      { "command": "focused corrective Vitest sequence", "status": "pass", "detail": "20 tests" },
+      { "command": "npm run test:phase3:service", "status": "pass", "detail": "12 tests" },
+      { "command": "npm run test:phase3:recovery", "status": "pass", "detail": "12 tests" },
+      { "command": "npm run test:phase3:parity", "status": "pass", "detail": "12 tests" },
+      { "command": "npm run test:phase3:browser", "status": "pass", "detail": "6 tests including two diverged editors and full lifecycle" },
+      { "command": "npm run qa:chrome", "status": "fail", "detail": "Timed out waiting for lagging-main revoke confirmation" },
+      { "command": "node apps/editor/scripts/qa-chrome.mjs", "status": "fail", "detail": "Second identical timeout at qa-chrome.mjs:471" }
+    ],
+    "summary": "Implemented required runtime capability provisioning, fail-closed authentication, document-global reads for lagging-branch revoke, same-branch one-winner proof, real CLI lifecycle, and two-editor isolation. Focused/service/recovery/parity/browser tests pass. Stopped after installed Chrome reproduced the lagging-main revoke timeout twice.",
+    "remaining_blockers": ["Installed Chrome does not observe successful lagging-main document-claim revoke confirmation."],
+    "verification_attempts": 2,
+    "stopped_because": "T005 stop_if: the same focused Chrome product-or-harness failure occurred twice."
+  }
+}

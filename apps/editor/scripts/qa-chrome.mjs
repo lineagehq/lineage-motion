@@ -1,6 +1,8 @@
 import { spawn } from 'node:child_process';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 
 import { chromium } from '@playwright/test';
@@ -392,6 +394,123 @@ try {
   const responsiveHistoryAnchors = [1440, 1099, 768, 390]
     .every((width) => responsive[width].historyAnchor);
 
+  const persistenceDirectory = await mkdtemp(join(tmpdir(), 'lineage-motion-chrome-'));
+  const persistencePort = 41740;
+  const humanCapability = randomBytes(32).toString('base64url');
+  const agentCapability = randomBytes(32).toString('base64url');
+  const persistence = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(persistenceDirectory, 'project.sqlite'),
+      PHASE3_EDITOR_PORT: String(persistencePort), PHASE3_HUMAN_CAPABILITY: humanCapability,
+      PHASE3_AGENT_CAPABILITY: agentCapability }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let persistenceChecks;
+  try {
+    const addresses = await new Promise((resolveAddress, reject) => {
+      let output = ''; const timer = setTimeout(() => reject(new Error('PERSISTENCE_CHROME_TIMEOUT')), 10000);
+      persistence.stdout.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((value) => value.startsWith('{'));
+        if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); } });
+      persistence.once('exit', (code) => { clearTimeout(timer); reject(new Error(`PERSISTENCE_CHROME_EXIT_${code}`)); });
+    });
+    await waitForServer(addresses.editorUrl);
+    const persistencePage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); const persistenceErrors = [];
+    const editorOperationIds = [];
+    const captureEditorOperationId = (request) => {
+      if (!request.url().endsWith('/api/v1/commands')) return;
+      const command = request.postDataJSON();
+      if (typeof command?.operationId === 'string' && command.operationId.startsWith('editor:'))
+        editorOperationIds.push(command.operationId);
+    };
+    persistencePage.on('request', captureEditorOperationId);
+    persistencePage.on('console', (message) => { if (message.type() === 'error') persistenceErrors.push(message.text()); });
+    await persistencePage.goto(addresses.editorUrl); await persistencePage.locator('[data-editor-ready="true"]').waitFor();
+    await persistencePage.locator('[data-new-branch]').fill('chromefeature');
+    await persistencePage.locator('[data-branch-form] button').click();
+    await persistencePage.waitForFunction(() => document.querySelector('[data-operation-status]').textContent.includes('Branch chromefeature head revision 0 loaded'));
+    const mainEditorPage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    mainEditorPage.on('request', captureEditorOperationId);
+    mainEditorPage.on('console', (message) => { if (message.type() === 'error') persistenceErrors.push(message.text()); });
+    await mainEditorPage.goto(addresses.editorUrl); await mainEditorPage.locator('[data-editor-ready="true"]').waitFor();
+    const documentId = await persistencePage.evaluate(() => window.__motionEditor.inspectAuthoring().documentId);
+    const secret = ['chrome', 'claim', 'proof', '0123456789', 'abcdefghijklmnopqrstuvwxyz'].join('-');
+    const acquisition = { protocolVersion: 'motion.protocol.v1', operationId: 'chrome-claim', documentId,
+      branchId: 'chromefeature', expectedRevision: 0, command: { schemaVersion: 'motion.control.v1',
+        kind: 'motion.claim.acquire', operationId: 'chrome-claim', documentId, expectedRevision: 0,
+        payload: { scope: 'branch', branchId: 'chromefeature' } } };
+    const acquired = await fetch(`${addresses.serviceUrl}/api/v1/commands`, { method: 'POST', headers: {
+      'content-type': 'application/json', authorization: `Bearer ${agentCapability}`, 'x-motion-actor': 'agent',
+      'x-motion-claim-secret': secret }, body: JSON.stringify(acquisition) }).then((response) => response.json());
+    await persistencePage.locator('[data-claim-id]').fill(acquired.claimId);
+    await persistencePage.locator('[data-lease-version]').fill(String(acquired.leaseVersion));
+    await persistencePage.locator('[data-revoke-form] button').click();
+    await persistencePage.waitForFunction(() => document.querySelector('[data-operation-status]').textContent.includes('revoked at lease version 2'));
+    await persistencePage.getByRole('radio', { name: /Orb/ }).click();
+    await persistencePage.getByRole('button', { name: 'Create Orb opacity track' }).click();
+    await persistencePage.waitForFunction(() => document.querySelector('[data-operation-status]').textContent.includes('Revision 1'));
+    const mainWrite = { protocolVersion: 'motion.protocol.v1', operationId: 'chrome-diverged-main', documentId,
+      branchId: 'main', expectedRevision: 0, command: { schemaVersion: 'motion.operation.v1', kind: 'motion.track.create',
+        operationId: 'chrome-diverged-main', documentId, expectedRevision: 0, elementId: 'el_a2849ff826f3e167',
+        payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear', startValue: 0, endValue: 1 } } };
+    const mainWritten = await fetch(`${addresses.serviceUrl}/api/v1/commands`, { method: 'POST', headers: {
+      'content-type': 'application/json', authorization: `Bearer ${humanCapability}`, 'x-motion-actor': 'human',
+    }, body: JSON.stringify(mainWrite) }).then((response) => response.json());
+    const documentSecret = ['chrome', 'document', 'proof', '0123456789', 'abcdefghijklmnopqrstuvwxyz'].join('-');
+    const documentAcquisition = { protocolVersion: 'motion.protocol.v1', operationId: 'chrome-document-claim', documentId,
+      branchId: 'chromefeature', expectedRevision: 2, command: { schemaVersion: 'motion.control.v1',
+        kind: 'motion.claim.acquire', operationId: 'chrome-document-claim', documentId, expectedRevision: 2,
+        payload: { scope: 'document' } } };
+    const documentAcquired = await fetch(`${addresses.serviceUrl}/api/v1/commands`, { method: 'POST', headers: {
+      'content-type': 'application/json', authorization: `Bearer ${agentCapability}`, 'x-motion-actor': 'agent',
+      'x-motion-claim-secret': documentSecret }, body: JSON.stringify(documentAcquisition) }).then((response) => response.json());
+    const agentHeaders = { 'content-type': 'application/json', authorization: `Bearer ${agentCapability}`,
+      'x-motion-actor': 'agent', 'x-motion-claim-secret': documentSecret };
+    const control = async (kind, operationId, claimId, leaseVersion) => fetch(`${addresses.serviceUrl}/api/v1/commands`, {
+      method: 'POST', headers: agentHeaders, body: JSON.stringify({ protocolVersion: 'motion.protocol.v1', operationId,
+        documentId, branchId: 'chromefeature', expectedRevision: 2, command: { schemaVersion: 'motion.control.v1', kind,
+          operationId, documentId, expectedRevision: 2, payload: { claimId, leaseVersion } } }),
+    }).then((response) => response.json());
+    const documentRenewed = await control('motion.claim.renew', 'chrome-document-renew', documentAcquired.claimId, 1);
+    const documentReleased = await control('motion.claim.release', 'chrome-document-release', documentAcquired.claimId, 2);
+    const reacquisition = { ...documentAcquisition, operationId: 'chrome-document-reacquire', command: {
+      ...documentAcquisition.command, operationId: 'chrome-document-reacquire' } };
+    const documentReacquired = await fetch(`${addresses.serviceUrl}/api/v1/commands`, { method: 'POST', headers: agentHeaders,
+      body: JSON.stringify(reacquisition) }).then((response) => response.json());
+    await mainEditorPage.locator('[data-claim-id]').fill(documentReacquired.claimId);
+    await mainEditorPage.locator('[data-lease-version]').fill(String(documentReacquired.leaseVersion));
+    await mainEditorPage.locator('[data-revoke-form] button').click();
+    await mainEditorPage.waitForFunction(() => document.querySelector('[data-operation-status]').value
+      .includes('revoked at lease version 2'));
+    const mainHead = await fetch(`${addresses.serviceUrl}/api/v1/documents/${encodeURIComponent(documentId)}/branches/main/head`)
+      .then((response) => response.json());
+    const featureHead = await fetch(`${addresses.serviceUrl}/api/v1/documents/${encodeURIComponent(documentId)}/branches/chromefeature/head`)
+      .then((response) => response.json());
+    persistenceChecks = await persistencePage.evaluate(() => { const frame = document.querySelector('[data-preview]');
+      return { branch: window.__motionEditor.inspectAuthoring().activeBranchId,
+        revision: window.__motionEditor.inspectAuthoring().revision,
+        lastCommit: window.__motionEditor.inspectAuthoring().lastCommit,
+        exactCompilerOutput: frame.srcdoc === window.__motionEditor.compiledHtml,
+        nativeAnimations: frame.contentDocument.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation') }; });
+    persistenceChecks.mainEditor = await mainEditorPage.evaluate(() => { const frame = document.querySelector('[data-preview]');
+      return { branch: window.__motionEditor.inspectAuthoring().activeBranchId,
+        revision: window.__motionEditor.inspectAuthoring().revision,
+        exactCompilerOutput: frame.srcdoc === window.__motionEditor.compiledHtml,
+        nativeAnimations: frame.contentDocument.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation') }; });
+    persistenceChecks.divergedControlIsolated = mainWritten.resultingRevision === 2 && mainHead.document.revision === 2
+      && featureHead.document.revision === 1 && documentAcquired.resultingRevision === 1
+      && documentRenewed.leaseVersion === 2 && documentReleased.leaseVersion === 3
+      && documentReacquired.leaseVersion === 1 && persistenceChecks.revision === 1
+      && persistenceChecks.mainEditor.branch === 'main' && persistenceChecks.mainEditor.revision === 2
+      && persistenceChecks.mainEditor.exactCompilerOutput && persistenceChecks.mainEditor.nativeAnimations;
+    persistenceChecks.editorOperationIds = editorOperationIds;
+    persistenceChecks.collisionFreeEditorOperationIds = editorOperationIds.length === 4
+      && editorOperationIds.every((operationId) => /^editor:[0-9a-f-]{36}:[1-3]$/.test(operationId))
+      && new Set(editorOperationIds).size === editorOperationIds.length;
+    persistenceChecks.consoleErrors = persistenceErrors; persistenceChecks.noConsoleErrors = persistenceErrors.length === 0;
+    await persistencePage.close(); await mainEditorPage.close();
+  } finally {
+    persistence.kill('SIGTERM'); if (persistence.exitCode === null) await new Promise((resolveExit) => persistence.once('exit', resolveExit));
+    await rm(persistenceDirectory, { recursive: true, force: true });
+  }
+
   const checks = {
     exactCompilerOutput: initial.exactCompilerOutput,
     minimalSandbox: initial.sandbox === 'allow-same-origin',
@@ -434,6 +553,9 @@ try {
     responsiveHistoryAnchors,
     structuralNative,
     cursorDistinct,
+    persistentBranchClaimPath: persistenceChecks.branch === 'chromefeature' && persistenceChecks.exactCompilerOutput
+      && persistenceChecks.nativeAnimations && persistenceChecks.divergedControlIsolated
+      && persistenceChecks.collisionFreeEditorOperationIds && persistenceChecks.noConsoleErrors,
     noConsoleErrors: consoleErrors.length === 0,
   };
   const receipt = {
@@ -457,6 +579,7 @@ try {
       pauseDriftMs: roundTimes(pauseDriftMs),
     },
     responsive,
+    persistence: persistenceChecks,
     checks,
   };
   await mkdir(resolve(root, 'artifacts'), { recursive: true });

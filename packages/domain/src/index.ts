@@ -608,6 +608,7 @@ export function createAuthoringState(document: MotionDocument): AuthoringState {
 export function dispatchAuthoringOperation(
   state: AuthoringState,
   input: unknown,
+  allocatedRevision = state.document.revision + 1,
 ): AuthoringResult {
   const operation = parseOperation(input);
   if (!operation) return authoringFailure(state, 'AUTHORING_ENVELOPE_INVALID');
@@ -620,7 +621,7 @@ export function dispatchAuthoringOperation(
   if (operation.expectedRevision !== state.document.revision) {
     return authoringFailure(state, 'AUTHORING_STALE_REVISION');
   }
-  if (state.document.revision === Number.MAX_SAFE_INTEGER) {
+  if (!Number.isSafeInteger(allocatedRevision) || allocatedRevision <= state.document.revision) {
     return authoringFailure(state, 'AUTHORING_REVISION_EXHAUSTED');
   }
 
@@ -631,7 +632,7 @@ export function dispatchAuthoringOperation(
     const replay = operation.kind === 'motion.history.undo' ? record.inverse : record.forward;
     const applied = applyOperation(state.document, replay);
     if (!applied.ok) return authoringFailure(state, 'AUTHORING_HISTORY_REPLAY_INVALID');
-    const revision = state.document.revision + 1;
+    const revision = allocatedRevision;
     if (!validateMotionDocument({ ...applied.document, revision }).ok) {
       return authoringFailure(state, 'AUTHORING_HISTORY_REPLAY_INVALID');
     }
@@ -658,13 +659,12 @@ export function dispatchAuthoringOperation(
   const editOperation = operation as EditOperation;
   const applied = applyOperation(state.document, editOperation);
   if (!applied.ok) return authoringFailure(state, applied.code);
-  const candidateValidation = validateMotionDocument({ ...applied.document,
-    revision: state.document.revision + 1 });
+  const candidateValidation = validateMotionDocument({ ...applied.document, revision: allocatedRevision });
   if (!candidateValidation.ok) return authoringFailure(state, 'AUTHORING_CANDIDATE_INVALID');
   return {
     ok: true,
     state: {
-      document: { ...applied.document, revision: state.document.revision + 1 },
+      document: { ...applied.document, revision: allocatedRevision },
       consumedOperationIds: [...state.consumedOperationIds, operation.operationId],
       undo: [...state.undo.map(cloneRecord), { forward: structuredClone(editOperation), inverse: applied.inverse }],
       redo: [],

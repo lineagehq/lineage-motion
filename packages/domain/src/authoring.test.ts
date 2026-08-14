@@ -54,6 +54,13 @@ const envelope = (operationId: string, expectedRevision: number) => ({
 });
 
 describe('typed authoring operations', () => {
+  test('accepts an explicit document-global revision allocated above a branch head', () => {
+    const initial = fixture(); const result = dispatchAuthoringOperation(createAuthoringState(initial), {
+      ...envelope('global-revision', 0), kind: 'motion.keyframe-value.set', elementId: 'el', trackId: 'track',
+      keyframeId: 'start', payload: { value: 0.25 },
+    }, 4);
+    expect(result.ok && result.state.document.revision).toBe(4);
+  });
   test('inserts only the approved 600 ms cue_pair hold and replays its exact inverse', async () => {
     const source = await readFile(new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8');
     const imported = importMotionHtml(source);
