@@ -1,0 +1,155 @@
+version: 2
+
+goal:
+  title: "Phase 3 aggregate proof and exit gate"
+  slug: phase3-aggregate-proof
+  kind: existing_plan
+  tranche: "Complete and independently judge only the approved Phase 3 Slice 4 aggregate proof."
+  status: active
+  oracle:
+    signal: "Two clean runs from identical bases produce byte-identical canonical, compiled, export, and sanitized receipt evidence while every Phase 0-3 invariant, browser path, and privacy gate passes."
+    cadence: "after the proof Worker package and at final audit"
+    final_proof: "A fresh ten-invariant evidence matrix, repeated deterministic artifacts, installed-Chrome QA, privacy scans, and final Judge decision with full_outcome_complete: true."
+  intake:
+    original_request: "After merging Phase 3 Slice 3, create a fresh worktree and prepare the bounded GoalBuddy board for the aggregate Phase 3 proof and exit gate."
+    interpreted_outcome: "A ready-to-run proof-only board that can make or reject the complete Phase 3 exit claim without starting Phase 4."
+    input_shape: existing_plan
+    audience: "motion editor owner"
+    authority: approved
+    proof_type: decision
+    completion_proof: "Final Judge maps fresh reproducible evidence to all ten product invariants and accepts the complete Phase 3 exit gate."
+    likely_misfire: "Adding product behavior or trusting earlier slice receipts instead of producing one fresh aggregate proof."
+    blind_spots_considered:
+      - "Aggregate scripts that omit required suites or reuse stale evidence"
+      - "Editor/CLI or repeated-run byte drift hidden behind matching semantic assertions"
+      - "Private paths, content, selectors, screenshots, credentials, or SQLite artifacts entering evidence"
+      - "Browser tests that do not exercise installed Chrome or compiler-native preview"
+    existing_plan_facts:
+      - "Phase 3 Slices 1-3 are merged through f4e1368."
+      - "The approved architecture defines Slice 4 as private-data scanning, deterministic receipt repetition, invariant non-regression, full browser and Chrome evidence, and the aggregate gate."
+      - "Slice 4 proves the implementation and adds no Phase 4+ behavior."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/phase3-aggregate-proof/"
+    command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase3-aggregate-proof"
+
+active_task: T001
+
+tasks:
+  - id: T001
+    type: judge
+    assignee: Judge
+    status: active
+    reasoning_hint: high
+    objective: "Audit the merged Slice 3 baseline read-only, map every Phase 3 invariant to fresh direct evidence, and define the largest-safe proof-only Worker contract."
+    inputs:
+      - "docs/architecture/phase3-persistence-boundary.md"
+      - "docs/incubation-plan.md"
+      - "Merged Phase 0-3 implementation, tests, scripts, and sanitized receipts at f4e1368"
+      - "Prior completed GoalBuddy boards as historical context only, never as fresh proof"
+    constraints:
+      - "Read-only; do not implement or rewrite receipts."
+      - "Run enough fresh baseline checks to identify omissions, stale evidence, nondeterminism, or self-affirming proof."
+      - "Map all ten repository invariants and every approved Phase 3 acceptance command."
+      - "Prefer zero product-code changes and one coherent proof Worker package."
+      - "Exclude Phase 4+, new authoring behavior, migrations, schema expansion, merge/review, annotations, MCP, Lineage, publication, video, private corpus expansion, and dependency changes."
+    expected_output:
+      - "Fresh baseline and evidence-gap map covering all ten invariants"
+      - "Exact deterministic repetition and editor/CLI parity contract"
+      - "Exact installed-Chrome, import, discrete visual, privacy, repository, and environment proof matrix"
+      - "Largest-safe Worker objective with exact allowed_files, verify commands, and stop_if conditions"
+      - "Top three realistic failure modes and direct falsification requirements"
+    receipt: null
+
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: medium
+    objective: "Execute the proof-only Worker package grounded by T001 and produce the fresh sanitized aggregate evidence needed for the Phase 3 exit decision."
+    allowed_files: []
+    verify: []
+    stop_if:
+      - "T001 has not supplied an exact allowed-files and verification contract."
+      - "Work would add product behavior, change domain/protocol/storage semantics, edit migration history, add a dependency, or begin Phase 4+."
+      - "Proof requires committing private source, copy, branding, selectors, URLs, paths, screenshots, database files, credentials, tokens, or payload-bearing receipts."
+      - "A focused verification command fails twice for the same unresolved product cause; return to the Judge for re-contracting."
+    receipt: null
+
+  - id: T003
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Adversarially review the Worker diff and evidence, reject stale or incomplete proof, and identify any exact remaining Phase 3 gap."
+    inputs:
+      - "T001 grounded contract"
+      - "T002 complete diff and receipts"
+      - "Fresh aggregate command outputs and installed-Chrome evidence"
+    constraints:
+      - "Read-only; do not repair the work."
+      - "Independently inspect the complete diff and evidence provenance."
+      - "Do not accept semantic similarity where byte identity is required."
+      - "Do not pull Phase 4 or new product behavior into a proof tranche."
+    expected_output:
+      - "Decision with supported gaps or approval"
+      - "Exact evidence for all ten invariants and three failure modes"
+      - "Scope and sensitive-content inspection"
+      - "Required board updates and next contract if incomplete"
+    receipt: null
+
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Make the final Phase 3 exit decision from fresh reproducible aggregate evidence and stop before Phase 4."
+    inputs:
+      - "Original owner outcome and this goal oracle"
+      - "T001 contract, T002 receipts, and T003 independent review"
+      - "Complete branch diff and clean repeated verification results"
+    constraints:
+      - "Read-only final audit."
+      - "Set full_outcome_complete: true only when the complete Phase 3 exit claim is directly proven."
+      - "Reject stale receipts, omitted acceptance commands, nondeterminism, browser simulation substituted for installed Chrome, or sensitive-content leakage."
+      - "Stop before Phase 4 even when Phase 3 is approved."
+    expected_output:
+      - "Owner-facing Phase 3 claim and decision"
+      - "Ten-invariant evidence matrix"
+      - "Top three failure modes with exact falsification evidence"
+      - "Exact commands, counts, environment, deterministic digests, Chrome result, privacy scans, and repository status"
+      - "full_outcome_complete boolean and next-phase stop statement"
+    receipt: null
+
+notes:
+  - "Prep created from merged main f4e1368 in a dedicated worktree."
+  - "No product implementation is authorized during preparation."
