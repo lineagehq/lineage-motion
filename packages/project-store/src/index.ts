@@ -11,5 +11,6 @@ export interface ProjectStore {
   compareAndCommit(command: MotionCommand, auth?: AuthContext): CommitResult;
   readHead(documentId: string, branchId?: string): ImmutableRevision | null;
   readRevision(documentId: string, revision: number): ImmutableRevision | null;
+  readEvents(documentId: string, afterCommitSeq: number): CommitMetadata[];
   snapshot(): unknown; backup(destinationPath: string): void; close(): void;
 }

@@ -7,7 +7,7 @@ if (!databasePath || !['after-begin', 'after-inserts', 'before-commit', 'after-c
   throw new Error('CRASH_FIXTURE_ARGUMENTS_INVALID');
 }
 let armed = true;
-const service = await startLocalMotionService({ databasePath, seed: createPhase3Seed(), fault: (candidate) => {
+const service = await startLocalMotionService({ databasePath, seed: createPhase3Seed(), now: () => 100, fault: (candidate) => {
   if (armed && candidate === point) { armed = false; process.kill(process.pid, 'SIGKILL'); }
 } });
 process.stdout.write(`${JSON.stringify({ url: service.url })}\n`);

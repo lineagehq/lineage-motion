@@ -1,0 +1,33 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T006",
+    "board_path": "docs/goals/phase3-control-recovery/state.yaml",
+    "changed_files": ["apps/editor/scripts/qa-chrome.mjs", "apps/editor/src/main.ts", "apps/editor/tests/editor.spec.ts"],
+    "commands": [
+      { "command": "npm run test:browser", "status": "pass", "detail": "20/20" },
+      { "command": "npm run qa:chrome", "status": "pass", "detail": "Chrome 151; invalidAtomic=true, native CSSAnimation, reduced motion, real-CLI reconnect, two editors, zero console errors" },
+      { "command": "npm run test:phase3:browser", "status": "pass", "detail": "13/13" },
+      { "command": "focused nine-file Vitest sequence", "status": "pass", "detail": "61/61 including 20 crash cells" },
+      { "command": "npm run test:phase3:service", "status": "pass", "detail": "14/14" },
+      { "command": "npm run test:phase3:recovery", "status": "pass", "detail": "34/34" },
+      { "command": "npm run test:phase3:parity", "status": "pass", "detail": "13/13" },
+      { "command": "npm run verify:determinism", "status": "pass", "detail": "26/26" },
+      { "command": "npm run typecheck", "status": "pass" },
+      { "command": "npm run build", "status": "pass" },
+      { "command": "npm run verify:phase3", "status": "pass" },
+      { "command": "npm run check:sensitive", "status": "pass", "detail": "Zero findings" },
+      { "command": "npm run check:private-ignore", "status": "pass", "detail": "3/3 ignored; zero tracked private files" },
+      { "command": "git diff --check", "status": "pass" },
+      { "command": "protected-path diff check", "status": "pass" },
+      { "command": "git diff --name-only", "status": "pass", "detail": "Only allowed and preserved PM/earlier Worker files" },
+      { "command": "git status --short", "status": "pass" },
+      { "command": "node --version && npm --version", "status": "pass", "detail": "Node v22.22.3; npm 10.9.8" }
+    ],
+    "summary": "Accepted local, service-acknowledged, and committed lost-response creation now clear creation dirtiness only after applied state renders; rejected paths retain drafts. Chrome atomicity proof now compares canonical state from post-fill/pre-submit while validating retained draft, focus, invalid state, diagnostic, and no request. All T004 recovery and reconnect behavior remains green.",
+    "deviations": [],
+    "remaining_blockers": [],
+    "verification_attempts": 2,
+    "stopped_because": null
+  }
+}

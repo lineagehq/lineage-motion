@@ -1,0 +1,70 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T003",
+    "board_path": "docs/goals/phase3-control-recovery/state.yaml",
+    "decision": "not_complete",
+    "full_outcome_complete": false,
+    "rationale": "Fresh gates pass, but Slice 3 is incomplete. The editor advances lastCommitSeq before immutable refetch and digest validation, permanently consuming a failed event. It predicts local resulting revisions as expectedRevision+1, unsafe with global revision divergence and lost responses. Keep/discard and unavailable-selection behavior lose dirty identity or leave missing targets actionable. Direct checksum, PRAGMA, and foreign-key refusal evidence is also incomplete.",
+    "evidence": [
+      "Fresh focused 59/59, recovery, browser 10/10, Chrome 151, determinism 26/26, typecheck, build, privacy, and protected-diff gates passed.",
+      "reconcileCommit sets lastCommitSeq before branch filtering, immutable fetch, digest validation, and apply; its catch neither restores the cursor nor reconnects.",
+      "dispatch sets pendingRevision to expectedRevision+1 rather than the service's document-global result.",
+      "Keep clears dirty flags/stale base and empty drafts lose dirty identity; unavailable canonical targets leave mutation controls enabled.",
+      "Integrity code exists but checksum, PRAGMA, and foreign-key refusal lack direct runtime proof."
+    ],
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Failed immutable reconciliation must keep the cursor unacknowledged and retry the event exactly once.",
+      "Behind-branch and lost-response local commits must converge with serialized SSE reconciliation.",
+      "Complete Keep/Discard and unavailable/restored canonical-ID behavior across repeated refresh.",
+      "Combined real-Chrome two-editor CLI reconnect proof and direct PRAGMA/integrity refusal evidence."
+    ],
+    "required_board_updates": ["Mark T003 done/not_complete, activate T004 as the sole corrective Worker, and keep T999 queued."],
+    "worker_package": {
+      "objective": "Complete the remaining Slice 3 recovery state machine. Acknowledge commit_seq only after an event is safely ignored or its authenticated immutable revision passes canonical digest validation and is applied; on active reconciliation failure, reconnect from the previous durable cursor and retry without duplicate application. Serialize local service commits with reconciliation using the actual document-global result, clear pending state on every response path, and converge after a lost response or behind-branch commit without false draft conflict. Preserve every dirty draft value, dirty bit, canonical target, and stale base across repeated refresh and Keep; make Discard restore canonical values; keep unavailable track, keyframe, and creation IDs visible and mutation controls inert until the same IDs return. Add direct runtime PRAGMA, foreign-key, checksum, and pre-migration integrity refusal proof, and one combined real-Chrome two-editor CLI reconnect walkthrough. Preserve all Slice 0-2 invariants and Slice 4+ exclusions.",
+      "allowed_files": [
+        "apps/editor/scripts/qa-chrome.mjs",
+        "apps/editor/src/global.d.ts",
+        "apps/editor/src/main.ts",
+        "apps/editor/src/styles.css",
+        "apps/editor/tests/phase3.spec.ts",
+        "packages/local-service/src/branch-claim-recovery.test.ts",
+        "packages/local-service/src/service.test.ts",
+        "packages/local-service/src/sqlite-project-store.ts",
+        "packages/motion-protocol/src/index.ts",
+        "packages/motion-protocol/src/index.test.ts"
+      ],
+      "verify": [
+        "focused nine-file Vitest sequence from T002",
+        "npm run test:phase3:service",
+        "npm run test:phase3:recovery",
+        "npm run test:phase3:parity",
+        "npm run test:phase3:browser",
+        "npm run qa:chrome",
+        "npm run verify:determinism",
+        "npm run test:browser",
+        "npm run typecheck",
+        "npm run build",
+        "npm run verify:phase3",
+        "npm run check:sensitive",
+        "npm run check:private-ignore",
+        "git diff --check",
+        "protected-path diff check",
+        "git diff --name-only",
+        "git status --short",
+        "node --version && npm --version"
+      ],
+      "stop_if": [
+        "Correction needs a dependency, persistent operation kind, schema/migration change, second writer, browser persistence, URL credential, or event-payload reconstruction.",
+        "Cursor cannot remain unacknowledged until successful immutable validation/application without duplicate or cross-branch disorder.",
+        "Local command and SSE reconciliation cannot serialize across global revision divergence and lost responses without draft loss.",
+        "Keep/Discard cannot explicitly preserve and resolve every dirty field, empty value, creation target, and stale-base marker.",
+        "Unavailable canonical targets remain actionable, retarget, or restore without exact ID equality.",
+        "Integrity refusal permits writes before validation or requires migration-history edits.",
+        "Proof requires Slice 4+ scope or weakens existing invariants.",
+        "A focused verification fails twice for the same unresolved product cause."
+      ]
+    }
+  }
+}

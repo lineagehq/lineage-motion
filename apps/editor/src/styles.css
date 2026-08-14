@@ -70,6 +70,11 @@ input[aria-invalid="true"] { border-color: #ff9d9d; box-shadow: 0 0 0 2px rgba(2
 .history { display: flex; gap: 8px; }
 .operation-status { min-height: 18px; color: #81d8c9; font-size: 12px; }
 .operation-status[data-kind="error"] { color: #ff9d9d; }
+.draft-conflict { position: sticky; z-index: 5; bottom: 12px; display: flex; align-items: center; gap: 9px; margin-top: 12px; padding: 12px; border: 1px solid #d8a84f; border-radius: 12px; background: #2a2114; box-shadow: 0 12px 35px rgba(0,0,0,.35); }
+.draft-conflict[hidden] { display: none; }
+.draft-conflict > div { display: grid; flex: 1; gap: 3px; }
+.draft-conflict span, .selection-summary.unavailable span { color: #facf74; font-size: 11px; }
+.selection-summary.unavailable strong { color: #ffcf76; }
 .preview-panel { position: sticky; top: 16px; overflow: hidden; border-color: #466071; box-shadow: 0 24px 70px rgba(0,0,0,.24); }
 .preview-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 67px; padding: 12px 14px; border-bottom: 1px solid #30394a; }
 .preview-stage { position: relative; overflow: hidden; }

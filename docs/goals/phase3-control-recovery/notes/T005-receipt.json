@@ -1,0 +1,43 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T005",
+    "board_path": "docs/goals/phase3-control-recovery/state.yaml",
+    "decision": "not_complete",
+    "full_outcome_complete": false,
+    "rationale": "Mixed cause. Invalid submission is canonically atomic; the assertion became stale by comparing an intentionally changed invalid draft against a pre-edit object. T004 also introduced a product defect: accepted local track creation leaves creationDraftDirty true. Strengthen the canonical assertion and clear creation dirtiness only after accepted application.",
+    "evidence": [
+      "Chrome instrumentation kept revision, content/export digests, compiled output, history, consumed IDs, and service request count unchanged after rejection.",
+      "The invalid draft, aria-invalid, focus, applied value, and diagnostic remain visibly correct.",
+      "The failing whole-object comparison includes draftValues captured before the invalid edit.",
+      "Accepted local track creation leaves creationDraftDirty true because clearing exists only in service-backed success paths.",
+      "Fresh browser 13/13, service/recovery 42/42, and domain authoring 19/19 passed."
+    ],
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Strengthened Chrome atomicity proof from the post-fill/pre-submit baseline.",
+      "Accepted creation clears dirty state; rejected paths preserve the draft.",
+      "All deferred T004 gates after correction."
+    ],
+    "required_board_updates": ["Mark T005 done, keep T004 as historical superseded by T006, activate T006, and keep T999 queued."],
+    "worker_package": {
+      "objective": "Correct the mixed invalidAtomic failure without weakening invalid-operation semantics. Clear creationDraftDirty and stale creation base after every accepted local or service-backed track creation, but never for validation, stale, unauthorized, storage-failure, or uncommitted paths. Strengthen Chrome invalid-operation proof from the post-fill/pre-submit baseline, proving canonical revision/digests/compiled output/history/IDs/selection/applied duration/request count unchanged while exact invalid draft, aria-invalid, focus, and diagnostic remain visible. Add focused browser regressions and preserve all T004 work.",
+      "allowed_files": ["apps/editor/scripts/qa-chrome.mjs", "apps/editor/src/main.ts", "apps/editor/tests/editor.spec.ts"],
+      "verify": [
+        "npm run test:browser", "npm run qa:chrome", "npm run test:phase3:browser", "focused nine-file Vitest sequence",
+        "npm run test:phase3:service", "npm run test:phase3:recovery", "npm run test:phase3:parity", "npm run verify:determinism",
+        "npm run typecheck", "npm run build", "npm run verify:phase3", "npm run check:sensitive", "npm run check:private-ignore",
+        "git diff --check", "protected-path diff check", "git diff --name-only", "git status --short", "node --version && npm --version"
+      ],
+      "stop_if": [
+        "Atomicity proof omits canonical state, digests, output, history, IDs, applied value, retained draft, focus, diagnostic, or request count.",
+        "Correction hides, removes, reorders, or hard-codes the failing assertion.",
+        "Invalid submission mutates state, consumes IDs, changes output/history, or emits a service command.",
+        "Creation dirtiness clears before success or is lost on any rejected/uncommitted path.",
+        "Any T004 recovery, reconciliation, draft, integrity, or Chrome proof regresses.",
+        "Implementation needs files outside allowed_files, dependency/schema/writer/browser persistence/URL credentials/event reconstruction/Slice 4+ behavior.",
+        "A focused verification fails twice for the same unresolved product cause."
+      ]
+    }
+  }
+}

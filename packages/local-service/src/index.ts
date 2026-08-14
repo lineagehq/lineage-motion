@@ -46,25 +46,35 @@ export async function startLocalMotionService(options: { databasePath: string; s
       }
       const head = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/(?:branches\/([^/]+)\/)?head$/);
       if (request.method === 'GET' && head) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
         const found = store!.readHead(decodeURIComponent(head[1]!), head[2] ? decodeURIComponent(head[2]) : undefined);
         return json(response, found ? 200 : 404, found ?? { ok: false });
       }
       const revision = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/revisions\/(\d+)$/);
       if (request.method === 'GET' && revision) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
         const found = store!.readRevision(decodeURIComponent(revision[1]!), Number(revision[2]));
         return json(response, found ? 200 : 404, found ?? { ok: false });
       }
       const documentRevision = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/revision$/);
       if (request.method === 'GET' && documentRevision) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
         const found = (store as SqliteProjectStore).readDocumentRevision(decodeURIComponent(documentRevision[1]!));
         return json(response, found ? 200 : 404, found ?? { ok: false });
       }
       const events = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/events$/);
       if (request.method === 'GET' && events) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
         const documentId = decodeURIComponent(events[1]!);
+        const rawCursor = request.headers['last-event-id'];
+        if (Array.isArray(rawCursor) || (rawCursor !== undefined && !/^\d+$/.test(rawCursor)))
+          return json(response, 400, { ok: false, code: 'VALIDATION' });
+        const cursor = rawCursor === undefined ? 0 : Number(rawCursor);
+        if (!Number.isSafeInteger(cursor)) return json(response, 400, { ok: false, code: 'VALIDATION' });
         response.writeHead(200, { 'content-type': 'text/event-stream', connection: 'keep-alive', 'cache-control': 'no-store' });
-        response.write(': connected\n\n');
         const set = subscribers.get(documentId) ?? new Set<ServerResponse>(); set.add(response); subscribers.set(documentId, set);
+        for (const event of store!.readEvents(documentId, cursor)) publish(new Set([response]), event);
+        response.write(': connected\n\n');
         request.on('close', () => { set.delete(response); }); return;
       }
       json(response, 404, { ok: false });
@@ -85,7 +95,7 @@ export async function startLocalMotionService(options: { databasePath: string; s
 }
 
 function publish(subscribers: Set<ServerResponse> | undefined, event: CommitMetadata): void {
-  for (const response of subscribers ?? []) response.write(`event: commit\ndata: ${canonicalJson(event).trim()}\n\n`);
+  for (const response of subscribers ?? []) response.write(`id: ${event.commitSeq}\nevent: commit\ndata: ${canonicalJson(event).trim()}\n\n`);
 }
 function json(response: ServerResponse, status: number, value: unknown): void {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }); response.end(canonicalJson(value));

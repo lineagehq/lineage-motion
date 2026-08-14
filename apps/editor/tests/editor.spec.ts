@@ -188,7 +188,11 @@ test('inserts the fixed hold from Time, ripples native preview and timeline, the
 
 test('guides a first-time author through truthful creation, timing, focus, and exact history', async ({ page }) => {
   const failedRequests: string[] = [];
+  let commandRequestCount = 0;
   page.on('requestfailed', (request) => failedRequests.push(request.failure()?.errorText ?? 'failed'));
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/v1/commands')) commandRequestCount += 1;
+  });
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.goto(editorUrl);
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
@@ -213,7 +217,7 @@ test('guides a first-time author through truthful creation, timing, focus, and e
   }));
   expect(selectionAfter.sentinel).toBe('unchanged');
   expect(selectionAfter.state).toEqual({ ...selectionBefore,
-    selectedCreationElementId: 'el_2dbee68b1ea318c8' });
+    selectedCreationElementId: 'el_2dbee68b1ea318c8', draftDirty: true });
   await expect(page.getByRole('button', { name: 'Add midpoint' })).toBeDisabled();
   await expect(page.locator('[data-duration]')).toBeDisabled();
   await expect(page.getByRole('button', { name: 'Remove midpoint' })).toBeDisabled();
@@ -222,6 +226,7 @@ test('guides a first-time author through truthful creation, timing, focus, and e
   await page.getByRole('button', { name: 'Create Orb opacity track' }).press('Enter');
   await expect(page.locator('[data-operation-status]')).toContainText('Revision 1');
   states.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
+  expect(states.at(-1)).toEqual(expect.objectContaining({ draftDirty: false, draftStaleBaseRevision: null }));
   await expect(page.getByRole('button', { name: 'Add midpoint' })).toBeFocused();
   expect(await page.evaluate(() => scrollY)).toBe(beforeCreateScroll);
   await expect(page.locator('[data-duration]')).toHaveValue('1000');
@@ -284,6 +289,9 @@ test('guides a first-time author through truthful creation, timing, focus, and e
   await expect(page.locator('[data-choice-reason="el_a2849ff826f3e167"]'))
     .toHaveText('One created track is allowed in this document.');
   await page.locator('[data-duration]').fill('1400.5');
+  const invalidBaseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  const invalidRequestBaseline = commandRequestCount;
+  const appliedDurationBaseline = await page.locator('[data-applied-duration]').textContent();
   await page.locator('[data-set-duration]').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-duration]')).toHaveAttribute('aria-invalid', 'true');
@@ -291,7 +299,36 @@ test('guides a first-time author through truthful creation, timing, focus, and e
   await expect(page.locator('[data-applied-duration]')).toHaveText('Applied · 1400 ms');
   await expect(page.locator('[data-duration]')).toHaveValue('1400.5');
   await expect(page.locator('.timing-control:has([data-duration]) em')).toBeVisible();
-  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toEqual(states.at(-1));
+  await expect(page.getByRole('button', { name: 'Apply duration' })).toBeFocused();
+  await expect(page.locator('[data-operation-status]')).toHaveText(
+    'Enter a whole-number duration greater than 0. (AUTHORING_DURATION_INVALID) Revision 6 unchanged.');
+  expect(await page.locator('[data-applied-duration]').textContent()).toBe(appliedDurationBaseline);
+  expect(commandRequestCount).toBe(invalidRequestBaseline);
+  const invalidAfter = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  expect({
+    revision: invalidAfter.revision,
+    contentDigest: invalidAfter.contentDigest,
+    exportDigest: invalidAfter.exportDigest,
+    compiledHtml: invalidAfter.compiledHtml,
+    undoCount: invalidAfter.undoCount,
+    redoCount: invalidAfter.redoCount,
+    consumedOperationIds: invalidAfter.consumedOperationIds,
+    selectedTrackId: invalidAfter.selectedTrackId,
+    selectedKeyframeId: invalidAfter.selectedKeyframeId,
+    selectedCreationElementId: invalidAfter.selectedCreationElementId,
+  }).toEqual({
+    revision: invalidBaseline.revision,
+    contentDigest: invalidBaseline.contentDigest,
+    exportDigest: invalidBaseline.exportDigest,
+    compiledHtml: invalidBaseline.compiledHtml,
+    undoCount: invalidBaseline.undoCount,
+    redoCount: invalidBaseline.redoCount,
+    consumedOperationIds: invalidBaseline.consumedOperationIds,
+    selectedTrackId: invalidBaseline.selectedTrackId,
+    selectedKeyframeId: invalidBaseline.selectedKeyframeId,
+    selectedCreationElementId: invalidBaseline.selectedCreationElementId,
+  });
+  expect(invalidAfter.draftValues['[data-duration]']).toBe('1400.5');
   for (let index = 0; index < 6; index += 1) {
     if (index === 5) await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     await page.getByRole('button', { name: 'Undo' }).click();
@@ -401,6 +438,32 @@ test('selects Cursor by pointer and creates a distinct deterministic contained b
   })).toBe(true);
 });
 
+test('retains a rejected creation draft and clears it only after accepted application', async ({ page }) => {
+  await page.goto(editorUrl);
+  await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await page.getByRole('radio', { name: /Orb/ }).click();
+  const rejected = await page.evaluate(async () => {
+    const before = window.__motionEditor.inspectAuthoring();
+    const result = await window.__motionEditor.dispatch({
+      schemaVersion: 'motion.operation.v1', operationId: 'browser:stale-create', documentId: before.documentId,
+      expectedRevision: 1, kind: 'motion.track.create', elementId: 'el_2dbee68b1ea318c8',
+      payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear', startValue: 0, endValue: 1 },
+    });
+    return { before, result, after: window.__motionEditor.inspectAuthoring() };
+  });
+  expect(rejected.result).toEqual({ ok: false, code: 'AUTHORING_STALE_REVISION' });
+  expect(rejected.after).toEqual(rejected.before);
+  expect(rejected.after).toMatchObject({ revision: 0, draftDirty: true,
+    selectedCreationElementId: 'el_2dbee68b1ea318c8', consumedOperationIds: [] });
+
+  await page.getByRole('button', { name: 'Create Orb opacity track' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 1');
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({
+    revision: 1, draftDirty: false, draftStaleBaseRevision: null,
+    selectedCreationElementId: 'el_2dbee68b1ea318c8',
+  });
+});
+
 test('authors value and time through canonical operations with atomic history and native remounts', async ({ page }) => {
   const consoleErrors: string[] = [];
   const failedRequests: string[] = [];
@@ -426,10 +489,14 @@ test('authors value and time through canonical operations with atomic history an
   expect(s1.contentDigest).not.toBe(s0.contentDigest);
   expect(s1.compiledHtml).not.toBe(s0.compiledHtml);
   await page.locator('input[data-value]').fill('1.2');
+  const invalidValueBaseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
   await page.getByRole('button', { name: 'Set value' }).click();
   await expect(page.locator('[data-operation-status]')).toContainText('Opacity value:');
   await expect(page.locator('input[data-value]')).toHaveAttribute('aria-invalid', 'true');
-  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toEqual(s1);
+  const invalidValueAfter = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  expect(invalidValueAfter).toEqual(invalidValueBaseline);
+  expect(invalidValueAfter.draftDirty).toBe(true);
+  expect(invalidValueAfter.draftValues['[data-value]']).toBe('1.2');
 
   await editable.last().focus();
   await page.keyboard.press('Enter');

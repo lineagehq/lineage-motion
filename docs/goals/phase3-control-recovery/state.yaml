@@ -1,0 +1,683 @@
+version: 2
+
+goal:
+  title: "Phase 3 control recovery and refresh hardening"
+  slug: phase3-control-recovery
+  kind: existing_plan
+  tranche: "Implement and prove only approved Phase 3 Slice 3."
+  status: done
+  oracle:
+    signal: "A real CLI commit, crash/lost-response matrix, and two-editor Chrome walkthrough prove durable recovery, ordered reconnect, immutable refetch, stable-ID reconciliation, and visible dirty-draft conflicts without silent overwrite."
+    cadence: "after the Worker package and at final audit"
+    final_proof: "Receipt-backed recovery, service, parity, browser, Chrome, determinism, integrity, migration, and privacy evidence with full_outcome_complete: true for Slice 3."
+  intake:
+    original_request: "Create a fresh worktree and implement Phase 3 Slice 3 control recovery and refresh hardening, then stop for architecture review."
+    interpreted_outcome: "The existing durable branch-and-claim editor safely recovers from control crashes and lost responses and reconciles ordered remote CLI changes without silently overwriting local drafts."
+    input_shape: existing_plan
+    audience: "motion editor owner"
+    authority: approved
+    proof_type: test
+    completion_proof: "Final Judge accepts the exact crash, recovery, refresh, Chrome, privacy, and scope evidence for Slice 3 only."
+    likely_misfire: "Adding generic collaboration or merely reconnecting SSE without proving dirty-draft safety, stable identity, and durable control recovery."
+    blind_spots_considered:
+      - "Event gaps, duplicate delivery, reconnect ordering, and explicit-refetch fallback"
+      - "Dirty drafts whose target changes or disappears during remote refresh"
+      - "Crash and lost-response atomicity across every branch and claim control"
+      - "Migration rollback, corruption refusal, and branch-head digest verification"
+      - "Capability or claim-secret leakage through recovery logs and browser state"
+    existing_plan_facts:
+      - "Slice 1 durable authoring and Slice 2 minimum branches/claims are merged at e07a187."
+      - "The approved architecture assigns the full control crash matrix, SSE replay/refetch, stable-ID reconciliation, dirty-draft conflicts, integrity checks, and migration failure behavior to Slice 3."
+      - "Slice 4 owns aggregate Phase 3 proof and must not be pulled forward as product scope."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/phase3-control-recovery/"
+    command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase3-control-recovery"
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Validate the merged Slice 2 baseline and ground one largest-safe Slice 3 Worker contract from the approved architecture."
+    inputs:
+      - "docs/architecture/phase3-persistence-boundary.md"
+      - "Merged Slice 2 implementation and receipts"
+    constraints:
+      - "Read-only; do not implement."
+      - "Ground current implementation truth instead of assuming the architecture is already implemented."
+      - "Preserve the sole-writer, strict protocol, expected-revision, verifier-only secret, stable-ID, compiler-preview, determinism, and reduced-motion invariants."
+      - "Exclude Slice 4, merge/review, annotations, claim listing, generalized collaboration, MCP, Lineage, publication, Phase 4+, and dependency additions."
+    expected_output:
+      - "Baseline implementation and evidence gap map"
+      - "Exact crash/lost-response matrix and durable replay/refetch contract"
+      - "Largest-safe coherent Worker objective"
+      - "Exact allowed_files, verify commands, stop_if conditions, and Chrome walkthrough"
+      - "Top three realistic failure modes and direct falsification requirements"
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      rationale: "Approved one coherent Slice 3 vertical package. Slice 2 is healthy, but real process recovery covers all four kill points only for authoring; branch/claim recovery is partial. SSE is memory-only and cursorless, reads/events are unauthenticated, and editor refresh can race, overwrite dirty controls, and clear disappeared selections. The existing events table already supplies durable commit_seq, so the full five-control matrix, replay/refetch, authentication, and reconciliation fit one bounded package without a schema migration or dependency."
+      evidence:
+        - "Fresh baseline passed service 12/12, recovery 12/12, parity 12/12, and typecheck."
+        - "The four real SIGKILL points currently cover only motion.track.create; branch/claim recovery has migration, lost acquire, and restart examples rather than the required 20 cells."
+        - "The events table has durable commit_seq but ProjectStore exposes no replay query; SSE publishes no event ID and ignores reconnect cursors."
+        - "Head, immutable revision, document revision, and event reads are unauthenticated."
+        - "Editor callbacks are not serialized; refresh hydration rewrites drafts and missing selected canonical IDs are silently cleared."
+        - "Startup branch verification uses an inner join, so a dangling head can disappear instead of failing closed."
+      parallel_safety:
+        one_worker_package_safe: true
+        parallel_workers_safe: false
+        reason: "Store fault points, durable sequencing, authenticated streaming, shared-client cursor semantics, editor reconciliation, and browser proof share one transaction-to-render contract."
+      blocked_tasks:
+        - T003
+        - T999
+      missing_evidence:
+        - "A 20-cell real-process branch/claim fault matrix plus five lost-response exact retries."
+        - "Integrity, migration rollback, corrupt/dangling-head refusal, and restart proof."
+        - "Authenticated ordered replay/refetch, duplicate/gap handling, two-editor CLI refresh, dirty-draft and stable-ID browser proof."
+        - "Exact native preview, reduced motion, deterministic, privacy, and complete-diff evidence."
+      required_board_updates:
+        - "Mark T001 done and copy the exact Worker package to T002."
+        - "Activate T002 as the sole Worker; keep T003 and T999 queued."
+      worker_package:
+        objective: "Implement and prove the complete Phase 3 Slice 3 control-recovery and refresh-hardening vertical slice. Extend real-process recovery to branch creation and claim acquire, renew, release, and human revoke at after-begin, after event/state inserts, before commit, and after commit before response; prove pre/post-only restart exposure, one durable transition, exact committed retry, no rejected-ID consumption, and recovery of committed notifications lost with the response. Add authenticated durable metadata-only SSE replay by commit_seq with race-safe initial head sync, cursor continuation, serialized reconciliation, duplicate suppression, gap-triggered immutable head refetch, digest validation, and cross-branch isolation. Preserve dirty form and creation drafts visibly across conflicting CLI revisions, mark their base stale, never auto-submit/replay/overwrite/discard them, and provide explicit keep/discard resolution. Reconcile track, keyframe, and creation selection only by canonical IDs, retaining visible unavailable anchors when targets disappear and restoring them only when the same IDs return. Prove connected and disconnected/reconnected refresh using the real CLI and two branch editors, exact compiler-native output, stable selection, reduced motion, zero browser errors, deterministic repetition, verifier-only secrets, and sanitized receipts. Preserve every Slice 0-2 invariant and exclude Slice 4 and later scope."
+        allowed_files:
+          - apps/editor/scripts/qa-chrome.mjs
+          - apps/editor/src/global.d.ts
+          - apps/editor/src/main.ts
+          - apps/editor/src/styles.css
+          - apps/editor/tests/phase3.spec.ts
+          - packages/local-service/src/auth.ts
+          - packages/local-service/src/branch-claim-recovery.test.ts
+          - packages/local-service/src/branch-claim.test.ts
+          - packages/local-service/src/crash-fixture.ts
+          - packages/local-service/src/index.ts
+          - packages/local-service/src/recovery.test.ts
+          - packages/local-service/src/service.test.ts
+          - packages/local-service/src/sqlite-project-store.ts
+          - packages/local-service/src/test-support.ts
+          - packages/motion-cli/src/cli.ts
+          - packages/motion-cli/src/cli.test.ts
+          - packages/motion-protocol/src/index.ts
+          - packages/motion-protocol/src/index.test.ts
+          - packages/phase3-proof/src/privacy.test.ts
+          - packages/project-store/src/index.ts
+        verify:
+          - "repo_root=$(git rev-parse --show-toplevel) && npm exec vitest -- run --root \"$repo_root\" \"$repo_root/packages/motion-protocol/src/index.test.ts\" \"$repo_root/packages/local-service/src/service.test.ts\" \"$repo_root/packages/local-service/src/branch-claim.test.ts\" \"$repo_root/packages/local-service/src/recovery.test.ts\" \"$repo_root/packages/local-service/src/branch-claim-recovery.test.ts\" \"$repo_root/packages/motion-cli/src/cli.test.ts\" \"$repo_root/packages/phase3-proof/src/parity.test.ts\" \"$repo_root/packages/phase3-proof/src/branch-claim-parity.test.ts\" \"$repo_root/packages/phase3-proof/src/privacy.test.ts\" --sequence.concurrent false"
+          - "npm run test:phase3:service"
+          - "npm run test:phase3:recovery"
+          - "npm run test:phase3:parity"
+          - "npm run test:phase3:browser"
+          - "npm run qa:chrome"
+          - "npm run verify:determinism"
+          - "npm run test:browser"
+          - "npm run typecheck"
+          - "npm run build"
+          - "npm run verify:phase3"
+          - "npm run check:sensitive"
+          - "npm run check:private-ignore"
+          - "git diff --check"
+          - "git diff --exit-code -- package-lock.json package.json AGENTS.md docs/architecture/phase3-persistence-boundary.md docs/incubation-plan.md fixtures packages/css-import packages/css-compiler packages/preview-runtime packages/visual-proof scripts"
+          - "git diff --name-only"
+          - "git status --short"
+          - "node --version && npm --version"
+        stop_if:
+          - "Implementation needs a file outside allowed_files, a dependency, package or lockfile change, migration history change, or SQLite outside the sole adapter."
+          - "Replay requires event-payload state reconstruction, URL/browser-persisted credentials, or a second writer."
+          - "Subscribe/head race, cursor handoff, duplicate suppression, gap fallback, or overlapping refetch cannot be deterministically branch-safe."
+          - "Any faulted/rejected control mutates events, branches, claims, leases, revisions, IDs, or durable notification state."
+          - "Committed retry cannot return the exact stored response with original authenticated private context."
+          - "Integrity or migration refusal requires editing v1/v2 history or accepting writes before validation."
+          - "Dirty form or creation drafts cannot remain visible and unsubmitted with explicit keep/discard resolution after conflict."
+          - "Selection would use selectors/position, silently retarget, or permanently clear instead of visible canonical-ID unavailable state and restoration."
+          - "Proof requires a new persistent authoring kind, capability/secret leakage, or Slice 4+/merge/review/MCP/Lineage/publication behavior."
+          - "Existing determinism, native preview, reduced motion, sole writer, strict protocol, global revisions, branch CAS, privacy, or private-ignore proof must be weakened."
+          - "A focused verification command fails twice for the same unresolved product cause."
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Implement and prove the complete Phase 3 Slice 3 control-recovery and refresh-hardening vertical slice. Extend real-process recovery to branch creation and claim acquire, renew, release, and human revoke at all four crash points; add authenticated durable ordered SSE replay/refetch; preserve visible dirty drafts with explicit resolution and canonical-ID selection with unavailable/restored state; and prove the complete service-to-real-CLI-to-two-editor Chrome flow while preserving every Slice 0-2 invariant."
+    allowed_files:
+      - apps/editor/scripts/qa-chrome.mjs
+      - apps/editor/src/global.d.ts
+      - apps/editor/src/main.ts
+      - apps/editor/src/styles.css
+      - apps/editor/tests/phase3.spec.ts
+      - packages/local-service/src/auth.ts
+      - packages/local-service/src/branch-claim-recovery.test.ts
+      - packages/local-service/src/branch-claim.test.ts
+      - packages/local-service/src/crash-fixture.ts
+      - packages/local-service/src/index.ts
+      - packages/local-service/src/recovery.test.ts
+      - packages/local-service/src/service.test.ts
+      - packages/local-service/src/sqlite-project-store.ts
+      - packages/local-service/src/test-support.ts
+      - packages/motion-cli/src/cli.ts
+      - packages/motion-cli/src/cli.test.ts
+      - packages/motion-protocol/src/index.ts
+      - packages/motion-protocol/src/index.test.ts
+      - packages/phase3-proof/src/privacy.test.ts
+      - packages/project-store/src/index.ts
+    verify:
+      - >-
+        repo_root=$(git rev-parse --show-toplevel) && npm exec vitest -- run --root "$repo_root"
+        "$repo_root/packages/motion-protocol/src/index.test.ts" "$repo_root/packages/local-service/src/service.test.ts"
+        "$repo_root/packages/local-service/src/branch-claim.test.ts" "$repo_root/packages/local-service/src/recovery.test.ts"
+        "$repo_root/packages/local-service/src/branch-claim-recovery.test.ts" "$repo_root/packages/motion-cli/src/cli.test.ts"
+        "$repo_root/packages/phase3-proof/src/parity.test.ts" "$repo_root/packages/phase3-proof/src/branch-claim-parity.test.ts"
+        "$repo_root/packages/phase3-proof/src/privacy.test.ts" --sequence.concurrent false
+      - npm run test:phase3:service
+      - npm run test:phase3:recovery
+      - npm run test:phase3:parity
+      - npm run test:phase3:browser
+      - npm run qa:chrome
+      - npm run verify:determinism
+      - npm run test:browser
+      - npm run typecheck
+      - npm run build
+      - npm run verify:phase3
+      - npm run check:sensitive
+      - npm run check:private-ignore
+      - git diff --check
+      - git diff --exit-code -- package-lock.json package.json AGENTS.md docs/architecture/phase3-persistence-boundary.md docs/incubation-plan.md fixtures packages/css-import packages/css-compiler packages/preview-runtime packages/visual-proof scripts
+      - git diff --name-only
+      - git status --short
+      - node --version && npm --version
+    stop_if:
+      - "Implementation needs a file outside allowed_files, a dependency, package or lockfile change, migration history change, or SQLite outside the sole adapter."
+      - "Replay requires event-payload state reconstruction, URL/browser-persisted credentials, or a second writer."
+      - "Subscribe/head race, cursor handoff, duplicate suppression, gap fallback, or overlapping refetch cannot be deterministically branch-safe."
+      - "Any faulted or rejected control mutates events, branches, claims, leases, revisions, operation IDs, or durable notification state."
+      - "Committed retry cannot return the exact stored response with the original authenticated private context."
+      - "Integrity or migration refusal requires editing v1/v2 history or accepting writes before validation."
+      - "Dirty form or creation drafts cannot remain visible and unsubmitted with explicit keep/discard resolution after conflict."
+      - "Selection would use selectors or position, silently retarget, or permanently clear instead of visible canonical-ID unavailable state and restoration."
+      - "Proof requires a new persistent authoring kind, capability/secret leakage, or Slice 4+/merge/review/MCP/Lineage/publication behavior."
+      - "Existing determinism, native preview, reduced motion, sole writer, strict protocol, global revisions, branch CAS, privacy, or private-ignore proof must be weakened."
+      - "A focused verification command fails twice for the same unresolved product cause."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/scripts/qa-chrome.mjs
+        - apps/editor/src/global.d.ts
+        - apps/editor/src/main.ts
+        - apps/editor/src/styles.css
+        - apps/editor/tests/phase3.spec.ts
+        - packages/local-service/src/branch-claim-recovery.test.ts
+        - packages/local-service/src/crash-fixture.ts
+        - packages/local-service/src/index.ts
+        - packages/local-service/src/service.test.ts
+        - packages/local-service/src/sqlite-project-store.ts
+        - packages/motion-protocol/src/index.test.ts
+        - packages/motion-protocol/src/index.ts
+        - packages/project-store/src/index.ts
+      commands:
+        - command: "focused nine-file Vitest sequence"
+          status: pass
+          detail: "59 tests; real-process control matrix 20/20"
+        - command: "npm run test:phase3:service"
+          status: pass
+          detail: 13/13
+        - command: "npm run test:phase3:recovery"
+          status: pass
+          detail: "33/33 including 20 crash cells"
+        - command: "npm run test:phase3:parity"
+          status: pass
+          detail: 13/13
+        - command: "npm run test:phase3:browser"
+          status: pass
+          detail: 10/10
+        - command: "npm run qa:chrome"
+          status: pass
+          detail: "Chrome 151, native CSSAnimation, reduced motion, branch isolation, zero console errors"
+        - command: "npm run verify:determinism"
+          status: pass
+          detail: 26/26
+        - command: "npm run test:browser"
+          status: pass
+          detail: 16/16
+        - command: "npm run typecheck"
+          status: pass
+        - command: "npm run build"
+          status: pass
+        - command: "npm run verify:phase3"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+          detail: "Zero findings"
+        - command: "npm run check:private-ignore"
+          status: pass
+          detail: "3/3 ignored; zero tracked private files"
+        - command: "git diff --check"
+          status: pass
+        - command: "protected-path diff check"
+          status: pass
+        - command: "git diff --name-only"
+          status: pass
+          detail: "Only allowed implementation and PM-owned files"
+        - command: "git status --short"
+          status: pass
+        - command: "node --version && npm --version"
+          status: pass
+          detail: "Node v22.22.3; npm 10.9.8"
+      summary: "Slice 3 now provides atomic control recovery, authenticated durable replay, immutable reconciliation, and visible draft/ID conflict handling. The 20-cell SIGKILL matrix, exact retries, WAL/restart, migration, corruption, replay/gap ordering, real-CLI reconnect, two editors, keep/discard, unavailable/restored IDs, native Chrome preview, reduced motion, determinism, privacy, and scope gates all pass."
+      deviations:
+        - "Two synthetic test-fixture corrections; no scope expansion."
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
+  - id: T003
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Adversarially review the implemented Slice 3 package and prescribe one bounded correction if any recovery, refresh, browser, privacy, or scope gap remains."
+    inputs:
+      - "T001 and T002 receipts"
+      - "Complete Slice 3 diff and fresh verification"
+    constraints:
+      - "Read-only; do not implement."
+      - "Reject helper-only, API-only, or Chrome-mocked completion."
+      - "Require the real CLI, shared protocol client, sole-writer service, immutable refetch, compiler preview, and visible dirty-draft path."
+    expected_output:
+      - "complete | not_complete"
+      - "Accepted and rejected claims with exact evidence"
+      - "One largest-safe corrective Worker contract if needed"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "Fresh gates pass, but Slice 3 is incomplete. The editor advances lastCommitSeq before immutable refetch and digest validation, permanently consuming a failed event. It predicts local resulting revisions as expectedRevision+1, unsafe with global revision divergence and lost responses. Keep/discard and unavailable-selection behavior lose dirty identity or leave missing targets actionable. Direct checksum, PRAGMA, and foreign-key refusal evidence is also incomplete."
+      evidence:
+        - "Fresh focused 59/59, recovery, browser 10/10, Chrome 151, determinism 26/26, typecheck, build, privacy, and protected-diff gates passed."
+        - "reconcileCommit sets lastCommitSeq before branch filtering, immutable fetch, digest validation, and apply; its catch neither restores the cursor nor reconnects."
+        - "dispatch sets pendingRevision to expectedRevision+1 rather than the service's document-global result."
+        - "Keep clears dirty flags/stale base and empty drafts lose dirty identity; unavailable canonical targets leave mutation controls enabled."
+        - "Integrity code exists but checksum, PRAGMA, and foreign-key refusal lack direct runtime proof."
+      blocked_tasks:
+        - T999
+      missing_evidence:
+        - "Failed immutable reconciliation must keep the cursor unacknowledged and retry the event exactly once."
+        - "Behind-branch and lost-response local commits must converge with serialized SSE reconciliation."
+        - "Complete Keep/Discard and unavailable/restored canonical-ID behavior across repeated refresh."
+        - "Combined real-Chrome two-editor CLI reconnect proof and direct PRAGMA/integrity refusal evidence."
+      required_board_updates:
+        - "Mark T003 done/not_complete, activate T004 as the sole corrective Worker, and keep T999 queued."
+      worker_package:
+        objective: "Complete the remaining Slice 3 recovery state machine. Acknowledge commit_seq only after an event is safely ignored or its authenticated immutable revision passes canonical digest validation and is applied; on active reconciliation failure, reconnect from the previous durable cursor and retry without duplicate application. Serialize local service commits with reconciliation using the actual document-global result, clear pending state on every response path, and converge after a lost response or behind-branch commit without false draft conflict. Preserve every dirty draft value, dirty bit, canonical target, and stale base across repeated refresh and Keep; make Discard restore canonical values; keep unavailable track, keyframe, and creation IDs visible and mutation controls inert until the same IDs return. Add direct runtime PRAGMA, foreign-key, checksum, and pre-migration integrity refusal proof, and one combined real-Chrome two-editor CLI reconnect walkthrough. Preserve all Slice 0-2 invariants and Slice 4+ exclusions."
+        allowed_files:
+          - apps/editor/scripts/qa-chrome.mjs
+          - apps/editor/src/global.d.ts
+          - apps/editor/src/main.ts
+          - apps/editor/src/styles.css
+          - apps/editor/tests/phase3.spec.ts
+          - packages/local-service/src/branch-claim-recovery.test.ts
+          - packages/local-service/src/service.test.ts
+          - packages/local-service/src/sqlite-project-store.ts
+          - packages/motion-protocol/src/index.ts
+          - packages/motion-protocol/src/index.test.ts
+        verify:
+          - "focused nine-file Vitest sequence from T002"
+          - "npm run test:phase3:service"
+          - "npm run test:phase3:recovery"
+          - "npm run test:phase3:parity"
+          - "npm run test:phase3:browser"
+          - "npm run qa:chrome"
+          - "npm run verify:determinism"
+          - "npm run test:browser"
+          - "npm run typecheck"
+          - "npm run build"
+          - "npm run verify:phase3"
+          - "npm run check:sensitive"
+          - "npm run check:private-ignore"
+          - "git diff --check"
+          - "protected-path diff check"
+          - "git diff --name-only"
+          - "git status --short"
+          - "node --version && npm --version"
+        stop_if:
+          - "Correction needs a dependency, persistent operation kind, schema/migration change, second writer, browser persistence, URL credential, or event-payload reconstruction."
+          - "Cursor cannot remain unacknowledged until successful immutable validation/application without duplicate or cross-branch disorder."
+          - "Local command and SSE reconciliation cannot serialize across global revision divergence and lost responses without draft loss."
+          - "Keep/Discard cannot explicitly preserve and resolve every dirty field, empty value, creation target, and stale-base marker."
+          - "Unavailable canonical targets remain actionable, retarget, or restore without exact ID equality."
+          - "Integrity refusal permits writes before validation or requires migration-history edits."
+          - "Proof requires Slice 4+ scope or weakens existing invariants."
+          - "A focused verification fails twice for the same unresolved product cause."
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: blocked
+    superseded_by: T006
+    blocker_resolved_by: T006
+    reasoning_hint: medium
+    objective: "Complete the remaining Slice 3 recovery state machine: safe cursor acknowledgement/retry, actual-result local/SSE serialization, complete draft Keep/Discard identity, inert unavailable canonical targets, direct integrity proof, and combined real-Chrome two-editor CLI reconnect evidence."
+    allowed_files:
+      - apps/editor/scripts/qa-chrome.mjs
+      - apps/editor/src/global.d.ts
+      - apps/editor/src/main.ts
+      - apps/editor/src/styles.css
+      - apps/editor/tests/phase3.spec.ts
+      - packages/local-service/src/branch-claim-recovery.test.ts
+      - packages/local-service/src/service.test.ts
+      - packages/local-service/src/sqlite-project-store.ts
+      - packages/motion-protocol/src/index.ts
+      - packages/motion-protocol/src/index.test.ts
+    verify:
+      - >-
+        repo_root=$(git rev-parse --show-toplevel) && npm exec vitest -- run --root "$repo_root"
+        "$repo_root/packages/motion-protocol/src/index.test.ts" "$repo_root/packages/local-service/src/service.test.ts"
+        "$repo_root/packages/local-service/src/branch-claim.test.ts" "$repo_root/packages/local-service/src/recovery.test.ts"
+        "$repo_root/packages/local-service/src/branch-claim-recovery.test.ts" "$repo_root/packages/motion-cli/src/cli.test.ts"
+        "$repo_root/packages/phase3-proof/src/parity.test.ts" "$repo_root/packages/phase3-proof/src/branch-claim-parity.test.ts"
+        "$repo_root/packages/phase3-proof/src/privacy.test.ts" --sequence.concurrent false
+      - npm run test:phase3:service
+      - npm run test:phase3:recovery
+      - npm run test:phase3:parity
+      - npm run test:phase3:browser
+      - npm run qa:chrome
+      - npm run verify:determinism
+      - npm run test:browser
+      - npm run typecheck
+      - npm run build
+      - npm run verify:phase3
+      - npm run check:sensitive
+      - npm run check:private-ignore
+      - git diff --check
+      - git diff --exit-code -- package-lock.json package.json AGENTS.md docs/architecture/phase3-persistence-boundary.md docs/incubation-plan.md fixtures packages/css-import packages/css-compiler packages/preview-runtime packages/visual-proof scripts
+      - git diff --name-only
+      - git status --short
+      - node --version && npm --version
+    stop_if:
+      - "Correction needs a dependency, persistent operation kind, schema/migration change, second writer, browser persistence, URL credential, or event-payload reconstruction."
+      - "Cursor cannot remain unacknowledged until successful immutable validation/application without duplicate or cross-branch disorder."
+      - "Local command and SSE reconciliation cannot serialize across global revision divergence and lost responses without draft loss."
+      - "Keep/Discard cannot explicitly preserve and resolve every dirty field, empty value, creation target, and stale-base marker."
+      - "Unavailable canonical targets remain actionable, retarget, or restore without exact ID equality."
+      - "Integrity refusal permits writes before validation or requires migration-history edits."
+      - "Proof requires Slice 4+ scope or weakens existing invariants."
+      - "A focused verification command fails twice for the same unresolved product cause."
+    receipt:
+      result: blocked
+      changed_files:
+        - apps/editor/scripts/qa-chrome.mjs
+        - apps/editor/src/global.d.ts
+        - apps/editor/src/main.ts
+        - apps/editor/tests/phase3.spec.ts
+        - packages/local-service/src/branch-claim-recovery.test.ts
+        - packages/local-service/src/service.test.ts
+        - packages/local-service/src/sqlite-project-store.ts
+      commands:
+        - command: "npm run typecheck"
+          status: pass
+        - command: "focused service and recovery Vitest"
+          status: pass
+          detail: "33/33 with WAL/FULL/FK, checksum mismatch, and pre-migration no-write evidence"
+        - command: "npm run test:phase3:browser"
+          status: pass
+          detail: 13/13
+        - command: "npm run qa:chrome"
+          status: fail
+          detail: "Initial combined runner produced empty CLI output; corrected"
+        - command: "npm run qa:chrome"
+          status: fail
+          detail: "Combined reconnect/draft/native proof passed; invalidAtomic=false"
+        - command: "npm run qa:chrome"
+          status: fail
+          detail: "Combined proof and zero console errors passed again; invalidAtomic=false repeated"
+      summary: "Implemented post-validation cursor acknowledgement/retry, actual-result local/SSE convergence, lost-response recovery, persistent empty/dirty/stale drafts, exact unavailable IDs with inert controls, and direct SQLite integrity evidence. Browser tests pass 13/13 and the combined Chrome proof passes, but the existing invalidAtomic assertion failed twice, triggering the stop condition."
+      remaining_blockers:
+        - "Chrome qa reports invalidAtomic=false on two consecutive runs; remaining gates were not run after the mandatory stop."
+      verification_attempts: 2
+      stopped_because: "A focused verification command failed twice for the same unresolved product cause."
+  - id: T005
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Determine whether the repeated Chrome invalidAtomic failure is a real atomicity/product regression or a stale QA expectation, and prescribe the smallest safe correction while auditing T004's completed state-machine work."
+    inputs:
+      - "T003 and T004 receipts"
+      - "Complete current diff and failing Chrome evidence"
+    constraints:
+      - "Read-only; do not implement."
+      - "Reproduce the exact invalidAtomic failure and inspect the underlying canonical/service state."
+      - "Do not weaken the atomic invalid-operation contract or merely hide/reorder the Chrome assertion."
+      - "Preserve all Slice 3 oracle requirements and Slice 4+ exclusions."
+    expected_output:
+      - "Product defect | stale assertion | mixed cause"
+      - "Exact falsification evidence"
+      - "One bounded corrective Worker objective, allowed_files, verify, and stop_if"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "Mixed cause. Invalid submission is canonically atomic; the assertion became stale by comparing an intentionally changed invalid draft against a pre-edit object. T004 also introduced a product defect: accepted local track creation leaves creationDraftDirty true. Strengthen the canonical assertion and clear creation dirtiness only after accepted application."
+      evidence:
+        - "Chrome instrumentation kept revision, content/export digests, compiled output, history, consumed IDs, and service request count unchanged after rejection."
+        - "The invalid draft, aria-invalid, focus, applied value, and diagnostic remain visibly correct."
+        - "The failing whole-object comparison includes draftValues captured before the invalid edit."
+        - "Accepted local track creation leaves creationDraftDirty true because clearing exists only in service-backed success paths."
+        - "Fresh browser 13/13, service/recovery 42/42, and domain authoring 19/19 passed."
+      blocked_tasks:
+        - T999
+      missing_evidence:
+        - "Strengthened Chrome atomicity proof from the post-fill/pre-submit baseline."
+        - "Accepted creation clears dirty state; rejected paths preserve the draft."
+        - "All deferred T004 gates after correction."
+      required_board_updates:
+        - "Mark T005 done, keep T004 as historical superseded by T006, activate T006, and keep T999 queued."
+      worker_package:
+        objective: "Correct the mixed invalidAtomic failure without weakening invalid-operation semantics. Clear creationDraftDirty and stale creation base after every accepted local or service-backed track creation, but never for validation, stale, unauthorized, storage-failure, or uncommitted paths. Strengthen Chrome invalid-operation proof from the post-fill/pre-submit baseline, proving canonical revision/digests/compiled output/history/IDs/selection/applied duration/request count unchanged while exact invalid draft, aria-invalid, focus, and diagnostic remain visible. Add focused browser regressions and preserve all T004 work."
+        allowed_files:
+          - apps/editor/scripts/qa-chrome.mjs
+          - apps/editor/src/main.ts
+          - apps/editor/tests/editor.spec.ts
+        verify:
+          - "npm run test:browser"
+          - "npm run qa:chrome"
+          - "npm run test:phase3:browser"
+          - "focused nine-file Vitest sequence"
+          - "npm run test:phase3:service"
+          - "npm run test:phase3:recovery"
+          - "npm run test:phase3:parity"
+          - "npm run verify:determinism"
+          - "npm run typecheck"
+          - "npm run build"
+          - "npm run verify:phase3"
+          - "npm run check:sensitive"
+          - "npm run check:private-ignore"
+          - "git diff --check"
+          - "protected-path diff check"
+          - "git diff --name-only"
+          - "git status --short"
+          - "node --version && npm --version"
+        stop_if:
+          - "Atomicity proof omits canonical state, digests, output, history, IDs, applied value, retained draft, focus, diagnostic, or request count."
+          - "Correction hides, removes, reorders, or hard-codes the failing assertion."
+          - "Invalid submission mutates state, consumes IDs, changes output/history, or emits a service command."
+          - "Creation dirtiness clears before success or is lost on any rejected/uncommitted path."
+          - "Any T004 recovery, reconciliation, draft, integrity, or Chrome proof regresses."
+          - "Implementation needs files outside allowed_files, dependency/schema/writer/browser persistence/URL credentials/event reconstruction/Slice 4+ behavior."
+          - "A focused verification fails twice for the same unresolved product cause."
+  - id: T006
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Correct the mixed invalidAtomic failure without weakening atomicity: fix accepted creation draft state and strengthen canonical Chrome/browser rejection evidence while preserving all T004 recovery behavior."
+    allowed_files:
+      - apps/editor/scripts/qa-chrome.mjs
+      - apps/editor/src/main.ts
+      - apps/editor/tests/editor.spec.ts
+    verify:
+      - npm run test:browser
+      - npm run qa:chrome
+      - npm run test:phase3:browser
+      - >-
+        repo_root=$(git rev-parse --show-toplevel) && npm exec vitest -- run --root "$repo_root"
+        "$repo_root/packages/motion-protocol/src/index.test.ts" "$repo_root/packages/local-service/src/service.test.ts"
+        "$repo_root/packages/local-service/src/branch-claim.test.ts" "$repo_root/packages/local-service/src/recovery.test.ts"
+        "$repo_root/packages/local-service/src/branch-claim-recovery.test.ts" "$repo_root/packages/motion-cli/src/cli.test.ts"
+        "$repo_root/packages/phase3-proof/src/parity.test.ts" "$repo_root/packages/phase3-proof/src/branch-claim-parity.test.ts"
+        "$repo_root/packages/phase3-proof/src/privacy.test.ts" --sequence.concurrent false
+      - npm run test:phase3:service
+      - npm run test:phase3:recovery
+      - npm run test:phase3:parity
+      - npm run verify:determinism
+      - npm run typecheck
+      - npm run build
+      - npm run verify:phase3
+      - npm run check:sensitive
+      - npm run check:private-ignore
+      - git diff --check
+      - git diff --exit-code -- package-lock.json package.json AGENTS.md docs/architecture/phase3-persistence-boundary.md docs/incubation-plan.md fixtures packages/css-import packages/css-compiler packages/preview-runtime packages/visual-proof scripts
+      - git diff --name-only
+      - git status --short
+      - node --version && npm --version
+    stop_if:
+      - "Atomicity proof omits canonical state, digests, output, history, IDs, applied value, retained draft, focus, diagnostic, or request count."
+      - "Correction hides, removes, reorders, or hard-codes the failing assertion."
+      - "Invalid submission mutates state, consumes IDs, changes output/history, or emits a service command."
+      - "Creation dirtiness clears before success or is lost on any rejected/uncommitted path."
+      - "Any T004 recovery, reconciliation, draft, integrity, or Chrome proof regresses."
+      - "Implementation needs files outside allowed_files, dependency/schema/writer/browser persistence/URL credentials/event reconstruction/Slice 4+ behavior."
+      - "A focused verification fails twice for the same unresolved product cause."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/scripts/qa-chrome.mjs
+        - apps/editor/src/main.ts
+        - apps/editor/tests/editor.spec.ts
+      commands:
+        - command: "npm run test:browser"
+          status: pass
+          detail: 20/20
+        - command: "npm run qa:chrome"
+          status: pass
+          detail: "Chrome 151; invalidAtomic=true, native CSSAnimation, reduced motion, real-CLI reconnect, two editors, zero console errors"
+        - command: "npm run test:phase3:browser"
+          status: pass
+          detail: 13/13
+        - command: "focused nine-file Vitest sequence"
+          status: pass
+          detail: "61/61 including 20 crash cells"
+        - command: "npm run test:phase3:service"
+          status: pass
+          detail: 14/14
+        - command: "npm run test:phase3:recovery"
+          status: pass
+          detail: 34/34
+        - command: "npm run test:phase3:parity"
+          status: pass
+          detail: 13/13
+        - command: "npm run verify:determinism"
+          status: pass
+          detail: 26/26
+        - command: "npm run typecheck"
+          status: pass
+        - command: "npm run build"
+          status: pass
+        - command: "npm run verify:phase3"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+          detail: "Zero findings"
+        - command: "npm run check:private-ignore"
+          status: pass
+          detail: "3/3 ignored; zero tracked private files"
+        - command: "git diff --check"
+          status: pass
+        - command: "protected-path diff check"
+          status: pass
+        - command: "git diff --name-only"
+          status: pass
+          detail: "Only allowed and preserved PM/earlier Worker files"
+        - command: "git status --short"
+          status: pass
+        - command: "node --version && npm --version"
+          status: pass
+          detail: "Node v22.22.3; npm 10.9.8"
+      summary: "Accepted local, service-acknowledged, and committed lost-response creation now clear creation dirtiness only after applied state renders; rejected paths retain drafts. Chrome atomicity proof now compares canonical state from post-fill/pre-submit while validating retained draft, focus, invalid state, diagnostic, and no request. All T004 recovery and reconnect behavior remains green."
+      deviations: []
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Audit whether Phase 3 Slice 3—not all of Phase 3—satisfies the owner-facing oracle and is safe for architecture review."
+    inputs:
+      - "All completed receipts"
+      - "Fresh focused and aggregate verification"
+      - "Complete diff, recovery matrix, Chrome evidence, and sensitive-content scan"
+    constraints:
+      - "Do not implement."
+      - "Reject completion while required Worker or corrective work remains."
+      - "Do not claim Slice 4 or the aggregate Phase 3 exit gate."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false for Slice 3"
+      - "Owner-facing claim, top three realistic failure modes, and exact evidence"
+      - "Architecture-review handoff and explicitly deferred work"
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      rationale: "Phase 3 Slice 3 is complete and ready for architecture review. Fresh aggregate verification proves crash-safe idempotent controls, fail-closed SQLite startup/migration, authenticated durable replay with validated cursor acknowledgement, serialized CLI/editor reconciliation, explicit draft and canonical-ID conflicts, compiler-native Chrome refresh, determinism, parity, and privacy."
+      evidence:
+        - "verify:phase3 passed service 14/14, recovery 34/34, parity 13/13, phase3 browser 13/13, determinism 26/26, full browser 20/20, Chrome, typecheck, build, privacy, and protected diff."
+        - "All 20 real-process branch/claim crash cells and five after-commit retries exposed exactly one complete pre-state or post-state transition."
+        - "WAL/FULL/FK, integrity, dangling-head/digest/checksum/unsupported/corrupt refusal, and migration rollback passed."
+        - "Authenticated metadata replay passed cursor, duplicate, gap refetch, digest validation, failed-refetch retry, and exact-once acknowledgement."
+        - "Behind-branch/lost-response convergence, cross-branch isolation, two-editor CLI refresh, Keep/Discard, unavailable IDs, native CSSAnimation, and reduced motion passed."
+        - "Sensitive scan found zero; private-ignore passed 3/3; diff stayed within approved scope."
+      blocked_tasks: []
+      missing_evidence: []
+      required_board_updates:
+        - "Stop for architecture review and do not activate Slice 4."
+
+checks:
+  dirty_fingerprint: unknown
+  last_verification:
+    result: unknown
+    task: null
+    commands: []

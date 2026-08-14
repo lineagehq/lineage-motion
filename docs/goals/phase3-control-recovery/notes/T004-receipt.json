@@ -1,0 +1,28 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "blocked",
+    "task_id": "T004",
+    "board_path": "docs/goals/phase3-control-recovery/state.yaml",
+    "changed_files": [
+      "apps/editor/scripts/qa-chrome.mjs",
+      "apps/editor/src/global.d.ts",
+      "apps/editor/src/main.ts",
+      "apps/editor/tests/phase3.spec.ts",
+      "packages/local-service/src/branch-claim-recovery.test.ts",
+      "packages/local-service/src/service.test.ts",
+      "packages/local-service/src/sqlite-project-store.ts"
+    ],
+    "commands": [
+      { "command": "npm run typecheck", "status": "pass" },
+      { "command": "focused service and recovery Vitest", "status": "pass", "detail": "33/33 with WAL/FULL/FK, checksum mismatch, and pre-migration no-write evidence" },
+      { "command": "npm run test:phase3:browser", "status": "pass", "detail": "13/13" },
+      { "command": "npm run qa:chrome", "status": "fail", "detail": "Initial combined runner produced empty CLI output; corrected" },
+      { "command": "npm run qa:chrome", "status": "fail", "detail": "Combined reconnect/draft/native proof passed; invalidAtomic=false" },
+      { "command": "npm run qa:chrome", "status": "fail", "detail": "Combined proof and zero console errors passed again; invalidAtomic=false repeated" }
+    ],
+    "summary": "Implemented post-validation cursor acknowledgement/retry, actual-result local/SSE convergence, lost-response recovery, persistent empty/dirty/stale drafts, exact unavailable IDs with inert controls, and direct SQLite integrity evidence. Browser tests pass 13/13 and the combined Chrome proof passes, but the existing invalidAtomic assertion failed twice, triggering the stop condition.",
+    "remaining_blockers": ["Chrome qa reports invalidAtomic=false on two consecutive runs; remaining gates were not run after the mandatory stop."],
+    "verification_attempts": 2,
+    "stopped_because": "A focused verification command failed twice for the same unresolved product cause."
+  }
+}

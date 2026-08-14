@@ -1,4 +1,4 @@
-import { chmodSync, existsSync, rmSync } from 'node:fs';
+import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
 import { canonicalBytes, canonicalJson, createAuthoringState, dispatchAuthoringOperation, sha256Hex,
@@ -17,7 +17,8 @@ export class SqliteProjectStore implements ProjectStore {
   readonly database: DatabaseSync; readonly path: string;
   constructor(path: string, private readonly fault?: (point: FaultPoint) => void) {
     this.path = path; this.database = new DatabaseSync(path); if (path !== ':memory:') chmodSync(path, 0o600);
-    this.database.exec('PRAGMA foreign_keys=ON; PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL; PRAGMA busy_timeout=5000;'); this.migrate();
+    this.database.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;'); this.verifyPreMigration();
+    this.database.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;'); this.migrate();
   }
   private migrate(): void {
     this.database.exec('CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, checksum TEXT NOT NULL, applied_order INTEGER NOT NULL UNIQUE)');
@@ -176,6 +177,17 @@ export class SqliteProjectStore implements ProjectStore {
     'SELECT canonical_json,canonical_digest FROM revisions WHERE document_id=? AND revision=?').get(documentId, revision) as
     { canonical_json: string; canonical_digest: string } | undefined;
     return row ? { document: JSON.parse(row.canonical_json), canonicalDigest: row.canonical_digest } : null; }
+  readEvents(documentId: string, afterCommitSeq: number) {
+    const rows = this.database.prepare(`SELECT commit_seq,branch_id,resulting_revision,kind FROM events
+      WHERE document_id=? AND commit_seq>? ORDER BY commit_seq`).all(documentId, afterCommitSeq) as Array<{
+        commit_seq: number; branch_id: string; resulting_revision: number; kind: MotionCommand['command']['kind'] }>;
+    return rows.map((row) => {
+      const revision = this.readRevision(documentId, row.resulting_revision) ?? this.readHead(documentId, row.branch_id);
+      if (!revision) throw new Error('EVENT_REVISION_MISSING');
+      return { documentId, branchId: row.branch_id, revision: row.resulting_revision,
+        digest: revision.canonicalDigest, kind: row.kind, commitSeq: row.commit_seq };
+    });
+  }
   readDocumentRevision(documentId: string): { revision: number; canonicalDigest: string } | null {
     try { const row = this.readLastRevision(documentId); return { revision: row.revision, canonicalDigest: row.digest }; }
     catch { return null; }
@@ -185,6 +197,20 @@ export class SqliteProjectStore implements ProjectStore {
   backup(destinationPath: string): void { if (destinationPath === this.path) throw new Error('BACKUP_PATH_INVALID');
     rmSync(destinationPath, { force: true }); this.database.prepare('VACUUM INTO ?').run(destinationPath); chmodSync(destinationPath, 0o600); }
   close(): void { this.database.close(); }
+  runtimePragmas(): { journalMode: string; synchronous: number; foreignKeys: number } {
+    const journalMode = (this.database.prepare('PRAGMA journal_mode').get() as { journal_mode: string }).journal_mode;
+    const synchronous = (this.database.prepare('PRAGMA synchronous').get() as { synchronous: number }).synchronous;
+    const foreignKeys = (this.database.prepare('PRAGMA foreign_keys').get() as { foreign_keys: number }).foreign_keys;
+    return { journalMode, synchronous, foreignKeys };
+  }
+  proveForeignKeyRefusal(): void {
+    const before = this.snapshot(); this.database.exec('BEGIN IMMEDIATE'); let refused = false;
+    try { this.database.prepare('INSERT INTO branches(document_id,branch_id,head_revision,base_revision) VALUES(?,?,?,?)')
+      .run('missing-document', 'invalid', 0, 0); }
+    catch { refused = true; }
+    finally { if (this.database.isTransaction) this.database.exec('ROLLBACK'); }
+    if (!refused || canonicalJson(this.snapshot()) !== canonicalJson(before)) throw new Error('FOREIGN_KEY_REFUSAL_FAILED');
+  }
   private readHeadRow(documentId: string, branchId: string): HeadRow | null { const row = this.database.prepare(`SELECT b.head_revision revision,
     r.canonical_json json,r.canonical_digest digest FROM branches b JOIN revisions r ON r.document_id=b.document_id
     AND r.revision=b.head_revision WHERE b.document_id=? AND b.branch_id=?`).get(documentId, branchId) as HeadRow | undefined; return row ?? null; }
@@ -198,11 +224,31 @@ export class SqliteProjectStore implements ProjectStore {
     const revision = this.readRevision(documentId, row.resulting_revision) ?? this.readHead(documentId, row.branch_id)!;
     return { documentId, branchId: row.branch_id, revision: row.resulting_revision, digest: revision.canonicalDigest,
       kind: row.kind, commitSeq: row.commit_seq }; }
-  private verify(): void { const integrity = this.database.prepare('PRAGMA integrity_check').get() as { integrity_check: string };
+  private verifyPreMigration(): void {
+    const integrity = this.database.prepare('PRAGMA integrity_check').get() as { integrity_check: string };
     const foreign = this.database.prepare('PRAGMA foreign_key_check').all(); if (integrity.integrity_check !== 'ok' || foreign.length)
-      throw new Error('STORE_INTEGRITY_FAILED'); const heads = this.database.prepare(`SELECT r.canonical_json,r.canonical_digest FROM branches b
-      JOIN revisions r ON r.document_id=b.document_id AND r.revision=b.head_revision`).all() as Array<{ canonical_json: string; canonical_digest: string }>;
-    for (const row of heads) if (sha256Hex(canonicalBytes(JSON.parse(row.canonical_json))) !== row.canonical_digest) throw new Error('STORE_DIGEST_MISMATCH'); }
+      throw new Error('STORE_INTEGRITY_FAILED');
+    const hasRevisions = this.database.prepare("SELECT 1 ok FROM sqlite_master WHERE type='table' AND name='revisions'").get();
+    if (!hasRevisions) return;
+    const revisions = this.database.prepare('SELECT canonical_json,canonical_digest FROM revisions').all() as Array<{
+      canonical_json: string; canonical_digest: string }>;
+    for (const row of revisions) {
+      try { if (sha256Hex(canonicalBytes(JSON.parse(row.canonical_json))) !== row.canonical_digest)
+        throw new Error('STORE_DIGEST_MISMATCH'); }
+      catch (error) { if (error instanceof Error && error.message === 'STORE_DIGEST_MISMATCH') throw error;
+        throw new Error('STORE_DIGEST_MISMATCH'); }
+    }
+    const hasBranches = this.database.prepare("SELECT 1 ok FROM sqlite_master WHERE type='table' AND name='branches'").get();
+    if (!hasBranches) return;
+    const heads = this.database.prepare(`SELECT r.canonical_json,r.canonical_digest FROM branches b
+      LEFT JOIN revisions r ON r.document_id=b.document_id AND r.revision=b.head_revision`).all() as Array<{
+        canonical_json: string | null; canonical_digest: string | null }>;
+    for (const row of heads) {
+      if (row.canonical_json === null || row.canonical_digest === null) throw new Error('STORE_BRANCH_HEAD_MISSING');
+      if (sha256Hex(canonicalBytes(JSON.parse(row.canonical_json))) !== row.canonical_digest) throw new Error('STORE_DIGEST_MISMATCH');
+    }
+  }
+  private verify(): void { this.verifyPreMigration(); }
 }
 
 /** Synthetic migration fixture creation stays inside the sole SQLite adapter. */
@@ -218,3 +264,29 @@ export function createLegacyV1Database(path: string, seed: MotionDocument): void
       .run(seed.documentId, MAIN_BRANCH_ID, seed.revision, seed.revision);
   } finally { database.close(); chmodSync(path, 0o600); }
 }
+
+/** Synthetic failure fixtures remain inside the sole SQLite adapter. */
+export function poisonLegacyV1Migration(path: string): void {
+  const database = new DatabaseSync(path); try { database.exec('CREATE TABLE claims(blocker TEXT NOT NULL)'); } finally { database.close(); }
+}
+export function inspectMigrationFixture(path: string): { versions: number[]; mainOnlyConstraint: boolean } {
+  const database = new DatabaseSync(path); try {
+    const versions = (database.prepare('SELECT version FROM schema_migrations ORDER BY version').all() as Array<{ version: number }>)
+      .map((row) => row.version);
+    const sql = (database.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='branches'").get() as { sql: string }).sql;
+    return { versions, mainOnlyConstraint: sql.includes("CHECK(branch_id = 'main')") };
+  } finally { database.close(); }
+}
+export function corruptStoredHead(path: string, mode: 'digest' | 'dangling'): void {
+  const database = new DatabaseSync(path); try {
+    if (mode === 'digest') database.prepare("UPDATE revisions SET canonical_digest=? WHERE revision=(SELECT head_revision FROM branches WHERE branch_id='main')")
+      .run('0'.repeat(64));
+    else database.prepare("UPDATE branches SET head_revision=999 WHERE branch_id='main'").run();
+  } finally { database.close(); }
+}
+export function createCorruptDatabase(path: string): void { writeFileSync(path, 'not a sqlite database', { mode: 0o600 }); }
+export function corruptMigrationChecksum(path: string, version: number): void {
+  const database = new DatabaseSync(path); try { database.prepare('UPDATE schema_migrations SET checksum=? WHERE version=?')
+    .run('synthetic-checksum-mismatch', version); } finally { database.close(); }
+}
+export function rawDatabaseDigest(path: string): string { return sha256Hex(readFileSync(path)); }
