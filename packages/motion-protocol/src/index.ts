@@ -56,6 +56,7 @@ export type ImmutableRevision = { document: MotionDocument; canonicalDigest: str
 export type DocumentRevision = { revision: number; canonicalDigest: string };
 export type CommitMetadata = { documentId: string; branchId: string; revision: number; digest: string;
   kind: MotionCommand['command']['kind']; commitSeq: number };
+export type EventSubscription = { close(): void; readonly closed: boolean };
 
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
 const claimId = z.string().regex(/^claim_[a-f0-9]{24}$/);
@@ -120,26 +121,51 @@ export class MotionServiceClient {
     if (!/^[A-Za-z0-9_-]{43,}$/.test(auth.capability) && !isVitest()) throw new Error('CLIENT_CAPABILITY_REQUIRED');
   }
   async dispatch(command: MotionCommand, claimSecret?: string): Promise<CommandResponse> {
-    const headers: Record<string, string> = { 'content-type': 'application/json', authorization: `Bearer ${this.auth.capability}`,
-      'x-motion-actor': this.auth.actor };
+    const headers: Record<string, string> = { 'content-type': 'application/json', ...this.authHeaders() };
     const secret = claimSecret ?? this.auth.claimSecret; if (secret) headers['x-motion-claim-secret'] = secret;
     const response = await this.request(`${this.baseUrl}/api/v1/commands`, { method: 'POST', headers, body: canonicalJson(command) });
     return parseCommandResponse(await response.json());
   }
   async head(documentId: string, branch: string = MAIN_BRANCH_ID): Promise<ImmutableRevision> { const response = await this.request(
-    `${this.baseUrl}/api/v1/documents/${encodeURIComponent(documentId)}/branches/${encodeURIComponent(branch)}/head`);
+    `${this.baseUrl}/api/v1/documents/${encodeURIComponent(documentId)}/branches/${encodeURIComponent(branch)}/head`,
+    { headers: this.authHeaders() });
     if (!response.ok) throw new Error('SERVICE_HEAD_FAILED'); return parseImmutableRevision(await response.json()); }
   async revision(documentId: string, value: number): Promise<ImmutableRevision> { const response = await this.request(
-    `${this.baseUrl}/api/v1/documents/${encodeURIComponent(documentId)}/revisions/${value}`);
+    `${this.baseUrl}/api/v1/documents/${encodeURIComponent(documentId)}/revisions/${value}`, { headers: this.authHeaders() });
     if (!response.ok) throw new Error('SERVICE_REVISION_FAILED'); return parseImmutableRevision(await response.json()); }
   async documentRevision(documentId: string): Promise<DocumentRevision> { const response = await this.request(
-    `${this.baseUrl}/api/v1/documents/${encodeURIComponent(documentId)}/revision`);
+    `${this.baseUrl}/api/v1/documents/${encodeURIComponent(documentId)}/revision`, { headers: this.authHeaders() });
     if (!response.ok) throw new Error('SERVICE_DOCUMENT_REVISION_FAILED');
     const parsed = z.object({ revision, canonicalDigest: digest }).strict().safeParse(await response.json());
     if (!parsed.success) throw new Error('PROTOCOL_DOCUMENT_REVISION_INVALID'); return parsed.data; }
-  events(documentId: string, onCommit: (event: CommitMetadata) => void): EventSource { const source = new EventSource(
-    `${this.baseUrl}/api/v1/documents/${encodeURIComponent(documentId)}/events`); source.addEventListener('commit', (event) =>
-    onCommit(parseCommitMetadata(JSON.parse((event as MessageEvent<string>).data)))); return source; }
+  events(documentId: string, afterCommitSeq: number, onCommit: (event: CommitMetadata) => void,
+    onDisconnect?: (error: unknown) => void): EventSubscription {
+    const controller = new AbortController(); let closed = false;
+    void this.readEventStream(documentId, afterCommitSeq, onCommit, controller.signal).catch((error) => {
+      if (!closed && !controller.signal.aborted) onDisconnect?.(error);
+    });
+    return { close: () => { closed = true; controller.abort(); }, get closed() { return closed; } };
+  }
+  private authHeaders(): Record<string, string> { return { authorization: `Bearer ${this.auth.capability}`,
+    'x-motion-actor': this.auth.actor }; }
+  private async readEventStream(documentId: string, afterCommitSeq: number, onCommit: (event: CommitMetadata) => void,
+    signal: AbortSignal): Promise<void> {
+    const response = await this.request(`${this.baseUrl}/api/v1/documents/${encodeURIComponent(documentId)}/events`, {
+      headers: { ...this.authHeaders(), 'last-event-id': String(afterCommitSeq) }, signal });
+    if (!response.ok || !response.body) throw new Error('SERVICE_EVENTS_FAILED');
+    const reader = response.body.getReader(); const decoder = new TextDecoder(); let buffer = ''; let cursor = afterCommitSeq;
+    while (!signal.aborted) {
+      const next = await reader.read(); if (next.done) throw new Error('SERVICE_EVENTS_DISCONNECTED');
+      buffer += decoder.decode(next.value, { stream: true }).replace(/\r\n/g, '\n');
+      let boundary: number;
+      while ((boundary = buffer.indexOf('\n\n')) >= 0) {
+        const frame = buffer.slice(0, boundary); buffer = buffer.slice(boundary + 2);
+        const data = frame.split('\n').filter((line) => line.startsWith('data:')).map((line) => line.slice(5).trimStart()).join('\n');
+        if (data) { const event = parseCommitMetadata(JSON.parse(data)); if (event.commitSeq > cursor) {
+          cursor = event.commitSeq; onCommit(event); } }
+      }
+    }
+  }
 }
 
 function isVitest(): boolean { return typeof process !== 'undefined' && Boolean(process.env.VITEST); }

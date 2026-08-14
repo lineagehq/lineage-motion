@@ -40,9 +40,21 @@ const creationChoices = [
 ] as const;
 const statusCopyElementId = 'el_1f3f2908e4fd2401';
 let selectedCreationElementId: StructuralAuthoringElementId | null = null;
+let creationDraftDirty = false;
 let selectedTrackId: string | null = null;
 let selectedKeyframeId: string | null = null;
 let hasExplicitKeyframeSelection = false;
+let unavailableSelection = false;
+let unavailableCreation = false;
+let lastCommitSeq = 0;
+let reconciliation = Promise.resolve();
+let branchGeneration = 0;
+let eventSubscription: { close(): void } | null = null;
+let eventSubscriptionGeneration = 0;
+const reconciliationFailures = new Map<number, number>();
+let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+let draftConflictRevision: number | null = null;
+let draftStaleBaseRevision: number | null = null;
 
 document.body.innerHTML = `
   <main class="editor-shell">
@@ -103,6 +115,7 @@ document.body.innerHTML = `
         </div>
       </section>
     </div>
+    <section class="draft-conflict" data-draft-conflict hidden role="alert"><div><strong>Remote revision available</strong><span>Your unsubmitted draft is still here and has not been applied. Choose how to resolve it.</span></div><button type="button" data-keep-draft>Keep draft</button><button type="button" data-discard-draft>Discard draft</button></section>
     <details class="inspect-panel">
       <summary><span><strong>Inspect all tracks</strong><small>Complete timeline, cues, keyframes, stable IDs, and reduced motion</small></span><span data-track-count></span></summary>
       <div class="inspection-content">
@@ -141,6 +154,12 @@ const previewSelection = required<HTMLElement>('[data-preview-selection]');
 const branchSelect = document.querySelector<HTMLSelectElement>('[data-active-branch]');
 const branchForm = document.querySelector<HTMLFormElement>('[data-branch-form]');
 const revokeForm = document.querySelector<HTMLFormElement>('[data-revoke-form]');
+const draftConflict = required<HTMLElement>('[data-draft-conflict]');
+required<HTMLButtonElement>('[data-keep-draft]').addEventListener('click', () => resolveDraftConflict(true));
+required<HTMLButtonElement>('[data-discard-draft]').addEventListener('click', () => resolveDraftConflict(false));
+for (const control of document.querySelectorAll<HTMLInputElement>('[data-new-branch], [data-claim-id], [data-lease-version]')) {
+  control.addEventListener('input', () => { control.dataset.draft = String(control.value !== control.defaultValue); });
+}
 
 branchSelect?.addEventListener('change', () => void switchBranch(branchSelect.value));
 branchForm?.addEventListener('submit', (event) => { event.preventDefault(); void createBranch(
@@ -157,6 +176,7 @@ const holdStatus = required<HTMLOutputElement>('[data-hold-status]');
 for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="creation-target"]')) {
   radio.addEventListener('change', () => {
     selectedCreationElementId = radio.value as StructuralAuthoringElementId;
+    creationDraftDirty = true;
     updateStructuralControls(buildTimeline(authoring.document).rows);
     schedulePreviewSelection();
   });
@@ -181,6 +201,8 @@ valueInput.addEventListener('invalid', () => announceInvalidInput(valueInput, 'O
 timeInput.addEventListener('invalid', () => announceInvalidInput(timeInput, 'Master time'));
 valueInput.addEventListener('input', () => clearValidationFeedback(valueInput));
 timeInput.addEventListener('input', () => clearValidationFeedback(timeInput));
+valueInput.addEventListener('input', () => { valueInput.dataset.draft = 'true'; });
+timeInput.addEventListener('input', () => { timeInput.dataset.draft = 'true'; });
 undoButton.addEventListener('click', () => {
   if (authoring.undo.length === 0) return;
   void dispatch(makeHistory('motion.history.undo'), '[data-undo]', {
@@ -267,6 +289,14 @@ window.__motionEditor = {
     selectedTrackId: selectedTrackId as string,
     selectedKeyframeId: selectedKeyframeId as string,
     selectedCreationElementId,
+    unavailableSelection,
+    unavailableCreation,
+    draftConflictRevision,
+    draftStaleBaseRevision,
+    draftDirty: captureDraft().dirty,
+    draftValues: captureDraft().values,
+    lastCommitSeq,
+    pendingRevision,
     serviceBacked: Boolean(serviceClient),
     activeBranchId,
     immutableRefetchCount,
@@ -274,6 +304,8 @@ window.__motionEditor = {
   }),
   dispatch,
   switchBranch,
+  disconnectEvents: () => { eventSubscription?.close(); eventSubscriptionGeneration += 1; },
+  reconnectEvents: connectEvents,
 };
 
 async function dispatch(
@@ -290,30 +322,49 @@ async function dispatch(
   }
   let result = dispatchAuthoringOperation(authoring, operation);
   if (serviceClient && operation.kind === 'motion.track.create') {
-    pendingRevision = operation.expectedRevision + 1;
-    const response = await serviceClient.dispatch(makeTrackCreateCommand({ operationId: operation.operationId,
-      documentId: operation.documentId, branchId: activeBranchId, expectedRevision: operation.expectedRevision, elementId: operation.elementId }));
-    if (!response.ok) {
+    const command = makeTrackCreateCommand({ operationId: operation.operationId,
+      documentId: operation.documentId, branchId: activeBranchId, expectedRevision: operation.expectedRevision, elementId: operation.elementId });
+    const commandTask = reconciliation.then(async () => {
+      let response;
+      try { response = await serviceClient.dispatch(command); }
+      catch { response = { ok: false, code: 'STORAGE_FAILURE' } as const; }
+      if (response.ok) {
+        pendingRevision = response.resultingRevision;
+        try {
+          await applyImmutable(await serviceClient.revision(response.documentId, response.resultingRevision), false);
+          resolveAcceptedCreationDraft();
+        }
+        finally { pendingRevision = null; }
+        return { response, applied: true };
+      }
       pendingRevision = null;
       if (response.code === 'STALE_REVISION') {
-        const immutable = await serviceClient.head(operation.documentId, activeBranchId);
-        immutableRefetchCount += 1;
-        authoring = createAuthoringState(immutable.document);
-        compiled = compileMotionDocument(authoring.document);
-        await controller.mount(compiled.html);
-        renderProjection();
+        await applyImmutable(await serviceClient.head(operation.documentId, activeBranchId), true);
+      } else if (response.code === 'STORAGE_FAILURE') {
+        try {
+          const immutable = await serviceClient.head(operation.documentId, activeBranchId);
+          const committed = immutable.document.revision !== operation.expectedRevision
+            && buildTimeline(immutable.document).rows.some((row) => row.elementId === operation.elementId && row.property === 'opacity');
+          if (committed) {
+            await applyImmutable(immutable, false);
+            resolveAcceptedCreationDraft();
+            return { response, applied: true };
+          }
+        } catch { /* The unacknowledged SSE event remains the recovery path. */ }
       }
+      return { response, applied: false };
+    });
+    reconciliation = commandTask.then(() => undefined, () => undefined);
+    const outcome = await commandTask; const response = outcome.response;
+    if (!response.ok && !outcome.applied) {
       const code = response.code === 'STALE_REVISION' ? 'AUTHORING_STALE_REVISION' : `SERVICE_${response.code}`;
       status.value = response.code === 'STALE_REVISION'
         ? `${diagnosticMessage(code)} (${code}) Local operation not applied; refreshed to revision ${authoring.document.revision}.`
         : `${diagnosticMessage(code)} (${code}) Revision ${authoring.document.revision} unchanged.`;
       status.dataset.kind = 'error'; return { ok: false, code };
+    } else {
+      result = { ok: true, state: authoring };
     }
-    const immutable = await serviceClient.revision(response.documentId, response.resultingRevision);
-    immutableRefetchCount += 1;
-    authoring = createAuthoringState(immutable.document);
-    pendingRevision = null;
-    result = { ok: true, state: authoring };
   }
   if (!result.ok) {
     if (operation.kind === 'motion.slot-duration.set') {
@@ -364,6 +415,7 @@ async function dispatch(
     hasExplicitKeyframeSelection = true;
   }
   renderProjection();
+  if (operation.kind === 'motion.track.create') resolveAcceptedCreationDraft();
   status.value = `${successMessage(operation.kind)} Revision ${authoring.document.revision}.`;
   status.dataset.kind = 'success';
   if (focusSelector) {
@@ -387,34 +439,70 @@ async function dispatch(
   return { ok: true };
 }
 
-if (serviceClient) {
-  serviceClient.events(authoring.document.documentId, async (event) => {
-    if (event.branchId !== activeBranchId || event.revision === authoring.document.revision || event.revision === pendingRevision) { lastCommit = event; return; }
-    const immutable = event.kind === 'motion.track.create'
-      ? await serviceClient.revision(event.documentId, event.revision)
-      : await serviceClient.head(event.documentId, event.branchId);
-    immutableRefetchCount += 1; lastCommit = event;
-    authoring = createAuthoringState(immutable.document);
-    compiled = compileMotionDocument(authoring.document);
-    await controller.mount(compiled.html);
-    renderProjection();
-    status.value = `Revision ${authoring.document.revision} refreshed from committed service state.`;
+if (serviceClient) connectEvents();
+
+function connectEvents(): void {
+  if (!serviceClient) return;
+  eventSubscription?.close();
+  const generation = ++eventSubscriptionGeneration;
+  eventSubscription = serviceClient.events(authoring.document.documentId, lastCommitSeq, (event) => {
+    reconciliation = reconciliation.then(() => reconcileCommit(event, generation)).catch((error) => {
+      status.value = `Remote refresh failed (${error instanceof Error ? error.message : 'UNKNOWN'}).`;
+      status.dataset.kind = 'error';
+      if (generation !== eventSubscriptionGeneration) return;
+      eventSubscription?.close(); eventSubscriptionGeneration += 1;
+      const attempts = reconciliationFailures.get(event.commitSeq) ?? 0;
+      reconciliationFailures.set(event.commitSeq, attempts + 1);
+      if (attempts === 0) reconnectTimer = setTimeout(connectEvents, 0);
+    });
+  }, () => {
+    if (generation !== eventSubscriptionGeneration) return;
+    status.value = 'Live updates disconnected. Reconnecting from the durable cursor…'; status.dataset.kind = 'error';
+    if (reconnectTimer) clearTimeout(reconnectTimer);
+    reconnectTimer = setTimeout(connectEvents, 100);
   });
 }
 
+async function reconcileCommit(event: CommitMetadata, subscriptionGeneration: number): Promise<void> {
+  if (!serviceClient || subscriptionGeneration !== eventSubscriptionGeneration || event.commitSeq <= lastCommitSeq) return;
+  const acknowledge = () => { lastCommitSeq = event.commitSeq; lastCommit = event; reconciliationFailures.delete(event.commitSeq); };
+  const gap = event.commitSeq !== lastCommitSeq + 1;
+  if (event.branchId !== activeBranchId) { acknowledge(); return; }
+  if (event.kind === 'motion.track.create' && event.revision < authoring.document.revision) { acknowledge(); return; }
+  const branchAtStart = branchGeneration;
+  const immutable = gap ? await serviceClient.head(event.documentId, event.branchId)
+    : await serviceClient.revision(event.documentId, event.revision);
+  if (branchAtStart !== branchGeneration || event.branchId !== activeBranchId) return;
+  if (!gap && immutable.canonicalDigest !== event.digest) throw new Error('REMOTE_DIGEST_MISMATCH');
+  if (gap && immutable.document.revision === event.revision && immutable.canonicalDigest !== event.digest)
+    throw new Error('REMOTE_GAP_DIGEST_MISMATCH');
+  const applied = immutable.document.revision !== authoring.document.revision;
+  if (applied) await applyImmutable(immutable, true);
+  acknowledge();
+  if (applied || gap) {
+    status.value = gap ? `Event gap detected; immutable branch head refetched at revision ${authoring.document.revision}.`
+      : `Revision ${authoring.document.revision} refreshed from committed service state.`;
+    status.dataset.kind = 'success';
+  }
+}
+
 async function switchBranch(branchId: string): Promise<void> {
-  if (!serviceClient) return; const immutable = await serviceClient.head(authoring.document.documentId, branchId);
-  activeBranchId = branchId; authoring = createAuthoringState(immutable.document); compiled = compileMotionDocument(authoring.document);
-  immutableRefetchCount += 1; clearKeyframeSelection(); await controller.mount(compiled.html); renderProjection();
-  status.value = `Branch ${branchId} head revision ${authoring.document.revision} loaded.`;
+  if (!serviceClient) return; const generation = ++branchGeneration;
+  reconciliation = reconciliation.then(async () => {
+    const immutable = await serviceClient.head(authoring.document.documentId, branchId);
+    if (generation !== branchGeneration) return;
+    activeBranchId = branchId; await applyImmutable(immutable, true);
+    status.value = `Branch ${branchId} head revision ${authoring.document.revision} loaded.`;
+  });
+  await reconciliation;
 }
 
 async function createBranch(branchId: string): Promise<void> {
   if (!serviceClient) return;
   try {
-    const response = await serviceClient.dispatch(makeBranchCreateCommand({ operationId: nextOperationId(),
+    const response = await serializeServiceCommand(() => serviceClient.dispatch(makeBranchCreateCommand({ operationId: nextOperationId(),
       documentId: authoring.document.documentId, sourceBranchId: activeBranchId,
-      expectedRevision: authoring.document.revision, branchId }));
+      expectedRevision: authoring.document.revision, branchId })));
     if (!response.ok) { status.value = `Branch creation rejected (${response.code}).`; status.dataset.kind = 'error'; return; }
     if (branchSelect && ![...branchSelect.options].some((option) => option.value === branchId)) branchSelect.add(new Option(branchId, branchId));
     if (branchSelect) branchSelect.value = branchId; await switchBranch(branchId); status.dataset.kind = 'success';
@@ -425,18 +513,96 @@ async function revokeClaim(claimId: string, leaseVersion: number): Promise<void>
   if (!serviceClient) return;
   try {
     const documentRevision = await serviceClient.documentRevision(authoring.document.documentId);
-    const response = await serviceClient.dispatch(makeClaimControlCommand({ kind: 'motion.claim.revoke', operationId: nextOperationId(),
+    const response = await serializeServiceCommand(() => serviceClient.dispatch(makeClaimControlCommand({ kind: 'motion.claim.revoke', operationId: nextOperationId(),
       documentId: authoring.document.documentId, branchId: activeBranchId, expectedRevision: documentRevision.revision,
-      claimId, leaseVersion }));
+      claimId, leaseVersion })));
     status.value = response.ok ? `Claim ${response.claimId} revoked at lease version ${response.leaseVersion}.`
       : `Claim revocation rejected (${response.code}).`; status.dataset.kind = response.ok ? 'success' : 'error';
   } catch { status.value = 'Claim revocation rejected (VALIDATION).'; status.dataset.kind = 'error'; }
+}
+
+async function serializeServiceCommand<T>(command: () => Promise<T>): Promise<T> {
+  const task = reconciliation.then(command); reconciliation = task.then(() => undefined, () => undefined); return task;
 }
 
 function clearKeyframeSelection(): void {
   selectedTrackId = null;
   selectedKeyframeId = null;
   hasExplicitKeyframeSelection = false;
+}
+
+type ImmutableHead = Awaited<ReturnType<MotionServiceClient['head']>>;
+async function applyImmutable(immutable: ImmutableHead, remote: boolean): Promise<void> {
+  const draft = captureDraft();
+  authoring = createAuthoringState(immutable.document); compiled = compileMotionDocument(authoring.document);
+  immutableRefetchCount += 1; await controller.mount(compiled.html); renderProjection();
+  if (draft.dirty) {
+    restoreDraft(draft);
+    if (remote) { draftConflictRevision = authoring.document.revision;
+      draftConflict.hidden = false; draftConflict.dataset.revision = String(draftConflictRevision); }
+  } else {
+    draftStaleBaseRevision = null;
+  }
+}
+
+type DraftSnapshot = { dirty: boolean; values: Record<string, string>; dirtyFields: Record<string, boolean>;
+  creationElementId: StructuralAuthoringElementId | null; creationDirty: boolean; staleBaseRevision: number | null };
+function captureDraft(): DraftSnapshot {
+  const values: Record<string, string> = {}; const dirtyFields: Record<string, boolean> = {};
+  for (const selector of ['[data-duration]', '[data-delay]', '[data-easing]', '[data-value]', '[data-time]',
+    '[data-new-branch]', '[data-claim-id]', '[data-lease-version]']) {
+    const control = document.querySelector<HTMLInputElement | HTMLSelectElement>(selector); if (!control) continue;
+    values[selector] = control.value;
+    dirtyFields[selector] = selector === '[data-duration]' || selector === '[data-delay]' || selector === '[data-easing]'
+      ? control.closest<HTMLElement>('.timing-control')?.dataset.draft === 'true' : control.dataset.draft === 'true';
+  }
+  const dirty = Object.values(dirtyFields).some(Boolean) || creationDraftDirty;
+  return { dirty, values, dirtyFields, creationElementId: selectedCreationElementId, creationDirty: creationDraftDirty,
+    staleBaseRevision: dirtyStaleBase(dirty) };
+}
+function restoreDraft(draft: DraftSnapshot): void {
+  for (const [selector, value] of Object.entries(draft.values)) {
+    const control = document.querySelector<HTMLInputElement | HTMLSelectElement>(selector); if (control) control.value = value;
+  }
+  selectedCreationElementId = draft.creationElementId;
+  creationDraftDirty = draft.creationDirty; draftStaleBaseRevision = draft.staleBaseRevision;
+  for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="creation-target"]'))
+    radio.checked = radio.value === selectedCreationElementId;
+  for (const [selector, dirty] of Object.entries(draft.dirtyFields)) {
+    const control = document.querySelector<HTMLInputElement | HTMLSelectElement>(selector); if (!control) continue;
+    if (selector === '[data-duration]' || selector === '[data-delay]' || selector === '[data-easing]') {
+      control.closest<HTMLElement>('.timing-control')!.dataset.draft = String(dirty);
+      required<HTMLElement>('em', control.closest('.timing-control')!).hidden = !dirty;
+    } else control.dataset.draft = String(dirty);
+  }
+}
+function resolveDraftConflict(keep: boolean): void {
+  if (!keep) {
+    selectedCreationElementId = null; creationDraftDirty = false; draftStaleBaseRevision = null;
+    valueInput.value = ''; timeInput.value = ''; valueInput.dataset.draft = 'false'; timeInput.dataset.draft = 'false';
+    for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="creation-target"]')) radio.checked = false;
+    for (const control of document.querySelectorAll<HTMLInputElement>('[data-new-branch], [data-claim-id], [data-lease-version]')) {
+      control.value = control.defaultValue; control.dataset.draft = 'false';
+    }
+    renderProjection();
+  }
+  draftConflictRevision = null; draftConflict.hidden = true;
+  status.value = keep ? `Local draft kept against revision ${authoring.document.revision}; apply it explicitly when ready.`
+    : `Local draft discarded; revision ${authoring.document.revision} values restored.`;
+  status.dataset.kind = 'success';
+}
+
+function dirtyStaleBase(dirty: boolean): number | null {
+  return dirty ? draftStaleBaseRevision ?? authoring.document.revision : null;
+}
+
+function resolveAcceptedCreationDraft(): void {
+  creationDraftDirty = false;
+  if (captureDraft().dirty) return;
+  draftStaleBaseRevision = null;
+  draftConflictRevision = null;
+  draftConflict.hidden = true;
+  delete draftConflict.dataset.revision;
 }
 
 function operationEnvelope() {
@@ -522,12 +688,13 @@ function updateStructuralControls(rows: TimelineRow[]): void {
   for (const choice of creationChoices) {
     const eligibility = projectTrackCreationEligibility(authoring.document, choice.elementId, 'opacity');
     const radio = required<HTMLInputElement>(`input[name="creation-target"][value="${choice.elementId}"]`);
-    radio.disabled = locked || (!eligibility.available && selectedCreationElementId !== choice.elementId);
+    radio.disabled = locked || !eligibility.available;
     required(`[data-choice-reason="${choice.elementId}"]`).textContent = eligibility.available
       ? 'Available' : eligibilityReason(eligibility.reason);
   }
   const selectedEligibility = selectedCreationElementId
     ? projectTrackCreationEligibility(authoring.document, selectedCreationElementId, 'opacity') : null;
+  unavailableCreation = Boolean(selectedCreationElementId && !selectedEligibility?.available);
   createTrackButton.disabled = locked || !selectedEligibility?.available;
   createTrackButton.textContent = selectedCreationElementId
     ? `Create ${creationChoices.find((choice) => choice.elementId === selectedCreationElementId)!.label} opacity track`
@@ -635,12 +802,17 @@ function updateSelection(): void {
   const row = selectedTrackId
     ? buildTimeline(authoring.document).rows.find((candidate) => candidate.trackId === selectedTrackId) : undefined;
   const keyframe = row?.keyframes.find((candidate) => candidate.id === selectedKeyframeId);
-  if (!row || !keyframe) clearKeyframeSelection();
+  unavailableSelection = Boolean(hasExplicitKeyframeSelection && (!row || !keyframe));
   const locked = (authoring.document.holds ?? []).length > 0;
   valueInput.disabled = locked || !hasExplicitKeyframeSelection;
   timeInput.disabled = locked || !hasExplicitKeyframeSelection;
   valueButton.disabled = locked || !hasExplicitKeyframeSelection;
   timeButton.disabled = locked || !hasExplicitKeyframeSelection;
+  if (unavailableSelection) {
+    disableUnavailableMutationControls();
+    required('[data-selection]').innerHTML = `<div class="selection-summary unavailable"><strong>Selected canonical target unavailable</strong><span>Track ${selectedTrackId} · keyframe ${selectedKeyframeId}</span></div>`;
+    previewSelectionLabel.textContent = 'Selection unavailable'; previewSelection.hidden = true; return;
+  }
   if (!hasExplicitKeyframeSelection) {
     required('[data-selection]').innerHTML = `<div class="selection-summary"><strong>No keyframe selected</strong><span>Open Inspect all tracks and choose a keyframe for exact editing.</span></div>`;
     previewSelectionLabel.textContent = selectedCreationElementId ? 'Element chosen' : '';
@@ -655,9 +827,16 @@ function updateSelection(): void {
   previewSelectionLabel.textContent = `Selected element · ${row!.property}`;
   valueInput.value = keyframe!.value;
   timeInput.value = String(keyframe!.timeMs);
+  valueInput.dataset.draft = 'false'; timeInput.dataset.draft = 'false';
   valueInput.setAttribute('aria-invalid', 'false');
   timeInput.setAttribute('aria-invalid', 'false');
   schedulePreviewSelection();
+}
+
+function disableUnavailableMutationControls(): void {
+  for (const control of [createTrackButton, addMidpointButton, removeMidpointButton, durationInput, delayInput, easingInput,
+    setDurationButton, setDelayButton, setEasingButton, valueInput, timeInput, valueButton, timeButton, insertHoldButton])
+    control.disabled = true;
 }
 
 function findEditableTrack(): TimelineRow {

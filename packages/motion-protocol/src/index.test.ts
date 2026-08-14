@@ -2,7 +2,7 @@ import { describe, expect, test } from 'vitest';
 import { canonicalBytes, sha256Hex } from '../../domain/src/index.ts';
 import { createPhase3Seed } from '../../local-service/src/seed.ts';
 import { makeBranchCreateCommand, makeClaimAcquireCommand, makeTrackCreateCommand, parseCommand,
-  parseCommandResponse, parseCommitMetadata, parseImmutableRevision } from './index.ts';
+  parseCommandResponse, parseCommitMetadata, parseImmutableRevision, MotionServiceClient } from './index.ts';
 
 describe('motion.protocol.v1', () => {
   test('shares one strict canonical-ID command and rejects selector addressing or envelope drift', () => {
@@ -70,5 +70,23 @@ describe('motion.protocol.v1', () => {
       .toThrow('PROTOCOL_RESPONSE_INVALID');
     expect(() => parseCommandResponse({ ok: false, code: 'UNAUTHORIZED_CLAIM', currentRevision: 2,
       currentDigest: '2'.repeat(64) })).toThrow('PROTOCOL_RESPONSE_INVALID');
+  });
+  test('authenticates event reads, resumes from a cursor, and suppresses duplicate metadata', async () => {
+    const metadata = { documentId: 'doc', branchId: 'main', revision: 1, digest: '1'.repeat(64),
+      kind: 'motion.track.create' as const, commitSeq: 6 };
+    const encoder = new TextEncoder(); const body = new ReadableStream<Uint8Array>({ start(controller) {
+      controller.enqueue(encoder.encode(`id: 6\nevent: commit\ndata: ${JSON.stringify(metadata)}\n\n`));
+      controller.enqueue(encoder.encode(`id: 6\nevent: commit\ndata: ${JSON.stringify(metadata)}\n\n`)); controller.close();
+    } });
+    let request: { url: string; init: RequestInit | undefined } | undefined;
+    const client = new MotionServiceClient('http://service', async (url, init) => {
+      request = { url: String(url), init }; return new Response(body, { status: 200, headers: { 'content-type': 'text/event-stream' } });
+    }, { actor: 'human', capability: 'x'.repeat(43) });
+    const received: typeof metadata[] = []; await new Promise<void>((resolve) => {
+      client.events('doc', 5, (event) => received.push(event as typeof metadata), () => resolve());
+    });
+    expect(received).toEqual([metadata]); expect(request?.url).not.toContain('x'.repeat(43));
+    expect(new Headers(request?.init?.headers).get('authorization')).toBe(`Bearer ${'x'.repeat(43)}`);
+    expect(new Headers(request?.init?.headers).get('last-event-id')).toBe('5');
   });
 });

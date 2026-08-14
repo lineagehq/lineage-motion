@@ -1,0 +1,26 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T999",
+    "board_path": "docs/goals/phase3-control-recovery/state.yaml",
+    "decision": "complete",
+    "full_outcome_complete": true,
+    "rationale": "Phase 3 Slice 3 is complete and ready for architecture review. Fresh aggregate verification proves crash-safe idempotent controls, fail-closed SQLite startup/migration, authenticated durable replay with validated cursor acknowledgement, serialized CLI/editor reconciliation, explicit draft and canonical-ID conflicts, compiler-native Chrome refresh, determinism, parity, and privacy. T006 resolves T004 without weakening atomicity. This does not claim Slice 4 or the aggregate Phase 3 exit gate.",
+    "evidence": [
+      "verify:phase3 passed service 14/14, recovery 34/34, parity 13/13, phase3 browser 13/13, determinism 26/26, full browser 20/20, Chrome, typecheck, build, sensitive/private-ignore and protected diff.",
+      "All 20 real-process branch/claim crash cells and five after-commit retries exposed exactly one complete pre-state or post-state transition.",
+      "WAL/FULL/FK, FK refusal, integrity, dangling head, digest, checksum, unsupported schema, corruption, and migration rollback evidence passed.",
+      "Authenticated metadata-only commit_seq replay passed duplicate, cursor, gap refetch, immutable digest validation, failed-refetch retry, and exact-once acknowledgement.",
+      "Behind-branch global-result serialization, lost-response convergence, cross-branch isolation, and two-editor CLI refresh passed.",
+      "Keep/Discard, empty drafts, stale base, creation target, unavailable/restored exact IDs, and inert missing-target controls passed.",
+      "Invalid operations preserve canonical state/output/history/IDs/request count while retaining exact invalid draft, focus, aria-invalid and diagnostic.",
+      "Chrome 151 passed connected and nonzero-cursor reconnect, exact iframe output, native CSSAnimation, reduced motion, branch isolation, and zero console errors.",
+      "Sensitive scan found zero; private-ignore passed 3/3; complete diff stayed within approved files and exclusions."
+    ],
+    "blocked_tasks": [],
+    "missing_evidence": [],
+    "required_board_updates": [
+      "Mark T999 and the goal done, record T004 superseded/resolved by T006, clear active_task, and stop for architecture review."
+    ]
+  }
+}

@@ -61,6 +61,15 @@ describe('loopback sole-writer service', () => {
     for (const file of files) expect(await readFile(new URL(file, import.meta.url), 'utf8')).not.toContain("from 'node:sqlite'");
   });
 
+  test('runs with WAL, FULL synchronization, and enforced foreign keys that refuse state without side effects', async () => {
+    const temporary = await temporaryStore(); const seed = phase3Seed();
+    const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
+    const store = service.store as SqliteProjectStore; expect(store.runtimePragmas()).toEqual({
+      journalMode: 'wal', synchronous: 2, foreignKeys: 1 });
+    const before = store.snapshot(); expect(() => store.proveForeignKeyRefusal()).not.toThrow(); expect(store.snapshot()).toEqual(before);
+    await service.close(); await temporary.cleanup();
+  });
+
   test('fails the service closed immediately when the lock holder dies unexpectedly', async () => {
     const temporary = await temporaryStore(); const seed = phase3Seed();
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
@@ -81,5 +90,25 @@ describe('loopback sole-writer service', () => {
     await expect(startLocalMotionService({ databasePath: temporary.databasePath, seed }))
       .rejects.toThrow('UNSUPPORTED_SCHEMA_VERSION');
     await temporary.cleanup();
+  });
+
+  test('authenticates every canonical read and durably replays ordered metadata after a commit cursor', async () => {
+    const temporary = await temporaryStore(); const seed = phase3Seed();
+    const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
+    for (const path of [`/api/v1/documents/${seed.documentId}/branches/main/head`,
+      `/api/v1/documents/${seed.documentId}/revisions/0`, `/api/v1/documents/${seed.documentId}/revision`,
+      `/api/v1/documents/${seed.documentId}/events`]) expect((await fetch(`${service.url}${path}`)).status).toBe(403);
+    const client = new MotionServiceClient(service.url);
+    await client.dispatch(phase3Command('replay-one')); await client.dispatch(phase3Command('replay-stale'));
+    const response = await fetch(`${service.url}/api/v1/documents/${seed.documentId}/events`, { headers: {
+      authorization: 'Bearer human-editor', 'x-motion-actor': 'human', 'last-event-id': '0' } });
+    expect(response.status).toBe(200); const reader = response.body!.getReader(); const decoder = new TextDecoder();
+    let text = ''; while (!text.includes(': connected\n\n')) { const next = await reader.read(); if (next.done) break;
+      text += decoder.decode(next.value, { stream: true }); }
+    await reader.cancel(); expect(text).toContain('id: 1\nevent: commit\n');
+    expect(text).not.toContain('private_payload_json'); expect(text).not.toContain('elementId');
+    const parsed = text.split('\n').find((line) => line.startsWith('data: '));
+    expect(parsed && JSON.parse(parsed.slice(6))).toEqual(service.store.readEvents(seed.documentId, 0)[0]);
+    await service.close(); await temporary.cleanup();
   });
 });

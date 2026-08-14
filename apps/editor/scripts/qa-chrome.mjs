@@ -7,6 +7,12 @@ import { isDeepStrictEqual } from 'node:util';
 
 import { chromium } from '@playwright/test';
 
+if (process.argv[2] === '--real-cli') {
+  const argv = JSON.parse(Buffer.from(process.argv[3], 'base64url').toString('utf8'));
+  const { runCli } = await import('../../../packages/motion-cli/src/cli.ts');
+  process.exit(await runCli(argv));
+}
+
 const root = resolve(import.meta.dirname, '../../..');
 const port = 41739;
 const url = `http://127.0.0.1:${port}`;
@@ -22,8 +28,12 @@ try {
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const consoleErrors = [];
+  let editorCommandRequestCount = 0;
   page.on('console', (message) => {
     if (message.type() === 'error') consoleErrors.push(message.text());
+  });
+  page.on('request', (request) => {
+    if (request.url().endsWith('/api/v1/commands')) editorCommandRequestCount += 1;
   });
   await page.goto(url);
   await page.locator('[data-editor-ready="true"]').waitFor();
@@ -207,6 +217,11 @@ try {
     && staleEvidence.result.code === 'AUTHORING_STALE_REVISION'
     && isDeepStrictEqual(staleEvidence.before, staleEvidence.after);
   await page.locator('[data-duration]').fill('1400.5');
+  const invalidBaseline = {
+    state: await page.evaluate(() => window.__motionEditor.inspectAuthoring()),
+    appliedDuration: await page.locator('[data-applied-duration]').textContent(),
+    commandRequestCount: editorCommandRequestCount,
+  };
   await page.locator('[data-set-duration]').focus();
   await page.keyboard.press('Enter');
   const validationEvidence = await page.evaluate(() => ({
@@ -215,11 +230,26 @@ try {
     focus: document.activeElement?.getAttribute('data-set-duration') !== null,
     appliedDuration: document.querySelector('[data-applied-duration]').textContent,
     draftDuration: document.querySelector('[data-duration]').value,
+    diagnostic: document.querySelector('[data-operation-status]').textContent,
   }));
+  const atomicState = (state) => ({
+    revision: state.revision,
+    contentDigest: state.contentDigest,
+    exportDigest: state.exportDigest,
+    compiledHtml: state.compiledHtml,
+    undoCount: state.undoCount,
+    redoCount: state.redoCount,
+    consumedOperationIds: state.consumedOperationIds,
+    selectedTrackId: state.selectedTrackId,
+    selectedKeyframeId: state.selectedKeyframeId,
+    selectedCreationElementId: state.selectedCreationElementId,
+  });
   const invalidAtomic = validationEvidence.invalid === 'true' && validationEvidence.focus
-    && validationEvidence.appliedDuration === 'Applied · 1400 ms'
+    && validationEvidence.appliedDuration === invalidBaseline.appliedDuration
     && validationEvidence.draftDuration === '1400.5'
-    && isDeepStrictEqual(validationEvidence.state, workflowStates.at(-1));
+    && validationEvidence.diagnostic === 'Enter a whole-number duration greater than 0. (AUTHORING_DURATION_INVALID) Revision 6 unchanged.'
+    && editorCommandRequestCount === invalidBaseline.commandRequestCount
+    && isDeepStrictEqual(atomicState(validationEvidence.state), atomicState(invalidBaseline.state));
   let exactHistory = true;
   let historyUiRehydrated = true;
   let undoSixClampProven = false;
@@ -413,7 +443,7 @@ try {
     });
     await waitForServer(addresses.editorUrl);
     const persistencePage = await browser.newPage({ viewport: { width: 1280, height: 720 } }); const persistenceErrors = [];
-    const editorOperationIds = [];
+    const editorOperationIds = []; const eventCursors = [];
     const captureEditorOperationId = (request) => {
       if (!request.url().endsWith('/api/v1/commands')) return;
       const command = request.postDataJSON();
@@ -421,6 +451,8 @@ try {
         editorOperationIds.push(command.operationId);
     };
     persistencePage.on('request', captureEditorOperationId);
+    persistencePage.on('request', (request) => { if (request.url().endsWith('/events'))
+      eventCursors.push(request.headers()['last-event-id'] ?? 'missing'); });
     persistencePage.on('console', (message) => { if (message.type() === 'error') persistenceErrors.push(message.text()); });
     await persistencePage.goto(addresses.editorUrl); await persistencePage.locator('[data-editor-ready="true"]').waitFor();
     await persistencePage.locator('[data-new-branch]').fill('chromefeature');
@@ -443,9 +475,22 @@ try {
     await persistencePage.locator('[data-lease-version]').fill(String(acquired.leaseVersion));
     await persistencePage.locator('[data-revoke-form] button').click();
     await persistencePage.waitForFunction(() => document.querySelector('[data-operation-status]').textContent.includes('revoked at lease version 2'));
+    await persistencePage.waitForFunction(() => window.__motionEditor.inspectAuthoring().lastCommitSeq >= 3);
     await persistencePage.getByRole('radio', { name: /Orb/ }).click();
-    await persistencePage.getByRole('button', { name: 'Create Orb opacity track' }).click();
-    await persistencePage.waitForFunction(() => document.querySelector('[data-operation-status]').textContent.includes('Revision 1'));
+    await persistencePage.locator('[data-new-branch]').fill('');
+    await persistencePage.evaluate(() => window.__motionEditor.disconnectEvents());
+    const cliFeature = await runRealCli(['track-create', '--service', addresses.serviceUrl, '--operation-id', 'chrome-cli-feature',
+      '--document-id', documentId, '--branch-id', 'chromefeature', '--expected-revision', '0',
+      '--element-id', 'el_2dbee68b1ea318c8', '--capability', humanCapability]);
+    await persistencePage.evaluate(() => window.__motionEditor.reconnectEvents());
+    await persistencePage.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 1
+      && !document.querySelector('[data-draft-conflict]').hidden);
+    const combinedReconnectDraft = await persistencePage.evaluate(() => { const frame = document.querySelector('[data-preview]');
+      const state = window.__motionEditor.inspectAuthoring(); return { revision: state.revision, cursor: state.lastCommitSeq,
+        staleBase: state.draftStaleBaseRevision, dirty: state.draftDirty, emptyDraft: state.draftValues['[data-new-branch]'] === '',
+        targetId: state.selectedCreationElementId, conflictVisible: !document.querySelector('[data-draft-conflict]').hidden,
+        exactCompilerOutput: frame.srcdoc === window.__motionEditor.compiledHtml,
+        nativeAnimations: frame.contentDocument.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation') }; });
     const mainWrite = { protocolVersion: 'motion.protocol.v1', operationId: 'chrome-diverged-main', documentId,
       branchId: 'main', expectedRevision: 0, command: { schemaVersion: 'motion.operation.v1', kind: 'motion.track.create',
         operationId: 'chrome-diverged-main', documentId, expectedRevision: 0, elementId: 'el_a2849ff826f3e167',
@@ -479,9 +524,10 @@ try {
     await mainEditorPage.locator('[data-revoke-form] button').click();
     await mainEditorPage.waitForFunction(() => document.querySelector('[data-operation-status]').value
       .includes('revoked at lease version 2'));
-    const mainHead = await fetch(`${addresses.serviceUrl}/api/v1/documents/${encodeURIComponent(documentId)}/branches/main/head`)
+    const readHeaders = { authorization: `Bearer ${humanCapability}`, 'x-motion-actor': 'human' };
+    const mainHead = await fetch(`${addresses.serviceUrl}/api/v1/documents/${encodeURIComponent(documentId)}/branches/main/head`, { headers: readHeaders })
       .then((response) => response.json());
-    const featureHead = await fetch(`${addresses.serviceUrl}/api/v1/documents/${encodeURIComponent(documentId)}/branches/chromefeature/head`)
+    const featureHead = await fetch(`${addresses.serviceUrl}/api/v1/documents/${encodeURIComponent(documentId)}/branches/chromefeature/head`, { headers: readHeaders })
       .then((response) => response.json());
     persistenceChecks = await persistencePage.evaluate(() => { const frame = document.querySelector('[data-preview]');
       return { branch: window.__motionEditor.inspectAuthoring().activeBranchId,
@@ -500,8 +546,15 @@ try {
       && documentReacquired.leaseVersion === 1 && persistenceChecks.revision === 1
       && persistenceChecks.mainEditor.branch === 'main' && persistenceChecks.mainEditor.revision === 2
       && persistenceChecks.mainEditor.exactCompilerOutput && persistenceChecks.mainEditor.nativeAnimations;
+    persistenceChecks.combinedReconnectDraft = cliFeature.ok && cliFeature.resultingRevision === 1
+      && combinedReconnectDraft.revision === 1 && combinedReconnectDraft.cursor >= 4 && combinedReconnectDraft.staleBase === 0
+      && combinedReconnectDraft.dirty && combinedReconnectDraft.emptyDraft
+      && combinedReconnectDraft.targetId === 'el_2dbee68b1ea318c8' && combinedReconnectDraft.conflictVisible
+      && combinedReconnectDraft.exactCompilerOutput && combinedReconnectDraft.nativeAnimations
+      && eventCursors.some((cursor) => Number(cursor) > 0);
+    persistenceChecks.eventCursors = eventCursors;
     persistenceChecks.editorOperationIds = editorOperationIds;
-    persistenceChecks.collisionFreeEditorOperationIds = editorOperationIds.length === 4
+    persistenceChecks.collisionFreeEditorOperationIds = editorOperationIds.length === 3
       && editorOperationIds.every((operationId) => /^editor:[0-9a-f-]{36}:[1-3]$/.test(operationId))
       && new Set(editorOperationIds).size === editorOperationIds.length;
     persistenceChecks.consoleErrors = persistenceErrors; persistenceChecks.noConsoleErrors = persistenceErrors.length === 0;
@@ -555,7 +608,7 @@ try {
     cursorDistinct,
     persistentBranchClaimPath: persistenceChecks.branch === 'chromefeature' && persistenceChecks.exactCompilerOutput
       && persistenceChecks.nativeAnimations && persistenceChecks.divergedControlIsolated
-      && persistenceChecks.collisionFreeEditorOperationIds && persistenceChecks.noConsoleErrors,
+      && persistenceChecks.combinedReconnectDraft && persistenceChecks.collisionFreeEditorOperationIds && persistenceChecks.noConsoleErrors,
     noConsoleErrors: consoleErrors.length === 0,
   };
   const receipt = {
@@ -612,4 +665,14 @@ async function waitForServer(target) {
 
 function roundTimes(values) {
   return values.map((value) => value === null ? null : Math.round(value * 1000) / 1000);
+}
+
+async function runRealCli(args) {
+  const encoded = Buffer.from(JSON.stringify(args)).toString('base64url');
+  const child = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/qa-chrome.mjs'), '--real-cli', encoded],
+    { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = ''; let stderr = ''; child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+  child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
+  const code = await new Promise((resolveExit) => child.once('exit', resolveExit));
+  if (code !== 0) throw new Error(`REAL_CLI_FAILED_${code}_${stderr.length}`); return JSON.parse(stdout);
 }
