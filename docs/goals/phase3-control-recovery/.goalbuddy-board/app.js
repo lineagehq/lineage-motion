@@ -554,4 +554,3 @@ loadSettings()
     setLiveState("Offline", false);
     boardEl.textContent = error.message;
   });
-
