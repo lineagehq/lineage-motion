@@ -1,0 +1,183 @@
+version: 2
+
+goal:
+  title: "Phase 4 coach-mark breadth architecture review"
+  slug: phase4-architecture-review
+  kind: existing_plan
+  tranche: "Ground, write, and independently approve only the Phase 4 architecture and implementation slices."
+  status: active
+  oracle:
+    signal: "A sanitized five-scene capability inventory and approved architecture define cue-owned tracks, cursor/click authoring, revision-linked review, deterministic handoff, and a paired 2x benchmark without changing product behavior."
+    cadence: "after inventory, architecture writing, and final audit"
+    final_proof: "A final Judge maps the architecture to all five scenes, the four owner decisions, Phase 3 invariants, exact implementation slices, verification, privacy, and Phase 4 exit evidence with full_outcome_complete: true for architecture review only."
+  intake:
+    original_request: "Work out the Phase 4 architecture decisions and proceed with the architecture review."
+    interpreted_outcome: "A ready-to-implement Phase 4 design grounded in all five private coach-mark scenes and the agreed simple cue-authoring UX, without implementing Phase 4 yet."
+    input_shape: existing_plan
+    audience: "motion editor owner"
+    authority: approved
+    proof_type: decision
+    completion_proof: "Final Judge approves a grounded Phase 4 architecture, ordered vertical slices, exact gates, and explicit Phase 5 exclusions."
+    likely_misfire: "Building a second animation runtime, a bidirectional cue/track synchronization system, or a generalized review product instead of a simple deterministic CSS-animation authoring layer."
+    blind_spots_considered:
+      - "Cue ownership, generated-track locking, detachment, undo, and stable identity"
+      - "Silent cue inference from imported CSS and private-scene leakage"
+      - "Cursor geometry, click boundaries, discrete timing, and native CSS output"
+      - "Benchmark gaming, noisy timing measurements, and incomplete safety proof"
+      - "Annotations affecting canonical/export identity or pulling merge/approval workflow forward"
+    existing_plan_facts:
+      - "Phase 3 is merged at 9140431 with its aggregate exit gate complete."
+      - "Phase 4 imports all five real coach-mark scenes and adds cursor path, click pulse, reusable cues, annotations, comparison, handoff receipts, and performance evidence."
+      - "Owner decision: cues are authoritative and own locked generated tracks; an explicit undoable detach converts them to ordinary tracks."
+      - "Owner decision: the first vertical slice is the smallest scene with cursor travel, click pulse, and a resulting reveal."
+      - "Owner decision: Phase 4 uses three paired raw-CSS-versus-Motion tasks and must be at least 2x faster overall with no individual task slower."
+      - "Owner decision: annotations are revision-linked notes outside the canonical motion document, with open/resolved state only and no approval, assignment, merge, or publishing workflow."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/phase4-architecture-review/"
+    command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase4-architecture-review"
+
+active_task: T001
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: active
+    reasoning_hint: low
+    objective: "Produce a sanitized technical capability inventory for all five private coach-mark scenes and map it to the merged Phase 3 architecture without proposing implementation."
+    inputs:
+      - "Owner-authorized private coach-mark corpus"
+      - "docs/incubation-plan.md"
+      - "Merged Phase 0-3 domain, importer, compiler, preview, editor, service, proof, and receipts"
+    constraints:
+      - "Read-only; do not edit any file."
+      - "Inspect private scenes locally but never reproduce source, copy, branding, selectors, filenames, screenshots, absolute paths, or payloads."
+      - "Report scenes only as sanitized stable aliases and technical counts/capabilities."
+      - "Separate imported facts, inferred cue candidates, and unsupported constructs; never treat heuristic cue recognition as canonical truth."
+      - "Preserve native CSS output, compiler-backed preview, stable IDs, deterministic receipts, fail-closed import, sole writer, revision, claim, and reduced-motion invariants."
+      - "Exclude landing-scene work, Phase 5+, generalized constraints, merge/review workflow, publication, MCP, and Lineage integration."
+    expected_output:
+      - "Five-scene sanitized technical inventory and capability matrix"
+      - "Ranked composable gaps versus merged Phase 3"
+      - "Candidate scene matching cursor plus click plus reveal"
+      - "Evidence boundaries for cue inference, private data, and visual proof"
+      - "Exact repo areas and verification surfaces the architecture must address"
+    receipt: null
+
+  - id: T002
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Turn the sanitized inventory and owner decisions into one exact Phase 4 architecture-writing contract and ordered largest-safe implementation slices."
+    inputs:
+      - "T001 inventory receipt"
+      - "Owner decisions recorded in this board"
+      - "Merged Phase 3 architecture and evidence"
+    constraints:
+      - "Read-only; do not write architecture or implementation."
+      - "Cues must be authoritative authoring objects whose generated tracks are materialized, inspectable, deterministically owned, and locked until explicit undoable detachment."
+      - "The compiler and preview continue to consume canonical tracks and browser-created animations; cues cannot become a production runtime."
+      - "Imported CSS may expose cue candidates but cannot silently assign semantic cues."
+      - "Revision-linked annotations remain outside canonical animation/export identity and add no merge, approval, assignment, or publishing workflow."
+      - "The paired benchmark must be reproducible, sanitized, and resistant to benchmark-specific shortcuts."
+      - "Do not authorize implementation, private fixtures, Phase 5, or dependency expansion."
+    expected_output:
+      - "Canonical cue, generated-track ownership, detachment, history, and operation contracts"
+      - "Cursor path, click pulse, reveal, type, select, drag, and hold semantics"
+      - "Importer candidate and fail-closed boundary"
+      - "Revision-linked annotation, comparison, handoff, and privacy contracts"
+      - "Exact three-task paired benchmark and 2x exit calculation"
+      - "Ordered vertical implementation slices with allowed architecture files, verification, stop conditions, and top failure modes"
+    receipt: null
+
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: medium
+    objective: "Write the approved Phase 4 architecture and implementation-slice decision selected by T002."
+    allowed_files: []
+    verify: []
+    stop_if:
+      - "T002 has not provided an exact architecture-writing contract."
+      - "Any product implementation, dependency, package-lock, schema migration, private fixture, or Phase 5+ work is required."
+      - "Architecture would introduce a second runtime, dual cue/track authority, silent cue inference, or generalized review workflow."
+      - "Private source, copy, branding, selectors, filenames, paths, screenshots, or payloads would enter tracked files."
+    receipt: null
+
+  - id: T004
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Adversarially review the written Phase 4 architecture against all five sanitized scenes, owner decisions, and Phase 3 invariants."
+    inputs:
+      - "T001 inventory"
+      - "T002 architecture contract"
+      - "T003 complete architecture diff"
+    constraints:
+      - "Read-only; do not repair documentation."
+      - "Reject vague slices, unverifiable benchmarks, dual authority, silent inference, review-workflow expansion, or private leakage."
+      - "Reject claims that architecture completion proves Phase 4 implementation."
+    expected_output:
+      - "Approved or not-complete decision"
+      - "Owner-facing claim and top three failure modes"
+      - "Requirement-by-requirement evidence map"
+      - "Exact corrective Worker contract if incomplete"
+    receipt: null
+
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Make the final Phase 4 architecture-review decision and stop before implementation."
+    inputs:
+      - "Original owner outcome and oracle"
+      - "All task receipts and architecture diff"
+      - "Current repository and privacy status"
+    constraints:
+      - "Read-only final audit."
+      - "Set full_outcome_complete: true only for the architecture-review tranche, never for implemented Phase 4."
+      - "Require a ready-to-run first implementation slice and explicit stop before product changes."
+    expected_output:
+      - "complete or not_complete"
+      - "full_outcome_complete true or false for architecture review only"
+      - "Grounded five-scene, cue, annotation, benchmark, privacy, and slice evidence"
+      - "Exact first implementation handoff"
+    receipt: null
+
+notes:
+  - "Prepared from merged main 9140431 in a dedicated Phase 4 architecture-review worktree."
+  - "This board authorizes architecture review only; Phase 4 product implementation requires a separate approved goal."
