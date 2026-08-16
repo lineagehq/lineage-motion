@@ -5,4 +5,4 @@
 - Owner decisions recorded: cue-owned locked tracks with explicit detachment; cursor/click/reveal first; paired 2× benchmark; revision-linked notes without workflow machinery.
 - First active task: sanitized read-only five-scene technical inventory.
 - Product implementation, private fixtures, Phase 5 work, publication, push, and pull-request creation remain paused.
-- Local GoalBuddy board: `http://goalbuddy.localhost:41737/phase4-architecture-review/`.
+- Local GoalBuddy board: `goalbuddy.localhost:41737/phase4-architecture-review/`.

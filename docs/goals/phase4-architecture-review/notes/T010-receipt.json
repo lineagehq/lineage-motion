@@ -1,0 +1,33 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result":"done",
+    "task_id":"T010",
+    "board_path":"docs/goals/phase4-architecture-review/state.yaml",
+    "decision":"not_complete",
+    "full_outcome_complete":false,
+    "rationale":"Architecture and privacy-value scans pass, but 14 historical references still use the prohibited field-name token. Neutral wording and one fresh audit remain.",
+    "evidence":[
+      {"kind":"identifier_hygiene","status":"fail","detail":"Historical control entries retain the prohibited field-name token; standalone digest fragments are zero."},
+      {"kind":"receipt_and_verification","status":"pass"},
+      {"kind":"privacy_and_scope","status":"pass"},
+      {"kind":"t002_contract","status":"pass"},
+      {"kind":"architecture_regression","status":"pass"}
+    ],
+    "worker_package":{
+      "objective":"Replace the prohibited field-name token in T006-T009 receipts with neutral wording while preserving every historical decision and substantive contract.",
+      "allowed_files":[
+        "docs/goals/phase4-architecture-review/notes/T006-receipt.json",
+        "docs/goals/phase4-architecture-review/notes/T007-receipt.json",
+        "docs/goals/phase4-architecture-review/notes/T008-receipt.json",
+        "docs/goals/phase4-architecture-review/notes/T009-receipt.json"
+      ],
+      "verify":["valid JSON","zero prohibited field-name token occurrences","zero standalone digest fragments","sensitive/private-ignore checks","diff checks"],
+      "stop_if":["Any historical decision changes.","Any product, architecture, or private-corpus change is required.","Any prohibited token or fragment remains."]
+    },
+    "subgoal_contract":null,
+    "parallel_safety":null,
+    "blocked_tasks":["T999"],
+    "missing_evidence":["Zero prohibited field-name token scan","Fresh read-only approval","T999 decision"],
+    "required_board_updates":["PM neutralizes board history wording.","Queue one receipt sanitation Worker and fresh Judge."]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T001",
+    "board_path": "docs/goals/phase4-architecture-review/state.yaml",
+    "summary": "Inspected exactly five owner-authorized scenes and mapped them to merged Phase 3. All currently fail closed. Scene D is the smallest sanitized cursor-plus-click-pulse-plus-reveal candidate. Phase 3 already proves typed operations, sole-writer revisions/claims, deterministic native CSS, compiler-backed preview, privacy-safe receipts, reduced motion, and discrete visual sampling. Phase 4 gaps are cue-owned track materialization/detachment, cursor/click authoring, breadth import blockers, reusable cue semantics, revision-linked notes/comparison, sanitized handoff, and paired performance evidence. Cue classifications remain explicitly heuristic and noncanonical.",
+    "evidence": [
+      {
+        "kind": "private_corpus_inventory",
+        "scope": "exactly five scenes",
+        "alias_stability": "Scene A-E assigned by deterministic corpus ordering for this inventory snapshot",
+        "scenes": [
+          {"alias":"Scene A","dom_elements":61,"keyframe_rules":10,"keyframe_offsets":49,"applications":10,"slots":10,"tracks":29,"animated_property_categories":["position","opacity","transform","visibility","color/background"],"timing_features":["discrete visibility","infinite iteration"],"unsupported_count":1,"missing_count":0,"diagnostics":["IMPORT_EXTERNAL_RESOURCE"]},
+          {"alias":"Scene B","dom_elements":68,"keyframe_rules":10,"keyframe_offsets":44,"applications":9,"slots":10,"tracks":17,"animated_property_categories":["position","opacity","width"],"timing_features":["multiple animation slots","infinite iteration"],"unsupported_count":1,"missing_count":1,"diagnostics":["IMPORT_EXTERNAL_RESOURCE","IMPORT_RULE_MISSING"]},
+          {"alias":"Scene C","dom_elements":47,"keyframe_rules":11,"keyframe_offsets":52,"applications":11,"slots":11,"tracks":27,"animated_property_categories":["position","opacity","transform","color/background","font weight"],"timing_features":["negative delay","infinite iteration"],"unsupported_count":2,"missing_count":0,"diagnostics":["IMPORT_EXTERNAL_RESOURCE","IMPORT_TRANSITION_UNSUPPORTED"]},
+          {"alias":"Scene D","dom_elements":44,"keyframe_rules":9,"keyframe_offsets":53,"applications":8,"slots":9,"tracks":20,"animated_property_categories":["position","opacity","transform","width","color/background","border","shadow"],"timing_features":["steps timing","multiple animation slots","infinite iteration"],"unsupported_count":1,"missing_count":0,"diagnostics":["IMPORT_EXTERNAL_RESOURCE"]},
+          {"alias":"Scene E","dom_elements":52,"keyframe_rules":9,"keyframe_offsets":41,"applications":8,"slots":8,"tracks":22,"animated_property_categories":["position","opacity","transform","color/background","border","shadow"],"timing_features":["infinite iteration"],"unsupported_count":2,"missing_count":0,"diagnostics":["IMPORT_EXTERNAL_RESOURCE","IMPORT_PSEUDO_ELEMENT_MOTION"]}
+        ]
+      },
+      {"kind":"inferred_cue_candidates","canonical":false,"boundary":"Technical patterns identify review candidates only; no cue meaning may be assigned or persisted without explicit author confirmation.","scenes":[{"alias":"Scene A","candidates":["cursor path","click pulse","select","drag"]},{"alias":"Scene B","candidates":["cursor path","reveal"]},{"alias":"Scene C","candidates":["cursor path","click pulse","select"]},{"alias":"Scene D","candidates":["cursor path","click pulse","type","select","reveal","hold"]},{"alias":"Scene E","candidates":["cursor path","click pulse","select","reveal"]}]},
+      {"kind":"first_slice_candidate","alias":"Scene D","basis":["smallest DOM inventory","nine keyframe rules","position-based cursor travel candidate","transform pulse candidate","opacity reveal candidate","steps timing pressures discrete proof"],"qualification":"Sanitized architectural candidate only; browser inspection must confirm target identity, click press/release boundaries, synchronized reveal, and absence of omitted constructs before implementation."},
+      {"kind":"merged_phase3_receipt","passed":true,"proofs":["editor/CLI byte parity","repeated-run byte identity","sole persistent writer","atomic expected revisions","claim-bounded agent writes","selector-independent identity","fail-closed import","compiler-backed preview","native HTML/CSS output","reduced-motion inspection"],"browser_thresholds":{"console_errors":0,"page_errors":0,"failed_requests":0,"unexpected_network":0,"installed_chrome_required":true},"visual_thresholds":{"changed_pixels":0,"maximum_channel_delta":0,"discrete_boundary_sides_required":true}},
+      {"kind":"architecture_surface_map","areas":[{"area":"packages/domain","required_boundary":"cue schema, stable cue/target/moment IDs, generator version, generated track ownership/locking, expansion digest, detach and inverse operations"},{"area":"packages/css-import","required_boundary":"complete five-scene inventory, visible unsupported/missing diagnostics, nonpersistent cue candidates with confidence/evidence"},{"area":"packages/css-compiler","required_boundary":"consume materialized canonical tracks only; deterministic native CSS and receipts; no cue runtime"},{"area":"packages/preview-runtime","required_boundary":"render compiler output and browser-created animations; expose stable and discrete click/reveal samples"},{"area":"packages/local-service","required_boundary":"same typed cue/detach operations through expected-revision, claim, atomic event, idempotency, and refresh contracts"},{"area":"apps/editor","required_boundary":"cursor path and click timing controls, cue-owned track inspection/locking, explicit undoable detach, comparison without workflow expansion"},{"area":"packages/visual-proof","required_boundary":"before/after transition samples, repeated stability, network/browser assertions, paired benchmark instrumentation"},{"area":"receipts/evidence","required_boundary":"allowlisted aliases, counts, opaque IDs, revisions, digests, diagnostic codes, benchmark actions/times; exclude private bodies and source-derived payloads"}]}
+    ],
+    "facts": [
+      {"rank":1,"gap":"All five real scenes currently fail closed; architecture must distinguish materializable external-resource handling from prohibited live loading, repair or explicitly block Scene B's missing rule, decide transition treatment for Scene C, and keep Scene E pseudo-element motion unsupported because it belongs to Phase 5 unless separately authorized."},
+      {"rank":2,"gap":"The current cue model is only an ID, label, and time; it lacks cue kind, targets, named moments, parameters, generator version, generated-track IDs, expansion digest, ownership lock, and deterministic detach/undo."},
+      {"rank":3,"gap":"No typed cursor-path or click press/release/pulse operation exists. Geometry, coordinate space, target anchoring, pulse timing, synchronized reveal, stale-revision behavior, and unaffected-track proof require contracts."},
+      {"rank":4,"gap":"Reusable click/type/select/drag/reveal/hold authoring semantics are absent. Existing hold support is intentionally fixture-specific and cannot serve as the generalized Phase 4 contract."},
+      {"rank":5,"gap":"Revision-linked annotations, comparison, sanitized handoff receipts, and paired active-time instrumentation are absent; notes must remain outside canonical/export identity and limited to open/resolved state."},
+      {"claim":"A privacy-safe five-scene inventory identifies composable Phase 4 pressure without treating private-source heuristics as truth.","top_failure_modes":["cue metadata and generated tracks drift into dual authority or a second runtime","import diagnostics or heuristic cue recognition silently omit constructs or leak private material","the selected candidate appears simple by counts but browser inspection reveals unsynchronized interaction boundaries or unsupported behavior"]},
+      {"source_fact_boundary":"Counts, property categories, timing constructs, importer inventories, and diagnostic codes are directly observed source/import facts."},
+      {"inference_boundary":"Cue labels and the first-slice match are candidates inferred from technical patterns; they require explicit authoring confirmation and browser evidence."},
+      {"privacy_boundary":"No source, copy, branding, selector, URL, filename, screenshot, payload, or private note body is included. Future visual proof should retain only sanitized sample labels, timing boundaries, counts, and digests."}
+    ],
+    "contradictions": [
+      {"issue":"Phase 4 requires importing all five scenes, but every current import returns no canonical document.","impact":"Breadth architecture must explicitly close or preserve each diagnostic; it cannot claim current import readiness."},
+      {"issue":"Scene E contains pseudo-element motion while the current tranche excludes Phase 5 pseudo-element breadth.","impact":"Phase 4 must fail visibly or define a sanitized exclusion; it must not silently drop or implement the deferred construct."},
+      {"issue":"The existing hold schema is hard-coded to one cue, time, and duration while Phase 4 calls for reusable hold cues.","impact":"Architecture must replace fixture-specific semantics through a versioned general contract without invalidating deterministic projection proof."}
+    ],
+    "ambiguity_requiring_judge": [
+      {"question":"Does import all five permit locally materialized, digest-locked external-resource preprocessing, or must external resources be rejected and replaced before canonical import?"},
+      {"question":"Should Scene C's transition remain explicitly unsupported, or be normalized only with proof that it is motion-irrelevant?"},
+      {"question":"How should Scene E count toward Phase 4 while its pseudo-element motion is deferred to Phase 5?"},
+      {"question":"What confidence/evidence vocabulary may cue candidates expose while guaranteeing they never mutate canonical meaning?"}
+    ],
+    "commands": [
+      "Resolve repository root and read repository instructions, goal charter, and active board.",
+      "Read the incubation plan and enumerate merged architecture/evidence surfaces.",
+      "Inspect merged architecture, persistence boundary, and aggregate evidence.",
+      "Compute sanitized five-scene structural, animation, property, timing, diagnostic, and candidate inventories.",
+      "Map importer, domain, compiler, preview, service, editor, proof, and receipt boundaries."
+    ],
+    "note_needed": false
+  }
+}

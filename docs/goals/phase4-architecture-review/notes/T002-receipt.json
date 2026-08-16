@@ -1,0 +1,100 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T002",
+    "board_path": "docs/goals/phase4-architecture-review/state.yaml",
+    "decision": "approved",
+    "full_outcome_complete": false,
+    "rationale": "Approve one documentation-only Worker package. The architecture extends proven Phase 3 boundaries without implementation: offline digest-locked font materialization, proof-gated inert-transition normalization, explicit deferred pseudo-element accounting, noncanonical cue candidates, authoritative cues with locked materialized tracks and undoable detachment, revision-external annotations, and an exact paired benchmark.",
+    "evidence": [
+      {
+        "kind": "resolved_ambiguities",
+        "items": [
+          "Only offline owner-provided digest-locked font materialization is authorized; all production and proof runs have zero network fetches and other resource kinds remain fail-closed.",
+          "Scene C transitions remain fail-closed unless a source-bound certificate plus installed-Chrome equality proof demonstrates an inert declaration; this is not transition support.",
+          "Scene E counts only through an untouched-source failure ledger plus a deterministic non-pseudo acceptance projection ledger; pseudo-element motion remains Phase 5.",
+          "Cue candidates are ephemeral import-report sidecars with low/medium/high evidence confidence and can never enter the document, persistence, export identity, compiler input, revisions, or automatic operations."
+        ]
+      },
+      {
+        "kind": "required_architecture_sections",
+        "items": [
+          "Decision and scope",
+          "Five-scene grounded inventory",
+          "Import and candidate boundary",
+          "Canonical cue and generated-track contract",
+          "Cue semantics",
+          "Compiler and preview invariance",
+          "Service, revision, claim, and history contract",
+          "Annotations, comparison, and handoff",
+          "Paired benchmark contract",
+          "Ordered implementation slices",
+          "Proof, privacy, exclusions, and failure modes"
+        ]
+      },
+      {
+        "kind": "ordered_implementation_slices",
+        "slices": [
+          "Scene D cursor-click-reveal vertical slice",
+          "Reusable type-select-drag-hold breadth",
+          "Five-scene import closure and explicit deferrals",
+          "Revision-linked review and handoff vertical slice",
+          "Paired performance and aggregate Phase 4 gate"
+        ]
+      },
+      {
+        "kind": "top_failure_modes",
+        "items": [
+          "Cue metadata and materialized tracks diverge, direct edits bypass ownership, or detach/undo changes compiled output or creates dual authority.",
+          "External preprocessing, transition normalization, candidate inference, Scene E projection, annotations, or receipts silently drop unsupported behavior or leak private material.",
+          "The paired benchmark uses hidden automation, inconsistent timing, noisy single runs, or speed claims whose outputs fail unaffected-track, visual, determinism, Chrome, or undo-restoration safety."
+        ]
+      }
+    ],
+    "worker_package": {
+      "objective": "Write one exact Phase 4 coach-mark breadth architecture decision at docs/architecture/phase4-coach-mark-breadth.md. Include every required section and clause from T002, the sanitized Scene A-E inventory, all four resolved ambiguities, authoritative cue/generated-track/detach/history operations, reusable cue semantics, compiler/preview and Phase 3 persistence invariants, revision-external annotations/comparison/handoff, the exact three-task paired benchmark and formulas, the five ordered vertical implementation slices, privacy and proof gates, rejected alternatives, owner-facing claim, top three failure modes, and explicit Phase 5 exclusions. Make no product, dependency, fixture, board, or private-corpus change.",
+      "allowed_files": [
+        "docs/architecture/phase4-coach-mark-breadth.md"
+      ],
+      "verify": [
+        "test -f docs/architecture/phase4-coach-mark-breadth.md",
+        "test \"$(rg -c '^## (Decision and scope|Five-scene grounded inventory|Import and candidate boundary|Canonical cue and generated-track contract|Cue semantics|Compiler and preview invariance|Service, revision, claim, and history contract|Annotations, comparison, and handoff|Paired benchmark contract|Ordered implementation slices|Proof, privacy, exclusions, and failure modes)$' docs/architecture/phase4-coach-mark-breadth.md)\" -eq 11",
+        "! rg -n -e '[[:xdigit:]]{8,15}' -e '/''Users/' -e 'https?:''//' docs/architecture/phase4-coach-mark-breadth.md",
+        "npm run typecheck",
+        "npm run check:sensitive",
+        "npm run check:private-ignore",
+        "git diff --check",
+        "git status --short"
+      ],
+      "stop_if": [
+        "Any required decision cannot be written exactly from T001, the owner decisions, merged Phase 3 evidence, and this receipt without inspecting or copying private source content.",
+        "Writing requires a product file, package.json, package-lock.json, dependency, migration, fixture, screenshot, private corpus artifact, evidence payload, or file outside allowed_files.",
+        "The architecture would allow live resource fetching, generalized resource loading, invented Scene B motion, unproven Scene C transition dropping, silent Scene E pseudo-element omission, or Phase 5 pseudo-element implementation.",
+        "The architecture would persist cue candidates, accept candidate IDs as mutations, infer semantic cues without explicit confirmation, or include candidates in canonical/export identity.",
+        "The architecture would introduce cue-time compilation, runtime cue interpolation, direct edits to attached generated tracks, bidirectional cue/track synchronization, nondeterministic IDs, or non-atomic detach/history.",
+        "The architecture would let annotations or comparison affect canonical/export identity or add approval, assignment, merge, publishing, notification, or project-management workflow.",
+        "The benchmark cannot state all three exact paired tasks, three alternating repetitions, median calculations, combined Motion <= 50% CSS, no task slower, ordinary-user tooling, and every safety/undo gate.",
+        "Private source, copy, branding, selectors, filenames, paths, URLs, screenshots, payloads, or source-digest prefixes would enter the architecture.",
+        "A verification command fails twice for the same unresolved architecture or privacy cause."
+      ]
+    },
+    "subgoal_contract": null,
+    "parallel_safety": {
+      "one_worker_package_safe": true,
+      "parallel_workers_safe": false,
+      "reason": "All decisions must remain internally consistent in one architecture document."
+    },
+    "blocked_tasks": [],
+    "missing_evidence": [
+      "T003 has not yet written the architecture decision.",
+      "T004 must inspect the completed architecture.",
+      "T999 must decide completion for the architecture-review tranche only."
+    ],
+    "required_board_updates": [
+      "Mark T002 done with this approved receipt.",
+      "Copy worker_package to T003 without broadening allowed_files, verification, or stop conditions.",
+      "Activate T003 as the sole write Worker and keep T004 and T999 queued.",
+      "Do not authorize Phase 4 implementation from this receipt."
+    ]
+  }
+}

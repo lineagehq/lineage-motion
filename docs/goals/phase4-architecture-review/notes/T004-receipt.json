@@ -1,0 +1,71 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T004",
+    "board_path": "docs/goals/phase4-architecture-review/state.yaml",
+    "decision": "not_complete",
+    "full_outcome_complete": false,
+    "rationale": "The design preserves the main boundaries but has three coupled defects: circular expansion inputs, no atomic replaced-source lifecycle for hold, and handoff identity that omits mutable annotation snapshot identity.",
+    "evidence": [
+      {
+        "kind": "defects",
+        "items": [
+          "CueExpansionInput must exclude all derived IDs, digests, and ownership outputs.",
+          "Hold and deliberate conversion need a digest-checked replacedSourceBundle with exact create/update/delete/detach inverses.",
+          "HandoffIdentityInput must bind document identity plus immutable annotation and comparison/proof inputs."
+        ]
+      },
+      {
+        "kind": "verification",
+        "items": [
+          "11 headings pass",
+          "banned-content scan passes",
+          "typecheck passes",
+          "sensitive and private-ignore checks pass",
+          "diff checks pass"
+        ]
+      }
+    ],
+    "worker_package": {
+      "objective": "Correct only docs/architecture/phase4-coach-mark-breadth.md. Define an acyclic CueExpansionInput containing semantic cue fields, generator version, and explicit referenced-target state while excluding generated IDs, expansion-input digest, expansion digest, and ownership outputs; define how derived fields are computed and validated. Define an explicit replacedSourceBundle contract for hold and deliberate imported-motion conversion using ordered stable source track IDs plus an expected replacement-input digest, never candidate IDs: cue creation must atomically remove the validated source bundle and install the owned replacement, its inverse must restore the exact source bundle, update must preserve the replacement boundary, delete behavior must be explicit, and detach must leave only ordinary generated tracks with byte-identical output and an exact inverse. Define a versioned HandoffIdentityInput binding document revision/digest, immutable annotation snapshot version/digest, and every included comparison/proof input; equal complete tuples must produce identical handoff bytes, while annotation mutations must not alter canonical revision/export identity. Preserve all other approved clauses and make no implementation claim.",
+      "allowed_files": ["docs/architecture/phase4-coach-mark-breadth.md"],
+      "verify": [
+        "test -f docs/architecture/phase4-coach-mark-breadth.md",
+        "test \"$(rg -c '^## (Decision and scope|Five-scene grounded inventory|Import and candidate boundary|Canonical cue and generated-track contract|Cue semantics|Compiler and preview invariance|Service, revision, claim, and history contract|Annotations, comparison, and handoff|Paired benchmark contract|Ordered implementation slices|Proof, privacy, exclusions, and failure modes)$' docs/architecture/phase4-coach-mark-breadth.md)\" -eq 11",
+        "rg -n 'CueExpansionInput' docs/architecture/phase4-coach-mark-breadth.md",
+        "rg -n 'replacedSourceBundle' docs/architecture/phase4-coach-mark-breadth.md",
+        "rg -n 'HandoffIdentityInput' docs/architecture/phase4-coach-mark-breadth.md",
+        "architecture banned-content scan",
+        "npm run typecheck",
+        "npm run check:sensitive",
+        "npm run check:private-ignore",
+        "git diff --check",
+        "git diff --check origin/main",
+        "git status --short"
+      ],
+      "stop_if": [
+        "A correction requires any file other than docs/architecture/phase4-coach-mark-breadth.md.",
+        "Generated IDs, expansion-input digest, expansion digest, or ownership outputs remain inputs to their own deterministic expansion.",
+        "Hold or cue conversion can coexist with overlapping ordinary tracks, remove source tracks without an exact create inverse, use candidate IDs as mutation authority, or leave source and generated tracks simultaneously authoritative.",
+        "Detach changes immediate compiled bytes, infers reattachment, or loses exact undo/redo restoration.",
+        "Handoff bytes containing annotation counts remain identified by document revision alone rather than an immutable complete input tuple.",
+        "The correction adds live loading, semantic inference, review workflow, Phase 5 behavior, product code, dependencies, fixtures, private material, or any claim that Phase 4 is implemented.",
+        "A verification command fails twice for the same unresolved architecture or privacy cause."
+      ]
+    },
+    "subgoal_contract": null,
+    "parallel_safety": {"parallel_workers_safe": false, "reason": "The defects are coupled in one architecture file."},
+    "blocked_tasks": ["T999"],
+    "missing_evidence": [
+      "Corrected acyclic expansion contract",
+      "Corrected replacement lifecycle",
+      "Corrected handoff identity tuple",
+      "Fresh review and final decision"
+    ],
+    "required_board_updates": [
+      "Record T004 not_complete.",
+      "Queue one corrective Worker and one fresh Judge before T999.",
+      "Do not authorize implementation."
+    ]
+  }
+}
