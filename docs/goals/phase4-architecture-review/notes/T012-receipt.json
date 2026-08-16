@@ -1,0 +1,24 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result":"done",
+    "task_id":"T012",
+    "board_path":"docs/goals/phase4-architecture-review/state.yaml",
+    "decision":"approved",
+    "full_outcome_complete":false,
+    "rationale":"All pre-T999 gates pass: full-tree hygiene scans are zero, receipts and state parse, repository checks pass, scope is architecture/control only, and all substantive boundaries remain intact.",
+    "evidence":[
+      {"kind":"hygiene","identifier_hits":0,"standalone_hex_fragment_hits":0},
+      {"kind":"receipt_validity","receipt_count":11,"invalid_receipts":0,"state_yaml_valid":true},
+      {"kind":"verification","typecheck":"pass","sensitive_check":"pass","private_ignore":"pass","diff_checks":"pass"},
+      {"kind":"scope","changed_paths":19,"outside_architecture_control_scope":0,"product_or_dependency_paths":0,"phase5_paths":0},
+      {"kind":"architecture","status":"pass","coverage":["five scenes and fail-closed boundaries","noncanonical candidates","acyclic cue expansion","immutable replacement and exact history","complete handoff identity","seven cue semantics","compiler-native preview","service invariants","revision-external annotations","exact benchmark","five slices","Phase 5 and implementation exclusions"]},
+      {"kind":"sanitation_regression","status":"pass"}
+    ],
+    "worker_package":null,
+    "subgoal_contract":null,
+    "parallel_safety":null,
+    "blocked_tasks":[],
+    "missing_evidence":["T999 final architecture-review decision."],
+    "required_board_updates":["Mark T012 done and activate T999.","Do not authorize implementation."]
+  }
+}

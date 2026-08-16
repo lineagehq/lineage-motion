@@ -1,0 +1,25 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T003",
+    "board_path": "docs/goals/phase4-architecture-review/state.yaml",
+    "changed_files": [
+      "docs/architecture/phase4-coach-mark-breadth.md"
+    ],
+    "commands": [
+      { "command": "test -f docs/architecture/phase4-coach-mark-breadth.md", "status": "pass" },
+      { "command": "required heading count is exactly 11", "status": "pass" },
+      { "command": "architecture banned-content scan", "status": "pass" },
+      { "command": "npm run typecheck", "status": "pass" },
+      { "command": "npm run check:sensitive", "status": "pass" },
+      { "command": "npm run check:private-ignore", "status": "pass" },
+      { "command": "git diff --check", "status": "pass" },
+      { "command": "git status --short", "status": "pass" }
+    ],
+    "summary": "Completed the architecture-only Phase 4 decision with exactly 11 required sections. It specifies the sanitized five-scene inventory, fail-closed import boundaries, authoritative cue-owned tracks and detachment, reusable semantics, compiler/service invariants, revision-external review, exact benchmark, ordered slices, privacy gates, exclusions, and adversarial proofs. All exact verification commands passed. Diff inspection confirms the architecture document is the only product output; remaining status entries are PM-owned GoalBuddy control files.",
+    "deviations": [],
+    "remaining_blockers": [],
+    "verification_attempts": 1,
+    "stopped_because": null
+  }
+}

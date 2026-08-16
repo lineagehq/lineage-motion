@@ -1,0 +1,27 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result": "done",
+    "task_id": "T005",
+    "board_path": "docs/goals/phase4-architecture-review/state.yaml",
+    "changed_files": ["docs/architecture/phase4-coach-mark-breadth.md"],
+    "commands": [
+      {"command":"architecture file exists","status":"pass"},
+      {"command":"required heading count is 11","status":"pass"},
+      {"command":"CueExpansionInput present","status":"pass"},
+      {"command":"replacedSourceBundle present","status":"pass"},
+      {"command":"HandoffIdentityInput present","status":"pass"},
+      {"command":"banned-content scan","status":"pass"},
+      {"command":"npm run typecheck","status":"pass"},
+      {"command":"npm run check:sensitive","status":"pass"},
+      {"command":"npm run check:private-ignore","status":"pass"},
+      {"command":"git diff --check","status":"pass"},
+      {"command":"git diff --check origin/main","status":"pass"},
+      {"command":"git status --short","status":"pass"}
+    ],
+    "summary": "Defined acyclic CueExpansionInput derivation and recomputation validation; an atomic, digest-checked replacedSourceBundle lifecycle covering create, update, delete, detach, undo, and redo; and complete immutable HandoffIdentityInput determinism. Preserved all 11 headings, architecture-only scope, privacy boundaries, native-CSS invariants, and annotation noninterference. All required verification passed.",
+    "deviations": [],
+    "remaining_blockers": [],
+    "verification_attempts": 1,
+    "stopped_because": null
+  }
+}

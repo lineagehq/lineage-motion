@@ -1,0 +1,28 @@
+{
+  "goalbuddy_receipt_v1": {
+    "result":"done",
+    "task_id":"T008",
+    "board_path":"docs/goals/phase4-architecture-review/state.yaml",
+    "decision":"not_complete",
+    "full_outcome_complete":false,
+    "rationale":"All architecture semantics pass, but five prohibited source-digest fragments remain in self-referential board and T002 verification commands.",
+    "evidence":[
+      {"kind":"immutable_replacement_boundary","status":"pass"},
+      {"kind":"inverse_detach_history","status":"pass"},
+      {"kind":"expansion_and_handoff","status":"pass"},
+      {"kind":"architecture_regression","status":"pass"},
+      {"kind":"privacy_sanitation","status":"fail","detail":"Self-referential verification strings retain prohibited digest fragments."}
+    ],
+    "worker_package": {
+      "objective":"Remove prohibited digest fragments from notes/T002-receipt.json while preserving its decision and contract.",
+      "allowed_files":["docs/goals/phase4-architecture-review/notes/T002-receipt.json"],
+      "verify":["valid JSON","zero prohibited digest-fragment fields","zero 8-15 character digest fragments across Phase 4 evidence/control files","npm run check:sensitive","npm run check:private-ignore","git diff --check"],
+      "stop_if":["Sanitation requires architecture, product, or private-corpus changes.","Any prohibited digest fragment remains."]
+    },
+    "subgoal_contract":null,
+    "parallel_safety":{"parallel_workers_safe":false,"reason":"One bounded evidence sanitation pass."},
+    "blocked_tasks":["T999"],
+    "missing_evidence":["Clean evidence/control fragment scan","Fresh privacy review","T999 decision"],
+    "required_board_updates":["PM sanitizes state verification strings.","Queue T002 receipt sanitation Worker and fresh Judge."]
+  }
+}

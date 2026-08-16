@@ -1,0 +1,890 @@
+version: 2
+
+goal:
+  title: "Phase 4 coach-mark breadth architecture review"
+  slug: phase4-architecture-review
+  kind: existing_plan
+  tranche: "Ground, write, and independently approve only the Phase 4 architecture and implementation slices."
+  status: done
+  oracle:
+    signal: "A sanitized five-scene capability inventory and approved architecture define cue-owned tracks, cursor/click authoring, revision-linked review, deterministic handoff, and a paired 2x benchmark without changing product behavior."
+    cadence: "after inventory, architecture writing, and final audit"
+    final_proof: "A final Judge maps the architecture to all five scenes, the four owner decisions, Phase 3 invariants, exact implementation slices, verification, privacy, and Phase 4 exit evidence with full_outcome_complete: true for architecture review only."
+  intake:
+    original_request: "Work out the Phase 4 architecture decisions and proceed with the architecture review."
+    interpreted_outcome: "A ready-to-implement Phase 4 design grounded in all five private coach-mark scenes and the agreed simple cue-authoring UX, without implementing Phase 4 yet."
+    input_shape: existing_plan
+    audience: "motion editor owner"
+    authority: approved
+    proof_type: decision
+    completion_proof: "Final Judge approves a grounded Phase 4 architecture, ordered vertical slices, exact gates, and explicit Phase 5 exclusions."
+    likely_misfire: "Building a second animation runtime, a bidirectional cue/track synchronization system, or a generalized review product instead of a simple deterministic CSS-animation authoring layer."
+    blind_spots_considered:
+      - "Cue ownership, generated-track locking, detachment, undo, and stable identity"
+      - "Silent cue inference from imported CSS and private-scene leakage"
+      - "Cursor geometry, click boundaries, discrete timing, and native CSS output"
+      - "Benchmark gaming, noisy timing measurements, and incomplete safety proof"
+      - "Annotations affecting canonical/export identity or pulling merge/approval workflow forward"
+    existing_plan_facts:
+      - "Phase 3 is merged at 9140431 with its aggregate exit gate complete."
+      - "Phase 4 imports all five real coach-mark scenes and adds cursor path, click pulse, reusable cues, annotations, comparison, handoff receipts, and performance evidence."
+      - "Owner decision: cues are authoritative and own locked generated tracks; an explicit undoable detach converts them to ordinary tracks."
+      - "Owner decision: the first vertical slice is the smallest scene with cursor travel, click pulse, and a resulting reveal."
+      - "Owner decision: Phase 4 uses three paired raw-CSS-versus-Motion tasks and must be at least 2x faster overall with no individual task slower."
+      - "Owner decision: annotations are revision-linked notes outside the canonical motion document, with open/resolved state only and no approval, assignment, merge, or publishing workflow."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "goalbuddy.localhost:41737/phase4-architecture-review/"
+    command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase4-architecture-review"
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: scout
+    assignee: Scout
+    status: done
+    reasoning_hint: low
+    objective: "Produce a sanitized technical capability inventory for all five private coach-mark scenes and map it to the merged Phase 3 architecture without proposing implementation."
+    inputs:
+      - "Owner-authorized private coach-mark corpus"
+      - "docs/incubation-plan.md"
+      - "Merged Phase 0-3 domain, importer, compiler, preview, editor, service, proof, and receipts"
+    constraints:
+      - "Read-only; do not edit any file."
+      - "Inspect private scenes locally but never reproduce source, copy, branding, selectors, filenames, screenshots, absolute paths, or payloads."
+      - "Report scenes only as sanitized stable aliases and technical counts/capabilities."
+      - "Separate imported facts, inferred cue candidates, and unsupported constructs; never treat heuristic cue recognition as canonical truth."
+      - "Preserve native CSS output, compiler-backed preview, stable IDs, deterministic receipts, fail-closed import, sole writer, revision, claim, and reduced-motion invariants."
+      - "Exclude landing-scene work, Phase 5+, generalized constraints, merge/review workflow, publication, MCP, and Lineage integration."
+    expected_output:
+      - "Five-scene sanitized technical inventory and capability matrix"
+      - "Ranked composable gaps versus merged Phase 3"
+      - "Candidate scene matching cursor plus click plus reveal"
+      - "Evidence boundaries for cue inference, private data, and visual proof"
+      - "Exact repo areas and verification surfaces the architecture must address"
+    receipt:
+      result: done
+      summary: "Inspected exactly five owner-authorized scenes and mapped them to merged Phase 3. All currently fail closed. Scene D is the smallest sanitized cursor-plus-click-pulse-plus-reveal candidate. Phase 3 already proves typed operations, sole-writer revisions/claims, deterministic native CSS, compiler-backed preview, privacy-safe receipts, reduced motion, and discrete visual sampling. Phase 4 gaps are cue-owned track materialization/detachment, cursor/click authoring, breadth import blockers, reusable cue semantics, revision-linked notes/comparison, sanitized handoff, and paired performance evidence. Cue classifications remain explicitly heuristic and noncanonical."
+      evidence:
+        - kind: private_corpus_inventory
+          scope: "exactly five scenes"
+          alias_stability: "Scene A-E assigned by deterministic corpus ordering for this inventory snapshot"
+          scenes: "[object Object],[object Object],[object Object],[object Object],[object Object]"
+        - kind: inferred_cue_candidates
+          canonical: false
+          boundary: "Technical patterns identify review candidates only; no cue meaning may be assigned or persisted without explicit author confirmation."
+          scenes: "[object Object],[object Object],[object Object],[object Object],[object Object]"
+        - kind: first_slice_candidate
+          alias: "Scene D"
+          basis: "smallest DOM inventory,nine keyframe rules,position-based cursor travel candidate,transform pulse candidate,opacity reveal candidate,steps timing pressures discrete proof"
+          qualification: "Sanitized architectural candidate only; browser inspection must confirm target identity, click press/release boundaries, synchronized reveal, and absence of omitted constructs before implementation."
+        - kind: merged_phase3_receipt
+          passed: true
+          proofs: "editor/CLI byte parity,repeated-run byte identity,sole persistent writer,atomic expected revisions,claim-bounded agent writes,selector-independent identity,fail-closed import,compiler-backed preview,native HTML/CSS output,reduced-motion inspection"
+          browser_thresholds: "[object Object]"
+          visual_thresholds: "[object Object]"
+        - kind: architecture_surface_map
+          areas: "[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object],[object Object]"
+      facts:
+        - rank: 1
+          gap: "All five real scenes currently fail closed; architecture must distinguish materializable external-resource handling from prohibited live loading, repair or explicitly block Scene B's missing rule, decide transition treatment for Scene C, and keep Scene E pseudo-element motion unsupported because it belongs to Phase 5 unless separately authorized."
+        - rank: 2
+          gap: "The current cue model is only an ID, label, and time; it lacks cue kind, targets, named moments, parameters, generator version, generated-track IDs, expansion digest, ownership lock, and deterministic detach/undo."
+        - rank: 3
+          gap: "No typed cursor-path or click press/release/pulse operation exists. Geometry, coordinate space, target anchoring, pulse timing, synchronized reveal, stale-revision behavior, and unaffected-track proof require contracts."
+        - rank: 4
+          gap: "Reusable click/type/select/drag/reveal/hold authoring semantics are absent. Existing hold support is intentionally fixture-specific and cannot serve as the generalized Phase 4 contract."
+        - rank: 5
+          gap: "Revision-linked annotations, comparison, sanitized handoff receipts, and paired active-time instrumentation are absent; notes must remain outside canonical/export identity and limited to open/resolved state."
+        - claim: "A privacy-safe five-scene inventory identifies composable Phase 4 pressure without treating private-source heuristics as truth."
+          top_failure_modes: "cue metadata and generated tracks drift into dual authority or a second runtime,import diagnostics or heuristic cue recognition silently omit constructs or leak private material,the selected candidate appears simple by counts but browser inspection reveals unsynchronized interaction boundaries or unsupported behavior"
+        - source_fact_boundary: "Counts, property categories, timing constructs, importer inventories, and diagnostic codes are directly observed source/import facts."
+        - inference_boundary: "Cue labels and the first-slice match are candidates inferred from technical patterns; they require explicit authoring confirmation and browser evidence."
+        - privacy_boundary: "No source, copy, branding, selector, URL, filename, screenshot, payload, or private note body is included. Future visual proof should retain only sanitized sample labels, timing boundaries, counts, and digests."
+      contradictions:
+        - issue: "Phase 4 requires importing all five scenes, but every current import returns no canonical document."
+          impact: "Breadth architecture must explicitly close or preserve each diagnostic; it cannot claim current import readiness."
+        - issue: "Scene E contains pseudo-element motion while the current tranche excludes Phase 5 pseudo-element breadth."
+          impact: "Phase 4 must fail visibly or define a sanitized exclusion; it must not silently drop or implement the deferred construct."
+        - issue: "The existing hold schema is hard-coded to one cue, time, and duration while Phase 4 calls for reusable hold cues."
+          impact: "Architecture must replace fixture-specific semantics through a versioned general contract without invalidating deterministic projection proof."
+      ambiguity_requiring_judge:
+        - question: "Does import all five permit locally materialized, digest-locked external-resource preprocessing, or must external resources be rejected and replaced before canonical import?"
+        - question: "Should Scene C's transition remain explicitly unsupported, or be normalized only with proof that it is motion-irrelevant?"
+        - question: "How should Scene E count toward Phase 4 while its pseudo-element motion is deferred to Phase 5?"
+        - question: "What confidence/evidence vocabulary may cue candidates expose while guaranteeing they never mutate canonical meaning?"
+      commands:
+        - "Resolve repository root and read repository instructions, goal charter, and active board."
+        - "Read the incubation plan and enumerate merged architecture/evidence surfaces."
+        - "Inspect merged architecture, persistence boundary, and aggregate evidence."
+        - "Compute sanitized five-scene structural, animation, property, timing, diagnostic, and candidate inventories."
+        - "Map importer, domain, compiler, preview, service, editor, proof, and receipt boundaries."
+      note_needed: false
+  - id: T002
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Turn the sanitized inventory and owner decisions into one exact Phase 4 architecture-writing contract and ordered largest-safe implementation slices."
+    inputs:
+      - "T001 inventory receipt"
+      - "Owner decisions recorded in this board"
+      - "Merged Phase 3 architecture and evidence"
+    constraints:
+      - "Read-only; do not write architecture or implementation."
+      - "Cues must be authoritative authoring objects whose generated tracks are materialized, inspectable, deterministically owned, and locked until explicit undoable detachment."
+      - "The compiler and preview continue to consume canonical tracks and browser-created animations; cues cannot become a production runtime."
+      - "Imported CSS may expose cue candidates but cannot silently assign semantic cues."
+      - "Revision-linked annotations remain outside canonical animation/export identity and add no merge, approval, assignment, or publishing workflow."
+      - "The paired benchmark must be reproducible, sanitized, and resistant to benchmark-specific shortcuts."
+      - "Do not authorize implementation, private fixtures, Phase 5, or dependency expansion."
+    expected_output:
+      - "Canonical cue, generated-track ownership, detachment, history, and operation contracts"
+      - "Cursor path, click pulse, reveal, type, select, drag, and hold semantics"
+      - "Importer candidate and fail-closed boundary"
+      - "Revision-linked annotation, comparison, handoff, and privacy contracts"
+      - "Exact three-task paired benchmark and 2x exit calculation"
+      - "Ordered vertical implementation slices with allowed architecture files, verification, stop conditions, and top failure modes"
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      rationale: "Approve one documentation-only Worker package. The architecture extends proven Phase 3 boundaries without implementation: offline digest-locked font materialization, proof-gated inert-transition normalization, explicit deferred pseudo-element accounting, noncanonical cue candidates, authoritative cues with locked materialized tracks and undoable detachment, revision-external annotations, and an exact paired benchmark."
+      evidence:
+        - kind: resolved_ambiguities
+          items: "Only offline owner-provided digest-locked font materialization is authorized; all production and proof runs have zero network fetches and other resource kinds remain fail-closed.,Scene C transitions remain fail-closed unless a source-bound certificate plus installed-Chrome equality proof demonstrates an inert declaration; this is not transition support.,Scene E counts only through an untouched-source failure ledger plus a deterministic non-pseudo acceptance projection ledger; pseudo-element motion remains Phase 5.,Cue candidates are ephemeral import-report sidecars with low/medium/high evidence confidence and can never enter the document, persistence, export identity, compiler input, revisions, or automatic operations."
+        - kind: required_architecture_sections
+          items: "Decision and scope,Five-scene grounded inventory,Import and candidate boundary,Canonical cue and generated-track contract,Cue semantics,Compiler and preview invariance,Service, revision, claim, and history contract,Annotations, comparison, and handoff,Paired benchmark contract,Ordered implementation slices,Proof, privacy, exclusions, and failure modes"
+        - kind: ordered_implementation_slices
+          slices: "Scene D cursor-click-reveal vertical slice,Reusable type-select-drag-hold breadth,Five-scene import closure and explicit deferrals,Revision-linked review and handoff vertical slice,Paired performance and aggregate Phase 4 gate"
+        - kind: top_failure_modes
+          items: "Cue metadata and materialized tracks diverge, direct edits bypass ownership, or detach/undo changes compiled output or creates dual authority.,External preprocessing, transition normalization, candidate inference, Scene E projection, annotations, or receipts silently drop unsupported behavior or leak private material.,The paired benchmark uses hidden automation, inconsistent timing, noisy single runs, or speed claims whose outputs fail unaffected-track, visual, determinism, Chrome, or undo-restoration safety."
+      worker_package:
+        objective: "Write one exact Phase 4 coach-mark breadth architecture decision at docs/architecture/phase4-coach-mark-breadth.md. Include every required section and clause from T002, the sanitized Scene A-E inventory, all four resolved ambiguities, authoritative cue/generated-track/detach/history operations, reusable cue semantics, compiler/preview and Phase 3 persistence invariants, revision-external annotations/comparison/handoff, the exact three-task paired benchmark and formulas, the five ordered vertical implementation slices, privacy and proof gates, rejected alternatives, owner-facing claim, top three failure modes, and explicit Phase 5 exclusions. Make no product, dependency, fixture, board, or private-corpus change."
+        allowed_files:
+          - docs/architecture/phase4-coach-mark-breadth.md
+        verify:
+          - "test -f docs/architecture/phase4-coach-mark-breadth.md"
+          - "test \"$(rg -c '^## (Decision and scope|Five-scene grounded inventory|Import and candidate boundary|Canonical cue and generated-track contract|Cue semantics|Compiler and preview invariance|Service, revision, claim, and history contract|Annotations, comparison, and handoff|Paired benchmark contract|Ordered implementation slices|Proof, privacy, exclusions, and failure modes)$' docs/architecture/phase4-coach-mark-breadth.md)\" -eq 11"
+          - "! rg -n -e '[[:xdigit:]]{8,15}' -e '/''Users/' -e 'https?:''//' docs/architecture/phase4-coach-mark-breadth.md"
+          - "npm run typecheck"
+          - "npm run check:sensitive"
+          - "npm run check:private-ignore"
+          - "git diff --check"
+          - "git status --short"
+        stop_if:
+          - "Any required decision cannot be written exactly from T001, the owner decisions, merged Phase 3 evidence, and this receipt without inspecting or copying private source content."
+          - "Writing requires a product file, package.json, package-lock.json, dependency, migration, fixture, screenshot, private corpus artifact, evidence payload, or file outside allowed_files."
+          - "The architecture would allow live resource fetching, generalized resource loading, invented Scene B motion, unproven Scene C transition dropping, silent Scene E pseudo-element omission, or Phase 5 pseudo-element implementation."
+          - "The architecture would persist cue candidates, accept candidate IDs as mutations, infer semantic cues without explicit confirmation, or include candidates in canonical/export identity."
+          - "The architecture would introduce cue-time compilation, runtime cue interpolation, direct edits to attached generated tracks, bidirectional cue/track synchronization, nondeterministic IDs, or non-atomic detach/history."
+          - "The architecture would let annotations or comparison affect canonical/export identity or add approval, assignment, merge, publishing, notification, or project-management workflow."
+          - "The benchmark cannot state all three exact paired tasks, three alternating repetitions, median calculations, combined Motion <= 50% CSS, no task slower, ordinary-user tooling, and every safety/undo gate."
+          - "Private source, copy, branding, selectors, filenames, paths, URLs, screenshots, payloads, or source-digest prefixes would enter the architecture."
+          - "A verification command fails twice for the same unresolved architecture or privacy cause."
+      subgoal_contract: null
+      parallel_safety:
+        one_worker_package_safe: true
+        parallel_workers_safe: false
+        reason: "All decisions must remain internally consistent in one architecture document."
+      blocked_tasks: []
+      missing_evidence:
+        - "T003 has not yet written the architecture decision."
+        - "T004 must inspect the completed architecture."
+        - "T999 must decide completion for the architecture-review tranche only."
+      required_board_updates:
+        - "Mark T002 done with this approved receipt."
+        - "Copy worker_package to T003 without broadening allowed_files, verification, or stop conditions."
+        - "Activate T003 as the sole write Worker and keep T004 and T999 queued."
+        - "Do not authorize Phase 4 implementation from this receipt."
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Write one exact Phase 4 coach-mark breadth architecture decision at docs/architecture/phase4-coach-mark-breadth.md. Include every required section and clause from T002, the sanitized Scene A-E inventory, all four resolved ambiguities, authoritative cue/generated-track/detach/history operations, reusable cue semantics, compiler/preview and Phase 3 persistence invariants, revision-external annotations/comparison/handoff, the exact three-task paired benchmark and formulas, the five ordered vertical implementation slices, privacy and proof gates, rejected alternatives, owner-facing claim, top three failure modes, and explicit Phase 5 exclusions. Make no product, dependency, fixture, board, or private-corpus change."
+    allowed_files:
+      - "docs/architecture/phase4-coach-mark-breadth.md"
+    verify:
+      - "test -f docs/architecture/phase4-coach-mark-breadth.md"
+      - "test \"$(rg -c '^## (Decision and scope|Five-scene grounded inventory|Import and candidate boundary|Canonical cue and generated-track contract|Cue semantics|Compiler and preview invariance|Service, revision, claim, and history contract|Annotations, comparison, and handoff|Paired benchmark contract|Ordered implementation slices|Proof, privacy, exclusions, and failure modes)$' docs/architecture/phase4-coach-mark-breadth.md)\" -eq 11"
+      - "! rg -n -e '[[:xdigit:]]{8,15}' -e '/''Users/' -e 'https?:''//' docs/architecture/phase4-coach-mark-breadth.md"
+      - "npm run typecheck"
+      - "npm run check:sensitive"
+      - "npm run check:private-ignore"
+      - "git diff --check"
+      - "git status --short"
+    stop_if:
+      - "Any required decision cannot be written exactly from T001, the owner decisions, merged Phase 3 evidence, and the T002 receipt without inspecting or copying private source content."
+      - "Writing requires a product file, package.json, package-lock.json, dependency, migration, fixture, screenshot, private corpus artifact, evidence payload, or file outside allowed_files."
+      - "The architecture would allow live resource fetching, generalized resource loading, invented Scene B motion, unproven Scene C transition dropping, silent Scene E pseudo-element omission, or Phase 5 pseudo-element implementation."
+      - "The architecture would persist cue candidates, accept candidate IDs as mutations, infer semantic cues without explicit confirmation, or include candidates in canonical/export identity."
+      - "The architecture would introduce cue-time compilation, runtime cue interpolation, direct edits to attached generated tracks, bidirectional cue/track synchronization, nondeterministic IDs, or non-atomic detach/history."
+      - "The architecture would let annotations or comparison affect canonical/export identity or add approval, assignment, merge, publishing, notification, or project-management workflow."
+      - "The benchmark cannot state all three exact paired tasks, three alternating repetitions, median calculations, combined Motion <= 50% CSS, no task slower, ordinary-user tooling, and every safety/undo gate."
+      - "Private source, copy, branding, selectors, filenames, paths, URLs, screenshots, payloads, or source-digest prefixes would enter the architecture."
+      - "A verification command fails twice for the same unresolved architecture or privacy cause."
+    receipt:
+      result: done
+      changed_files:
+        - docs/architecture/phase4-coach-mark-breadth.md
+      commands:
+        - command: "test -f docs/architecture/phase4-coach-mark-breadth.md"
+          status: pass
+        - command: "required heading count is exactly 11"
+          status: pass
+        - command: "architecture banned-content scan"
+          status: pass
+        - command: "npm run typecheck"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+        - command: "npm run check:private-ignore"
+          status: pass
+        - command: "git diff --check"
+          status: pass
+        - command: "git status --short"
+          status: pass
+      summary: "Completed the architecture-only Phase 4 decision with exactly 11 required sections. It specifies the sanitized five-scene inventory, fail-closed import boundaries, authoritative cue-owned tracks and detachment, reusable semantics, compiler/service invariants, revision-external review, exact benchmark, ordered slices, privacy gates, exclusions, and adversarial proofs. All exact verification commands passed. Diff inspection confirms the architecture document is the only product output; remaining status entries are PM-owned GoalBuddy control files."
+      deviations: []
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+  - id: T004
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Adversarially review the written Phase 4 architecture against all five sanitized scenes, owner decisions, and Phase 3 invariants."
+    inputs:
+      - "T001 inventory"
+      - "T002 architecture contract"
+      - "T003 complete architecture diff"
+    constraints:
+      - "Read-only; do not repair documentation."
+      - "Reject vague slices, unverifiable benchmarks, dual authority, silent inference, review-workflow expansion, or private leakage."
+      - "Reject claims that architecture completion proves Phase 4 implementation."
+    expected_output:
+      - "Approved or not-complete decision"
+      - "Owner-facing claim and top three failure modes"
+      - "Requirement-by-requirement evidence map"
+      - "Exact corrective Worker contract if incomplete"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "The design preserves the main boundaries but has three coupled defects: circular expansion inputs, no atomic replaced-source lifecycle for hold, and handoff identity that omits mutable annotation snapshot identity."
+      evidence:
+        - kind: defects
+          items: "CueExpansionInput must exclude all derived IDs, digests, and ownership outputs.,Hold and deliberate conversion need a digest-checked replacedSourceBundle with exact create/update/delete/detach inverses.,HandoffIdentityInput must bind document identity plus immutable annotation and comparison/proof inputs."
+        - kind: verification
+          items: "11 headings pass,banned-content scan passes,typecheck passes,sensitive and private-ignore checks pass,diff checks pass"
+      worker_package:
+        objective: "Correct only docs/architecture/phase4-coach-mark-breadth.md. Define an acyclic CueExpansionInput containing semantic cue fields, generator version, and explicit referenced-target state while excluding generated IDs, expansion-input digest, expansion digest, and ownership outputs; define how derived fields are computed and validated. Define an explicit replacedSourceBundle contract for hold and deliberate imported-motion conversion using ordered stable source track IDs plus an expected replacement-input digest, never candidate IDs: cue creation must atomically remove the validated source bundle and install the owned replacement, its inverse must restore the exact source bundle, update must preserve the replacement boundary, delete behavior must be explicit, and detach must leave only ordinary generated tracks with byte-identical output and an exact inverse. Define a versioned HandoffIdentityInput binding document revision/digest, immutable annotation snapshot version/digest, and every included comparison/proof input; equal complete tuples must produce identical handoff bytes, while annotation mutations must not alter canonical revision/export identity. Preserve all other approved clauses and make no implementation claim."
+        allowed_files:
+          - docs/architecture/phase4-coach-mark-breadth.md
+        verify:
+          - "test -f docs/architecture/phase4-coach-mark-breadth.md"
+          - "test \"$(rg -c '^## (Decision and scope|Five-scene grounded inventory|Import and candidate boundary|Canonical cue and generated-track contract|Cue semantics|Compiler and preview invariance|Service, revision, claim, and history contract|Annotations, comparison, and handoff|Paired benchmark contract|Ordered implementation slices|Proof, privacy, exclusions, and failure modes)$' docs/architecture/phase4-coach-mark-breadth.md)\" -eq 11"
+          - "rg -n 'CueExpansionInput' docs/architecture/phase4-coach-mark-breadth.md"
+          - "rg -n 'replacedSourceBundle' docs/architecture/phase4-coach-mark-breadth.md"
+          - "rg -n 'HandoffIdentityInput' docs/architecture/phase4-coach-mark-breadth.md"
+          - "architecture banned-content scan"
+          - "npm run typecheck"
+          - "npm run check:sensitive"
+          - "npm run check:private-ignore"
+          - "git diff --check"
+          - "git diff --check origin/main"
+          - "git status --short"
+        stop_if:
+          - "A correction requires any file other than docs/architecture/phase4-coach-mark-breadth.md."
+          - "Generated IDs, expansion-input digest, expansion digest, or ownership outputs remain inputs to their own deterministic expansion."
+          - "Hold or cue conversion can coexist with overlapping ordinary tracks, remove source tracks without an exact create inverse, use candidate IDs as mutation authority, or leave source and generated tracks simultaneously authoritative."
+          - "Detach changes immediate compiled bytes, infers reattachment, or loses exact undo/redo restoration."
+          - "Handoff bytes containing annotation counts remain identified by document revision alone rather than an immutable complete input tuple."
+          - "The correction adds live loading, semantic inference, review workflow, Phase 5 behavior, product code, dependencies, fixtures, private material, or any claim that Phase 4 is implemented."
+          - "A verification command fails twice for the same unresolved architecture or privacy cause."
+      subgoal_contract: null
+      parallel_safety:
+        parallel_workers_safe: false
+        reason: "The defects are coupled in one architecture file."
+      blocked_tasks:
+        - T999
+      missing_evidence:
+        - "Corrected acyclic expansion contract"
+        - "Corrected replacement lifecycle"
+        - "Corrected handoff identity tuple"
+        - "Fresh review and final decision"
+      required_board_updates:
+        - "Record T004 not_complete."
+        - "Queue one corrective Worker and one fresh Judge before T999."
+        - "Do not authorize implementation."
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Make the final Phase 4 architecture-review decision and stop before implementation."
+    inputs:
+      - "Original owner outcome and oracle"
+      - "All task receipts and architecture diff"
+      - "Current repository and privacy status"
+    constraints:
+      - "Read-only final audit."
+      - "Set full_outcome_complete: true only for the architecture-review tranche, never for implemented Phase 4."
+      - "Require a ready-to-run first implementation slice and explicit stop before product changes."
+    expected_output:
+      - "complete or not_complete"
+      - "full_outcome_complete true or false for architecture review only"
+      - "Grounded five-scene, cue, annotation, benchmark, privacy, and slice evidence"
+      - "Exact first implementation handoff"
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      rationale: "The architecture-review tranche is complete; Phase 4 implementation is not. The architecture grounds all five sanitized scenes, resolves the owner decisions, defines single-authority cue expansion and exact history, preserves compiler-native preview and Phase 3 persistence invariants, keeps review metadata revision-external, specifies the safety-qualified benchmark and five vertical slices, and stops before implementation. Verification and hygiene checks pass with no product, dependency, Phase 5, or private-data changes."
+      evidence:
+        - kind: owner_facing_claim
+          claim: "Five-scene coach-mark breadth is ready for implementation as one deterministic browser-native CSS-animation authoring system, without a second runtime, silent import weakening, or review-workflow expansion."
+          scope: "Architecture review only; no Phase 4 behavior is implemented."
+        - kind: owner_decisions
+          status: pass
+          items: "authoritative cues own locked materialized tracks with explicit undoable detach,Scene D is the browser-qualified first-slice candidate,three paired tasks require per-task non-regression and aggregate two-times improvement with safety proof,annotations remain revision-linked outside canonical/export identity with open/resolved notes only"
+        - kind: five_scene_grounding
+          status: pass
+          counts: "A:61 elements,10 rules,49 offsets,10 applications,10 slots,29 tracks,B:68,10,44,9,10,17,C:47,11,52,11,11,27,D:44,9,53,8,9,20,E:52,9,41,8,8,22"
+          fail_closed: "all untouched scenes remain blocked today,B requires owner correction,C requires inert-transition proof,E retains failure and non-pseudo ledgers while pseudo motion remains deferred,candidates are ephemeral and noncanonical"
+        - kind: cue_and_history
+          status: pass
+          items: "acyclic semantic expansion input,deterministic materialized IDs/content/digests/ownership,locked attached tracks and atomic rejection,immutable replaced-source boundary,scope change requires delete restoration then new create,exact create/update/delete/detach/undo/redo inverses,detach preserves compiler/export bytes and single authority"
+        - kind: cue_semantics
+          status: pass
+          items: "cursor-path,click,reveal,type,select,drag,hold"
+        - kind: runtime_service_review
+          status: pass
+          items: "compiler consumes canonical tracks only,preview mounts exact compiler output and browser animations,sole writer and shared typed operations,expected revisions and claims,revision-external annotations,read-only comparison,complete immutable handoff identity"
+        - kind: benchmark
+          status: pass
+          tasks: "delay Scene D click by 400 ms with synchronized reveal,retarget Scene A drag and extend 300 ms with ripple,insert 600 ms hold without earlier change"
+          calculation: "three alternating repetitions; per-task Motion median no slower than CSS and sum of Motion medians no greater than half the CSS sum"
+          safety: "no raw CSS percentage editing in Motion,zero unintended or unowned-track change,stable and both-sides discrete proof,repeated byte identity,zero browser errors/network,exact undo restoration"
+        - kind: ordered_slices
+          status: pass
+          items: "Scene D cursor-click-reveal,type-select-drag-hold breadth,five-scene import closure and deferrals,revision-linked review and handoff,paired performance and aggregate gate"
+        - kind: repository_verification
+          status: pass
+          items: "receipts and board parse,11 architecture sections,typecheck passes,sensitive and private-ignore checks pass,hygiene scans zero,diff checks pass,changed paths are architecture/control only,no product, dependency, fixture, or Phase 5 changes"
+        - kind: top_failure_modes
+          items: "[object Object],[object Object],[object Object]"
+        - kind: first_implementation_handoff
+          activation: inactive
+          activation_condition: "A separate accepted implementation goal in a fresh worktree."
+          objective: "Implement the complete Scene D cursor-click-reveal vertical slice through shared typed editor/CLI operations, sole-writer persistence, deterministic materialized cue tracks, exact detach/history, compiler-native installed-Chrome preview, visual proof, privacy, and rejection evidence."
+          stop_if: "private material would enter tracked files or receipts,browser inspection reveals unaccounted constructs,cue inference or a second runtime is required,single authority or exact detach/history fails,partial state publishes on rejection,scope expands to dependencies, Phase 5, generalized loading, other cue families, workflow, integration, or publication"
+      worker_package: null
+      subgoal_contract: null
+      parallel_safety: null
+      blocked_tasks: []
+      missing_evidence: []
+      required_board_updates:
+        - "Record T999 done."
+        - "Set goal done."
+        - "Clear active task."
+        - "Preserve stop before implementation."
+  - id: T005
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Correct only docs/architecture/phase4-coach-mark-breadth.md by defining acyclic CueExpansionInput derivation, the atomic replacedSourceBundle lifecycle, and immutable HandoffIdentityInput determinism while preserving every approved boundary."
+    allowed_files:
+      - "docs/architecture/phase4-coach-mark-breadth.md"
+    verify:
+      - "test -f docs/architecture/phase4-coach-mark-breadth.md"
+      - "test \"$(rg -c '^## (Decision and scope|Five-scene grounded inventory|Import and candidate boundary|Canonical cue and generated-track contract|Cue semantics|Compiler and preview invariance|Service, revision, claim, and history contract|Annotations, comparison, and handoff|Paired benchmark contract|Ordered implementation slices|Proof, privacy, exclusions, and failure modes)$' docs/architecture/phase4-coach-mark-breadth.md)\" -eq 11"
+      - "rg -n 'CueExpansionInput' docs/architecture/phase4-coach-mark-breadth.md"
+      - "rg -n 'replacedSourceBundle' docs/architecture/phase4-coach-mark-breadth.md"
+      - "rg -n 'HandoffIdentityInput' docs/architecture/phase4-coach-mark-breadth.md"
+      - "! rg -n -e '[[:xdigit:]]{8,15}' -e '/''Users/' -e 'https?:''//' docs/architecture/phase4-coach-mark-breadth.md"
+      - "npm run typecheck"
+      - "npm run check:sensitive"
+      - "npm run check:private-ignore"
+      - "git diff --check"
+      - "git diff --check origin/main"
+      - "git status --short"
+    stop_if:
+      - "A correction requires any file other than docs/architecture/phase4-coach-mark-breadth.md."
+      - "Generated IDs, expansion-input digest, expansion digest, or ownership outputs remain inputs to their own deterministic expansion."
+      - "Hold or cue conversion can coexist with overlapping ordinary tracks, remove source tracks without an exact create inverse, use candidate IDs as mutation authority, or leave source and generated tracks simultaneously authoritative."
+      - "Detach changes immediate compiled bytes, infers reattachment, or loses exact undo/redo restoration."
+      - "Handoff bytes containing annotation counts remain identified by document revision alone rather than an immutable complete input tuple."
+      - "The correction adds live loading, semantic inference, review workflow, Phase 5 behavior, product code, dependencies, fixtures, private material, or any claim that Phase 4 is implemented."
+      - "A verification command fails twice for the same unresolved architecture or privacy cause."
+    receipt:
+      result: done
+      changed_files:
+        - docs/architecture/phase4-coach-mark-breadth.md
+      commands:
+        - command: "architecture file exists"
+          status: pass
+        - command: "required heading count is 11"
+          status: pass
+        - command: "CueExpansionInput present"
+          status: pass
+        - command: "replacedSourceBundle present"
+          status: pass
+        - command: "HandoffIdentityInput present"
+          status: pass
+        - command: "banned-content scan"
+          status: pass
+        - command: "npm run typecheck"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+        - command: "npm run check:private-ignore"
+          status: pass
+        - command: "git diff --check"
+          status: pass
+        - command: "git diff --check origin/main"
+          status: pass
+        - command: "git status --short"
+          status: pass
+      summary: "Defined acyclic CueExpansionInput derivation and recomputation validation; an atomic, digest-checked replacedSourceBundle lifecycle covering create, update, delete, detach, undo, and redo; and complete immutable HandoffIdentityInput determinism. Preserved all 11 headings, architecture-only scope, privacy boundaries, native-CSS invariants, and annotation noninterference. All required verification passed."
+      deviations: []
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+  - id: T006
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Independently verify the three T004 architecture corrections and re-audit all previously approved Phase 4 boundaries before T999."
+    inputs:
+      - "T004 not-complete receipt"
+      - "T005 corrected architecture"
+    constraints:
+      - "Read-only; do not repair documentation."
+      - "Reject circular expansion, incomplete replacement lifecycle, or handoff identity not bound to immutable annotation inputs."
+      - "Preserve every prior scope, privacy, native-CSS, benchmark, and Phase 5 exclusion."
+    expected_output:
+      - "approved or not_complete"
+      - "Exact evidence for all three corrections"
+      - "Regression audit of prior approved boundaries"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "CueExpansionInput and HandoffIdentityInput now pass, but replacement-enabled update could discard the prior source boundary, and the T001 receipt contains prohibited digest fragments."
+      evidence:
+        - kind: cue_expansion_correction
+          status: pass
+        - kind: replacement_lifecycle_correction
+          status: fail
+          detail: "Update can replace the stored boundary without restoring the prior source bundle."
+        - kind: handoff_identity_correction
+          status: pass
+        - kind: privacy_audit
+          status: fail
+          detail: "T001 receipt contains five prohibited digest-fragment fields."
+        - kind: regression_audit
+          status: pass
+          detail: "Prior scope, native CSS, benchmark, five-scene, annotation, privacy, and Phase 5 boundaries otherwise remain intact."
+      worker_package:
+        objective: "Correct the replacement lifecycle so motion.cue.update preserves the exact existing replacedSourceBundle boundary and source-scope changes cannot lose records; sanitize the T001 receipt by removing source digest fragments. Preserve all other approved architecture and evidence."
+        allowed_files:
+          - docs/architecture/phase4-coach-mark-breadth.md
+          - docs/goals/phase4-architecture-review/notes/T001-receipt.json
+        verify:
+          - "test -f docs/architecture/phase4-coach-mark-breadth.md"
+          - "required heading count is 11"
+          - "T001 has no prohibited digest-fragment field"
+          - "npm run typecheck"
+          - "npm run check:sensitive"
+          - "npm run check:private-ignore"
+          - "git diff --check"
+          - "git diff --check origin/main"
+          - "git status --short"
+        stop_if:
+          - "Any product, dependency, schema, migration, fixture, private corpus, or Phase 5 file is required."
+          - "motion.cue.update can still change or discard the stored replacement boundary."
+          - "Sanitation introduces source copy, branding, selectors, filenames, paths, URLs, screenshots, payloads, or digest fragments."
+          - "A verification command fails twice for the same unresolved cause."
+      subgoal_contract: null
+      parallel_safety:
+        parallel_workers_safe: false
+        reason: "One coherent final-readiness correction."
+      blocked_tasks:
+        - T999
+      missing_evidence:
+        - "Corrected immutable replacement boundary"
+        - "Sanitized T001 receipt"
+        - "Fresh read-only review"
+        - "T999 decision"
+      required_board_updates:
+        - "Queue one correction Worker and one fresh Judge before T999."
+        - "Do not authorize implementation."
+  - id: T007
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Make replacedSourceBundle immutable across motion.cue.update so scope changes require exact restoration before a new create, and remove digest fragments from the sanitized T001 receipt."
+    allowed_files:
+      - "docs/architecture/phase4-coach-mark-breadth.md"
+      - "docs/goals/phase4-architecture-review/notes/T001-receipt.json"
+    verify:
+      - "test -f docs/architecture/phase4-coach-mark-breadth.md"
+      - "test \"$(rg -c '^## (Decision and scope|Five-scene grounded inventory|Import and candidate boundary|Canonical cue and generated-track contract|Cue semantics|Compiler and preview invariance|Service, revision, claim, and history contract|Annotations, comparison, and handoff|Paired benchmark contract|Ordered implementation slices|Proof, privacy, exclusions, and failure modes)$' docs/architecture/phase4-coach-mark-breadth.md)\" -eq 11"
+      - "! rg -n 'source_''digest_''prefix' docs/goals/phase4-architecture-review/notes/T001-receipt.json"
+      - "npm run typecheck"
+      - "npm run check:sensitive"
+      - "npm run check:private-ignore"
+      - "git diff --check"
+      - "git diff --check origin/main"
+      - "git status --short"
+    stop_if:
+      - "Any product, dependency, schema, migration, fixture, private corpus, or Phase 5 file is required."
+      - "motion.cue.update can still change or discard the stored replacement boundary."
+      - "Sanitation introduces source copy, branding, selectors, filenames, paths, URLs, screenshots, payloads, or digest fragments."
+      - "A verification command fails twice for the same unresolved cause."
+    receipt:
+      result: done
+      changed_files:
+        - docs/architecture/phase4-coach-mark-breadth.md
+        - docs/goals/phase4-architecture-review/notes/T001-receipt.json
+      commands:
+        - command: "architecture file exists"
+          status: pass
+        - command: "required heading count is 11"
+          status: pass
+        - command: "T001 prohibited digest-fragment field scan"
+          status: pass
+        - command: "npm run typecheck"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+        - command: "npm run check:private-ignore"
+          status: pass
+        - command: "git diff --check"
+          status: pass
+        - command: "git diff --check origin/main"
+          status: pass
+        - command: "git status --short"
+          status: pass
+        - command: "receipt JSON and bounded lifecycle inspection"
+          status: pass
+      summary: "Made replacedSourceBundle immutable across cue updates: ordered source IDs, source bytes, and replacement-input digest must remain exact; source-scope changes now require separately revisioned delete restoration followed by validated create. Preserved exact inverses, undo/redo, detach behavior, and single authority. Removed all five prohibited digest-fragment fields and values while preserving other sanitized T001 facts. All verification passed."
+      deviations: []
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+  - id: T008
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Verify immutable replacement-boundary updates and receipt sanitation, then perform the final pre-T999 regression audit."
+    inputs:
+      - "T006 not-complete receipt"
+      - "T007 corrected architecture and sanitized receipt"
+    constraints:
+      - "Read-only; do not repair."
+      - "Reject any source-bundle loss, digest fragment, or regression in approved boundaries."
+    expected_output:
+      - "approved or not_complete"
+      - "Exact replacement lifecycle and privacy evidence"
+      - "Pre-T999 regression decision"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "All architecture semantics pass, but five prohibited source-digest fragments remain in self-referential board and T002 verification commands."
+      evidence:
+        - kind: immutable_replacement_boundary
+          status: pass
+        - kind: inverse_detach_history
+          status: pass
+        - kind: expansion_and_handoff
+          status: pass
+        - kind: architecture_regression
+          status: pass
+        - kind: privacy_sanitation
+          status: fail
+          detail: "Self-referential verification strings retain prohibited digest fragments."
+      worker_package:
+        objective: "Remove prohibited digest fragments from notes/T002-receipt.json while preserving its decision and contract."
+        allowed_files:
+          - docs/goals/phase4-architecture-review/notes/T002-receipt.json
+        verify:
+          - "valid JSON"
+          - "zero prohibited digest-fragment fields"
+          - "zero 8-15 character digest fragments across Phase 4 evidence/control files"
+          - "npm run check:sensitive"
+          - "npm run check:private-ignore"
+          - "git diff --check"
+        stop_if:
+          - "Sanitation requires architecture, product, or private-corpus changes."
+          - "Any prohibited digest fragment remains."
+      subgoal_contract: null
+      parallel_safety:
+        parallel_workers_safe: false
+        reason: "One bounded evidence sanitation pass."
+      blocked_tasks:
+        - T999
+      missing_evidence:
+        - "Clean evidence/control fragment scan"
+        - "Fresh privacy review"
+        - "T999 decision"
+      required_board_updates:
+        - "PM sanitizes state verification strings."
+        - "Queue T002 receipt sanitation Worker and fresh Judge."
+  - id: T009
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Remove prohibited digest fragments from the T002 receipt's self-referential verification command while preserving its decision and contract."
+    allowed_files:
+      - "docs/goals/phase4-architecture-review/notes/T002-receipt.json"
+    verify:
+      - "node -e 'JSON.parse(require(\"fs\").readFileSync(\"docs/goals/phase4-architecture-review/notes/T002-receipt.json\",\"utf8\"))'"
+      - "! rg -n 'source_''digest_''prefix' docs/goals/phase4-architecture-review"
+      - "! rg -n '[[:xdigit:]]{8,15}' docs/goals/phase4-architecture-review/state.yaml docs/goals/phase4-architecture-review/notes"
+      - "npm run check:sensitive"
+      - "npm run check:private-ignore"
+      - "git diff --check"
+      - "git diff --check origin/main"
+      - "git status --short"
+    stop_if:
+      - "Sanitation requires architecture, product, dependency, fixture, or private-corpus changes."
+      - "Any prohibited digest fragment remains in Phase 4 evidence/control files."
+      - "The T002 decision, worker package, or substantive contract would be weakened."
+      - "A verification command fails twice for the same unresolved cause."
+    receipt:
+      result: done
+      changed_files:
+        - docs/goals/phase4-architecture-review/notes/T002-receipt.json
+      commands:
+        - command: "T002 receipt JSON validation"
+          status: pass
+        - command: "prohibited digest-fragment field scan"
+          status: pass
+        - command: "Phase 4 8-15 hex fragment scan"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+        - command: "npm run check:private-ignore"
+          status: pass
+        - command: "git diff --check"
+          status: pass
+        - command: "git diff --check origin/main"
+          status: pass
+        - command: "git status --short"
+          status: pass
+      summary: "Replaced the prohibited digest literals only in T002's self-referential verification command with a generic fragment scan. T002's decision, rationale, evidence, Worker package, verification intent, stop conditions, and contract remain unchanged. All privacy and diff checks passed."
+      deviations: []
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+  - id: T010
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Perform a fresh complete privacy and architecture regression audit after all evidence/control sanitation, then decide readiness for T999."
+    inputs:
+      - "T008 not-complete receipt"
+      - "T009 sanitized receipt and PM-sanitized board"
+    constraints:
+      - "Read-only; do not repair."
+      - "Reject any digest fragment, private leakage, semantic regression, or implementation claim."
+    expected_output:
+      - "approved or not_complete"
+      - "Clean privacy/control scan evidence"
+      - "Architecture regression evidence and T999 readiness"
+    receipt:
+      result: done
+      decision: not_complete
+      full_outcome_complete: false
+      rationale: "Architecture and privacy-value scans pass, but 14 historical references still use the prohibited field-name token. Neutral wording and one fresh audit remain."
+      evidence:
+        - kind: identifier_hygiene
+          status: fail
+          detail: "Historical control entries retain the prohibited field-name token; standalone digest fragments are zero."
+        - kind: receipt_and_verification
+          status: pass
+        - kind: privacy_and_scope
+          status: pass
+        - kind: t002_contract
+          status: pass
+        - kind: architecture_regression
+          status: pass
+      worker_package:
+        objective: "Replace the prohibited field-name token in T006-T009 receipts with neutral wording while preserving every historical decision and substantive contract."
+        allowed_files:
+          - docs/goals/phase4-architecture-review/notes/T006-receipt.json
+          - docs/goals/phase4-architecture-review/notes/T007-receipt.json
+          - docs/goals/phase4-architecture-review/notes/T008-receipt.json
+          - docs/goals/phase4-architecture-review/notes/T009-receipt.json
+        verify:
+          - "valid JSON"
+          - "zero prohibited field-name token occurrences"
+          - "zero standalone digest fragments"
+          - "sensitive/private-ignore checks"
+          - "diff checks"
+        stop_if:
+          - "Any historical decision changes."
+          - "Any product, architecture, or private-corpus change is required."
+          - "Any prohibited token or fragment remains."
+      subgoal_contract: null
+      parallel_safety: null
+      blocked_tasks:
+        - T999
+      missing_evidence:
+        - "Zero prohibited field-name token scan"
+        - "Fresh read-only approval"
+        - "T999 decision"
+      required_board_updates:
+        - "PM neutralizes board history wording."
+        - "Queue one receipt sanitation Worker and fresh Judge."
+  - id: T011
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Replace the prohibited field-name token in T006-T009 receipts with neutral wording while preserving all decisions, evidence meaning, and contracts."
+    allowed_files:
+      - "docs/goals/phase4-architecture-review/notes/T006-receipt.json"
+      - "docs/goals/phase4-architecture-review/notes/T007-receipt.json"
+      - "docs/goals/phase4-architecture-review/notes/T008-receipt.json"
+      - "docs/goals/phase4-architecture-review/notes/T009-receipt.json"
+    verify:
+      - "node -e 'for(const f of process.argv.slice(1)) JSON.parse(require(\"fs\").readFileSync(f,\"utf8\"))' docs/goals/phase4-architecture-review/notes/T006-receipt.json docs/goals/phase4-architecture-review/notes/T007-receipt.json docs/goals/phase4-architecture-review/notes/T008-receipt.json docs/goals/phase4-architecture-review/notes/T009-receipt.json"
+      - "! rg -n 'source_''digest_''prefix' docs/goals/phase4-architecture-review"
+      - "! rg -n '[[:xdigit:]]{8,15}' docs/goals/phase4-architecture-review/state.yaml docs/goals/phase4-architecture-review/notes"
+      - "npm run check:sensitive"
+      - "npm run check:private-ignore"
+      - "git diff --check"
+      - "git diff --check origin/main"
+      - "git status --short"
+    stop_if:
+      - "Any historical decision, evidence meaning, or contract would change."
+      - "Any product, architecture, dependency, fixture, or private-corpus change is required."
+      - "Any prohibited field-name token or standalone digest fragment remains."
+      - "A verification command fails twice for the same unresolved cause."
+    receipt:
+      result: done
+      changed_files:
+        - docs/goals/phase4-architecture-review/notes/T006-receipt.json
+        - docs/goals/phase4-architecture-review/notes/T007-receipt.json
+        - docs/goals/phase4-architecture-review/notes/T008-receipt.json
+        - docs/goals/phase4-architecture-review/notes/T009-receipt.json
+      commands:
+        - command: "receipt JSON validation"
+          status: pass
+        - command: "fragmented prohibited-field scan"
+          status: pass
+        - command: "8-15 hex fragment scan"
+          status: pass
+        - command: "npm run check:sensitive"
+          status: pass
+        - command: "npm run check:private-ignore"
+          status: pass
+        - command: "git diff --check"
+          status: pass
+        - command: "git diff --check origin/main"
+          status: pass
+        - command: "git status --short"
+          status: pass
+      summary: "Replaced six prohibited field-name occurrences with neutral wording across four historical receipts. Preserved every decision, status, evidence meaning, and contract. All verification passed."
+      deviations: []
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+  - id: T012
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Perform the final pre-T999 privacy and architecture regression audit after neutralizing all historical token references."
+    inputs:
+      - "T010 not-complete receipt"
+      - "T011 sanitized receipts and PM-sanitized state"
+    constraints:
+      - "Read-only; do not repair."
+      - "Reject any prohibited token, digest fragment, private leakage, contract change, or architecture regression."
+    expected_output:
+      - "approved or not_complete"
+      - "Exact zero-result hygiene scans"
+      - "T999 readiness decision"
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      rationale: "All pre-T999 gates pass: full-tree hygiene scans are zero, receipts and state parse, repository checks pass, scope is architecture/control only, and all substantive boundaries remain intact."
+      evidence:
+        - kind: hygiene
+          identifier_hits: 0
+          standalone_hex_fragment_hits: 0
+        - kind: receipt_validity
+          receipt_count: 11
+          invalid_receipts: 0
+          state_yaml_valid: true
+        - kind: verification
+          typecheck: pass
+          sensitive_check: pass
+          private_ignore: pass
+          diff_checks: pass
+        - kind: scope
+          changed_paths: 19
+          outside_architecture_control_scope: 0
+          product_or_dependency_paths: 0
+          phase5_paths: 0
+        - kind: architecture
+          status: pass
+          coverage: "five scenes and fail-closed boundaries,noncanonical candidates,acyclic cue expansion,immutable replacement and exact history,complete handoff identity,seven cue semantics,compiler-native preview,service invariants,revision-external annotations,exact benchmark,five slices,Phase 5 and implementation exclusions"
+        - kind: sanitation_regression
+          status: pass
+      worker_package: null
+      subgoal_contract: null
+      parallel_safety: null
+      blocked_tasks: []
+      missing_evidence:
+        - "T999 final architecture-review decision."
+      required_board_updates:
+        - "Mark T012 done and activate T999."
+        - "Do not authorize implementation."
+notes:
+  - "Prepared from merged main 9140431 in a dedicated Phase 4 architecture-review worktree."
+  - "This board authorizes architecture review only; Phase 4 product implementation requires a separate approved goal."
