@@ -117,9 +117,15 @@ and colors unrelated to the landing page.
 
 ## Shot representation
 
-Shot 1 is ephemeral editor view state derived from the existing canonical cue
-times. This experiment adds no `shot` schema, runtime object, generated track
-owner, copied document, or separate export identity.
+Shot 1 is ephemeral editor view state derived from an explicit, ignored,
+owner-approved workspace configuration containing only the `0`, `700`, and
+`2100 ms` boundaries and stable target identities. Initialization validates
+those times against exact canonical keyframes and any matching canonical cues;
+it never infers narrative meaning from CSS. A missing match or disagreeing cue
+fails closed. The configuration is not imported, persisted, revisioned,
+compiled, exported, or included in receipts. This experiment adds no `shot`
+schema, runtime object, generated track owner, copied document, or separate
+export identity.
 
 The complete canonical document remains authoritative. Equal revisions still
 compile to byte-identical HTML, CSS, export digests, and receipts. Stable
