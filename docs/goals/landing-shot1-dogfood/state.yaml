@@ -1,0 +1,281 @@
+version: 2
+
+goal:
+  title: "Landing Shot 1 Dogfood"
+  slug: "landing-shot1-dogfood"
+  kind: existing_plan
+  tranche: "Validate the approved plan, pass the private full-loop preflight, implement the bounded Shot 1 trajectory workflow, and stop after adversarial and owner QA."
+  status: active
+  oracle:
+    signal: "Installed-Chrome owner walkthrough of the digest-locked private Shot 1 workflow backed by deterministic export, exact history, native preview, visual containment, and privacy receipts."
+    cadence: "after each Worker package and at final audit"
+    final_proof: "Final Judge maps complete import, trajectory editing, grouped edits, timing/hold, native preview, exact undo/redo, three-run export, boundary visual proof, and sensitive-content exclusion to the owner-facing claim."
+  intake:
+    original_request: "Return to the Bleep landing animation, separate it into shots, and dogfood editing the first shot's object placement, trajectories, grouping, speed, and easing."
+    interpreted_outcome: "The owner can safely adjust the real landing animation's first 0–2,100 ms through a simple trajectory workspace without diverging from deterministic browser-native CSS or damaging Shot 2."
+    input_shape: existing_plan
+    audience: "Product owner creating and iterating CSS animations"
+    authority: approved
+    proof_type: demo
+    completion_proof: "Owner completes the exact manual workflow in installed Chrome and receipts prove full-loop import, deterministic export, native preview, exact history, boundary containment, and zero private leakage."
+    likely_misfire: "Build an attractive synthetic-only path editor while the private full loop still fails import or while UI mutations bypass the shared domain/service protocol."
+    blind_spots_considered:
+      - "Narrative shot cues are not inferred by the importer; ignored owner-approved workspace configuration must validate against canonical keyframes."
+      - "Trajectory geometry and temporal easing are separate; spatial Bézier/freehand paths remain out of scope."
+      - "Multi-object grouping is an ephemeral selection with one atomic delta, not a permanent hierarchy."
+      - "Later-shot unsupported features cannot be silently dropped merely because the workspace focuses on Shot 1."
+    existing_plan_facts:
+      - "Approved design: docs/superpowers/specs/2026-08-18-landing-shot1-dogfood-design.md"
+      - "Approved implementation plan: docs/superpowers/plans/2026-08-19-landing-shot1-dogfood.md"
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/landing-shot1-dogfood/"
+    command: "node <goalbuddy-skill-path>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/landing-shot1-dogfood"
+
+active_task: T001
+
+tasks:
+  - id: T001
+    type: judge
+    assignee: Judge
+    status: active
+    reasoning_hint: high
+    objective: "Validate the approved design and implementation plan against current repo boundaries, private-preflight authority, oracle strength, allowed files, verification, and stop conditions before any production write."
+    inputs:
+      - "docs/superpowers/specs/2026-08-18-landing-shot1-dogfood-design.md"
+      - "docs/superpowers/plans/2026-08-19-landing-shot1-dogfood.md"
+      - "docs/incubation-plan.md"
+      - "AGENTS.md"
+    constraints:
+      - "Read-only; do not implement or inspect private source content."
+      - "Preserve the hard preflight gate and fail-closed complete-loop requirement."
+      - "Choose the largest safe next task; do not pre-authorize later packages if preflight evidence is missing."
+    expected_output:
+      - "complete | not_complete plan validation"
+      - "Grounded preflight Worker contract with allowed_files, verify, and stop_if"
+      - "Oracle and privacy audit"
+      - "Deferred implementation packages"
+    receipt: null
+  - id: T002
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: medium
+    objective: "Implement only the private complete-loop preflight and sanitized receipt boundary from approved plan Task 1; do not modify production packages."
+    allowed_files:
+      - "packages/css-import/src/landing-shot1.private.test.ts"
+    verify:
+      - "npx vitest run packages/css-import/src/landing-shot1.private.test.ts --sequence.concurrent false"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+    stop_if:
+      - "The source digest, ignored manifest, or required owner-supplied offline resource lock is unavailable."
+      - "The complete loop returns no canonical document or any importer error diagnostic."
+      - "Cue boundaries require semantic inference rather than validated ignored owner configuration."
+      - "The focal trajectories require unsupported transform composition, pseudo-elements, responsive variants, triggers, scripts, transitions, or generalized resource loading."
+      - "Any tracked file or receipt would expose private content, identity, counts, paths, selectors, branding, or detailed geometry."
+      - "Verification fails twice for the same unexplained reason."
+    receipt: null
+  - id: T003
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Audit the private preflight gate and either authorize the largest safe implementation slice or return to architecture review with a sanitized finding."
+    inputs:
+      - "T001 and T002 receipts"
+      - "Ignored preflight receipt existence and tracked sanitization evidence"
+      - "Approved design and implementation plan"
+    constraints:
+      - "Read-only; do not inspect or repeat private content."
+      - "A failing or incomplete full-loop import cannot authorize synthetic trajectory implementation."
+    expected_output:
+      - "complete | not_complete gate decision"
+      - "Exact next Worker contract or architecture-review stop"
+      - "Privacy and oracle audit"
+    receipt: null
+  - id: T004
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: high
+    objective: "Build the neutral trajectory foundation and atomic authoring slice: synthetic fixture, pure stable-identity projections, five strict operations, deterministic compilation, and exact undo/redo."
+    allowed_files:
+      - "fixtures/public-synthetic/landing-shot1.html"
+      - "packages/domain/src/index.ts"
+      - "packages/domain/src/trajectory.test.ts"
+      - "packages/domain/src/trajectory-authoring.test.ts"
+      - "packages/domain/src/authoring.test.ts"
+      - "packages/preview-runtime/src/index.ts"
+      - "packages/preview-runtime/src/trajectory.test.ts"
+      - "packages/css-compiler/src/determinism.test.ts"
+    verify:
+      - "npx vitest run packages/domain/src/trajectory.test.ts packages/domain/src/trajectory-authoring.test.ts packages/domain/src/authoring.test.ts packages/preview-runtime/src/trajectory.test.ts --sequence.concurrent false"
+      - "npm run verify:determinism"
+      - "npm run typecheck"
+    stop_if:
+      - "T003 has not explicitly recorded a passing private preflight gate."
+      - "The accepted private capability cannot be represented by the approved closed transform grammar."
+      - "Any operation would require selector identity, implicit keyframe creation, later-time movement, or a second reducer."
+      - "Files outside allowed_files are required."
+      - "Verification fails twice for the same unexplained reason."
+    receipt: null
+  - id: T005
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: high
+    objective: "Carry all five trajectory operations through the shared strict protocol, sole-writer service, claims, recovery, CLI, and parity proof."
+    allowed_files:
+      - "packages/motion-protocol/src/index.ts"
+      - "packages/motion-protocol/src/index.test.ts"
+      - "packages/local-service/src/sqlite-project-store.ts"
+      - "packages/local-service/src/service.test.ts"
+      - "packages/local-service/src/recovery.test.ts"
+      - "packages/motion-cli/src/cli.ts"
+      - "packages/motion-cli/src/cli.test.ts"
+      - "packages/phase3-proof/src/parity.test.ts"
+    verify:
+      - "npm run test:phase3:service"
+      - "npm run test:phase3:recovery"
+      - "npm run test:phase3:parity"
+      - "npm run typecheck"
+    stop_if:
+      - "T004 is not complete with deterministic exact-history evidence."
+      - "Wire schemas describe a wider language than the domain reducer."
+      - "A second persistence writer, reducer, or table appears necessary."
+      - "Files outside allowed_files are required."
+      - "Verification fails twice for the same unexplained reason."
+    receipt: null
+  - id: T006
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: high
+    objective: "Implement the bounded Shot 1 Pose/Path workspace, direct manipulation, atomic temporary grouping, timing/easing/hold controls, and native compiled-preview browser behavior."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/global.d.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/editor.spec.ts"
+      - "apps/editor/tests/phase3.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+    verify:
+      - "npm run test:browser"
+      - "npm run test:phase3:browser"
+      - "npm run qa:chrome"
+      - "npm run typecheck"
+      - "npm run build"
+    stop_if:
+      - "T005 is not complete with service/CLI parity evidence."
+      - "The UI would write directly to iframe DOM/styles or use a separate interpolation engine."
+      - "Draft and committed operation builders diverge."
+      - "Files outside allowed_files are required."
+      - "Verification fails twice for the same unexplained reason."
+    receipt: null
+  - id: T007
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: high
+    objective: "Add deterministic controlled-Chromium trajectory proof for direct/numeric convergence, grouped edits, retiming/easing/hold, exact history, native preview/export equality, and boundary containment."
+    allowed_files:
+      - "packages/visual-proof/src/trajectory-authoring.visual.test.ts"
+      - "packages/visual-proof/src/index.ts"
+      - "package.json"
+    verify:
+      - "npm run test:visual:trajectory"
+      - "npm run test:visual:trajectory"
+      - "npm run test:visual:trajectory"
+      - "npm run verify:determinism"
+      - "npm run verify:receipts"
+    stop_if:
+      - "T006 browser/native-preview proof is incomplete."
+      - "package-lock.json or a new dependency would be required."
+      - "Changed pixels escape declared elements or time spans, or repeated receipts differ."
+      - "Files outside allowed_files are required."
+      - "Verification fails twice for the same unexplained reason."
+    receipt: null
+  - id: T008
+    type: worker
+    assignee: Worker
+    status: queued
+    reasoning_hint: high
+    objective: "Run the digest-locked private installed-Chrome workflow, extend private import/visual acceptance, and produce sanitized owner-QA evidence without committing private artifacts."
+    allowed_files:
+      - "packages/css-import/src/landing-shot1.private.test.ts"
+      - "packages/visual-proof/src/landing-shot1.private.test.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "package.json"
+      - "docs/goals/landing-shot1-dogfood/notes/private-qa-receipt.md"
+    verify:
+      - "npx vitest run packages/css-import/src/landing-shot1.private.test.ts packages/visual-proof/src/landing-shot1.private.test.ts --sequence.concurrent false"
+      - "npm run qa:chrome"
+      - "npm run check:private-ignore"
+      - "npm run check:sensitive"
+    stop_if:
+      - "The private digest or stable acceptance configuration no longer matches."
+      - "Any live network, failed request, console error, preview/export mismatch, history mismatch, or out-of-bound change occurs."
+      - "A tracked artifact would expose private content, identities, paths, counts, selectors, branding, screenshots, or geometry."
+      - "Owner manual QA is required before a completion claim."
+      - "Verification fails twice for the same unexplained reason."
+    receipt: null
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: queued
+    reasoning_hint: high
+    objective: "Audit whether the private landing Shot 1 dogfood outcome is genuinely complete."
+    inputs:
+      - "All completed task receipts"
+      - "Final verification receipts"
+      - "Current complete branch diff"
+      - "Owner installed-Chrome walkthrough outcome"
+    constraints:
+      - "Read-only; do not implement."
+      - "Reject completion if the private full loop was not imported fail-closed and completely."
+      - "Reject completion if any required Worker remains queued, active, or blocked with safe local work available."
+      - "Reject synthetic-only proof as evidence of private dogfood readiness."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "User-facing claim and top three realistic failure modes"
+      - "Exact evidence mapping"
+      - "Next task if not complete"
+    receipt: null
+
+checks:
+  dirty_fingerprint: "727a18c: only docs/goals/landing-shot1-dogfood/ untracked during preparation"
+  last_verification:
+    result: unknown
+    task: null
+    commands: []
