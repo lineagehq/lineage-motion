@@ -42,11 +42,14 @@ Use a shot-focused workspace over ordinary canonical motion tracks.
 
 The workspace contains:
 
-- the compiler-rendered stage with one selected object;
-- direct dragging for X/Y placement;
+- the compiler-rendered stage with object selection by stable identity;
+- a Pose mode for direct X/Y placement at one named moment;
+- a Path mode that overlays existing named transform keyframes as draggable
+  waypoints connected by their compiled trajectory segments;
 - precise X/Y, scale, and rotation fields;
 - landing and settled moment fields;
-- one easing control for the approach segment ending at the landed moment;
+- one easing control for the selected temporal segment;
+- temporary multi-selection with an explicit "move together" option;
 - play, pause, restart, and a 0–2,100 ms scrubber; and
 - a collapsed, read-only underlying-track inspection section.
 
@@ -56,6 +59,33 @@ object's existing transform keyframe at that moment. Scrubbing alone never
 changes the editable moment and never creates a keyframe. If the selected
 object lacks one unambiguous editable transform track and exact keyframe at the
 chosen moment, placement controls are disabled with a specific diagnostic.
+
+Path mode makes geometry and time visibly separate. Each selected object's
+Start, Landed, and Settled transform keyframes appear as waypoints. Dragging a
+waypoint or editing its X/Y fields changes that keyframe's position. Moving the
+named moment or changing its incoming easing changes when and how quickly the
+browser traverses the segment. The path overlay is an editor affordance derived
+from canonical tracks; it is not compiled output and never supplies preview
+motion. The animated object beneath it remains compiler-rendered DOM.
+
+For this slice, a trajectory is the ordered polyline through existing named
+transform keyframes. Temporal CSS easing controls progress along each segment;
+it does not create a spatial Bézier curve. Freehand paths, spatial curve
+handles, `offset-path`, and adding arbitrary intermediate waypoints remain out
+of scope. If the imported source contains a trajectory that cannot be
+represented losslessly by the inventoried transform keyframes, editing fails
+closed rather than simplifying it.
+
+A person selects one object by clicking it or its neutral object-list entry.
+Shift-click or object-list toggles create an ephemeral ordered selection set;
+the most recently selected object is primary and drives the inspector. This is
+not a canonical group, DOM wrapper, reusable asset, or persistent hierarchy.
+With "move together" enabled, dragging the primary waypoint applies the same
+stage-normalized X/Y delta to the corresponding named waypoint of every
+selected object in one atomic operation. Individual paths and stable identities
+remain separate. Shared landing time or easing is available only when every
+selected track has the same explicitly accounted named moment and compatible
+segment semantics.
 
 Arbitrary-time keyframe insertion, object styling, content editing, DOM
 restructuring, responsive variant authoring, and general track creation are not
@@ -118,6 +148,35 @@ interpolated by editor JavaScript. Pointer release submits one typed pose edit;
 Escape or a failed commit discards the draft and restores the committed
 revision. Numeric controls dispatch the same operation shape and reducer.
 
+### Path and selection projection
+
+The editor derives each visible path only from ordered canonical transform
+keyframes for the selected stable element. Waypoint identity is canonical
+keyframe identity. The overlay uses stage-normalized coordinates for display,
+but a commit preserves the track's supported canonical transform representation
+and validates the current stage geometry used for normalization. Resizing or
+layout movement never silently rewrites stored waypoints.
+
+Selecting objects and switching Pose or Path mode are local editor state and do
+not create a document revision. Scrubbing is also inspection-only. The editor
+keeps the selected editable moment explicit when the playhead moves so a scrub
+cannot redirect the next edit to an arbitrary time.
+
+### Atomic multi-object move
+
+A grouped waypoint move names an ordered set of stable element, transform-track,
+and corresponding keyframe IDs; their exact current bytes; the common named
+moment; the stage-normalized X/Y delta; and the expected document revision. The
+reducer validates every member before changing any member, applies the same
+delta while preserving each object's distinct values and path, and records one
+exact inverse bundle.
+
+If any member is missing, stale, locked, unsupported, lacks the corresponding
+moment, would leave the supported stage bounds, or has incompatible transform
+semantics, the complete operation rejects unchanged. There is no partial group
+success. Undo and redo restore or reapply every member together. Deselecting an
+object changes only local selection and does not alter the committed bundle.
+
 ### Landing retime
 
 The landing field moves only the explicitly inventoried landed-moment keyframe
@@ -165,6 +224,8 @@ output, and preview:
   no canonical document;
 - missing or ambiguous stable targets disable the control;
 - an unsupported transform shape rejects with a stable error code;
+- a grouped move with any ineligible member rejects the entire bundle and
+  identifies only sanitized failing-member counts and codes;
 - landing at or after settling, or settling after 2,100 ms, rejects;
 - a retime that crosses unaccounted keyframes or breaks a synchronized group
   rejects;
@@ -183,15 +244,20 @@ payload from the real scene, or local path.
 The owner and agent perform this workflow in installed Chrome:
 
 1. open Shot 1 and confirm the untouched full-loop import receipt;
-2. select the focal object by stable identity and select its landed moment;
-3. drag the object, then refine X/Y numerically;
-4. adjust scale or rotation;
-5. make landing faster, change the approach easing, and move settling earlier
+2. select the focal object by stable identity, enter Path mode, and select its
+   Landed waypoint;
+3. drag the waypoint, then refine X/Y numerically and confirm that its path—not
+   an arbitrary scrub position—changed;
+4. enter Pose mode and adjust scale or rotation at the same named moment;
+5. select a second eligible object, enable move-together, and shift both Landed
+   waypoints by one shared delta while preserving their separate paths;
+6. make landing faster, change the approach easing, and move settling earlier
    to create a hold;
-6. scrub before, at, and after each changed boundary;
-7. play Shot 1 and cross 2,100 ms into Shot 2 to inspect continuity;
-8. undo to the byte-identical original revision and redo exactly; and
-9. export three times and confirm byte-identical output.
+7. scrub before, at, and after each changed boundary;
+8. play Shot 1 and cross 2,100 ms into Shot 2 to inspect continuity;
+9. undo the grouped and individual operations to the byte-identical original
+   revision, then redo exactly; and
+10. export three times and confirm byte-identical output.
 
 The session records concise observations about whether selection, placement,
 timing, and recovery felt obvious. It does not record or commit screenshots or
@@ -223,6 +289,19 @@ Required evidence:
 - pointer release creates exactly one revision and Escape creates none; and
 - undo restores exact original canonical/compiler/export digests while redo
   restores exact edited digests.
+
+Additional trajectory evidence requires:
+
+- every displayed path and waypoint maps to an ordered canonical transform
+  track and stable keyframe identity;
+- selecting, multi-selecting, switching modes, and scrubbing create zero
+  revisions;
+- from the same baseline, dragging one waypoint and entering equivalent X/Y
+  values produce byte-identical revision-neutral canonical content and export;
+- a two-object move-together commit creates one revision, changes every declared
+  member by the same normalized delta, and leaves all nonmembers byte-identical;
+- one ineligible or stale member causes zero changes to every member; and
+- grouped undo and redo reproduce exact before and after digests.
 
 ### Failure mode 3: retiming breaks a boundary or the following shot
 
