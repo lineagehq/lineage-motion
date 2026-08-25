@@ -4,11 +4,17 @@ import { parse } from 'parse5';
 
 import {
   canonicalBytes,
+  serializeCssTimingFunction,
+  splitCssTimingFunction,
   sha256Hex,
   validateMotionDocument,
   type MotionDocument,
   type TimingFunction,
 } from '../../domain/src/index.js';
+import {
+  evaluateCssTimingProgress,
+  stepTransitionFractions,
+} from '../../domain/src/css-motion-semantics.js';
 
 export const COMPILER_VERSION = 'css-compiler.v1';
 
@@ -43,6 +49,7 @@ export function compileMotionDocument(document: MotionDocument): CompilerResult 
   assertNoInlineMotion(document.presentation.html);
   assertNoLiveResources(document.presentation.html, document.presentation.css);
   assertNoOpaqueMotion(document.presentation.css);
+  assertReducedMotionSnapshot(document.reducedMotion.css);
 
   const generatedNames = new Map(
     document.rules.map((rule, index) => [rule.id, `motion_rule_${String(index).padStart(4, '0')}`]),
@@ -95,6 +102,9 @@ export function compileMotionDocument(document: MotionDocument): CompilerResult 
     cssParts.push(`@keyframes ${generatedName} {\n${blocks.join('\n')}\n}`);
   }
   }
+
+  const reducedMotionCss = document.reducedMotion.css.trim();
+  if (reducedMotionCss) cssParts.push(reducedMotionCss);
 
   const css = `${cssParts.join('\n\n')}\n`;
   const styleElement = `<style>\n${css}</style>`;
@@ -187,12 +197,12 @@ function compileWarpedKeyframes(
     }));
     if (slotEasing.kind === 'steps' && sourceFrames.length === 2) {
       const [first, last] = sourceFrames as [typeof sourceFrames[number], typeof sourceFrames[number]];
-      const fractions = Array.from({ length: slotEasing.count + 1 }, (_, index) => index / slotEasing.count);
+      const fractions = [0, ...stepTransitionFractions(slotEasing), 1];
       const times = new Set(fractions.map((fraction) => first.timeMs + (last.timeMs - first.timeMs) * fraction));
       if (boundary > first.timeMs && boundary < last.timeMs) times.add(boundary);
       for (const timeMs of [...times].sort((a, b) => a - b)) {
         const progress = (timeMs - first.timeMs) / (last.timeMs - first.timeMs);
-        const stepped = Math.floor(progress * slotEasing.count + 1e-12) / slotEasing.count;
+        const stepped = evaluateCssTimingProgress(slotEasing, progress);
         const value = interpolateCssValue(first.value, last.value, Math.min(1, stepped));
         const storyTime = warpTime(timeMs, boundary, holdDuration);
         add(storyTime, { property: track.property, value,
@@ -211,7 +221,7 @@ function compileWarpedKeyframes(
       const fraction = (boundary - frame.timeMs) / (next.timeMs - frame.timeMs);
       const easing = frame.easing ?? slotEasing;
       if (track.interpolation === 'continuous') {
-        const split = splitTimingFunction(easing, fraction);
+        const split = splitCssTimingFunction(easing, fraction);
         const value = interpolateCssValue(frame.value, next.value, split.progress);
         const startOffset = (warpTime(frame.timeMs, boundary, holdDuration) - storyDelay) / storyDuration;
         const prior = blocks.get(startOffset)?.find((candidate) => candidate.property === track.property);
@@ -266,53 +276,6 @@ function interpolateCssValue(from: string, to: string, progress: number): string
   ));
 }
 
-function splitTimingFunction(
-  timing: TimingFunction,
-  timeFraction: number,
-): { progress: number; before: TimingFunction; after: TimingFunction } {
-  if (timing.kind === 'keyword' && timing.value === 'linear') {
-    return { progress: timeFraction, before: timing, after: timing };
-  }
-  const points = timing.kind === 'cubic-bezier'
-    ? [timing.x1, timing.y1, timing.x2, timing.y2] as const
-    : timing.kind === 'keyword' && timing.value === 'ease-in-out'
-      ? [0.42, 0, 0.58, 1] as const : null;
-  if (!points) throw new Error('COMPILER_HOLD_EASING_UNSUPPORTED');
-  const parameter = solveBezierParameter(timeFraction, points[0], points[2]);
-  const [x1, y1, x2, y2] = points;
-  const ax = lerp(0, x1, parameter); const ay = lerp(0, y1, parameter);
-  const bx = lerp(x1, x2, parameter); const by = lerp(y1, y2, parameter);
-  const cx = lerp(x2, 1, parameter); const cy = lerp(y2, 1, parameter);
-  const dx = lerp(ax, bx, parameter); const dy = lerp(ay, by, parameter);
-  const ex = lerp(bx, cx, parameter); const ey = lerp(by, cy, parameter);
-  const splitX = lerp(dx, ex, parameter); const splitY = lerp(dy, ey, parameter);
-  const before = { kind: 'cubic-bezier' as const,
-    x1: ax / splitX, y1: ay / splitY, x2: dx / splitX, y2: dy / splitY };
-  const after = { kind: 'cubic-bezier' as const,
-    x1: (ex - splitX) / (1 - splitX), y1: (ey - splitY) / (1 - splitY),
-    x2: (cx - splitX) / (1 - splitX), y2: (cy - splitY) / (1 - splitY) };
-  return { progress: splitY, before, after };
-}
-
-function solveBezierParameter(x: number, x1: number, x2: number): number {
-  let low = 0; let high = 1;
-  for (let iteration = 0; iteration < 60; iteration += 1) {
-    const mid = (low + high) / 2;
-    const value = cubicBezier(mid, x1, x2);
-    if (value < x) low = mid; else high = mid;
-  }
-  return (low + high) / 2;
-}
-
-function cubicBezier(t: number, p1: number, p2: number): number {
-  const inverse = 1 - t;
-  return 3 * inverse * inverse * t * p1 + 3 * inverse * t * t * p2 + t * t * t;
-}
-
-function lerp(from: number, to: number, progress: number): number {
-  return from + (to - from) * progress;
-}
-
 function assertNoOpaqueMotion(css: string): void {
   const root = postcss.parse(css);
   let opaque = false;
@@ -323,6 +286,54 @@ function assertNoOpaqueMotion(css: string): void {
     if (isMotionProperty(declaration.prop)) opaque = true;
   });
   if (opaque) throw new Error('COMPILER_OPAQUE_MOTION');
+}
+
+function assertReducedMotionSnapshot(css: string): void {
+  if (!css.trim()) return;
+  let root: postcss.Root;
+  try {
+    root = postcss.parse(css);
+  } catch {
+    throw new Error('COMPILER_REDUCED_MOTION_INVALID');
+  }
+  let mediaCount = 0;
+  let animationNoneCount = 0;
+  let invalid = false;
+  for (const node of root.nodes) {
+    if (node.type === 'comment') continue;
+    if (node.type !== 'atrule' || node.name.toLowerCase() !== 'media'
+      || !/^\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)$/i.test(node.params)) {
+      invalid = true;
+      continue;
+    }
+    mediaCount += 1;
+    node.walkAtRules(() => { invalid = true; });
+    node.walkRules((rule) => {
+      if (rule.selector.includes('::')) invalid = true;
+    });
+    node.walkDecls((declaration) => {
+      const property = declaration.prop.toLowerCase();
+      if (isMotionProperty(property)) {
+        if (property === 'animation'
+          && declaration.value.trim().toLowerCase() === 'none'
+          && !declaration.important) animationNoneCount += 1;
+        else invalid = true;
+      }
+      valueParser(declaration.value).walk((valueNode) => {
+        if (valueNode.type !== 'function') return;
+        const name = valueNode.value.toLowerCase();
+        if (name === 'local') invalid = true;
+        if (name === 'url') {
+          const value = valueParser.stringify(valueNode.nodes).trim()
+            .replace(/^["']|["']$/g, '');
+          if (!value.startsWith('data:')) invalid = true;
+        }
+      });
+    });
+  }
+  if (invalid || mediaCount === 0 || animationNoneCount === 0) {
+    throw new Error('COMPILER_REDUCED_MOTION_INVALID');
+  }
 }
 
 function assertNoLiveResources(html: string, css: string): void {
@@ -470,9 +481,7 @@ function formatNumber(value: number): string {
 }
 
 function formatTimingFunction(timing: TimingFunction): string {
-  if (timing.kind === 'keyword') return timing.value;
-  if (timing.kind === 'steps') return `steps(${timing.count}, ${timing.position})`;
-  return `cubic-bezier(${formatNumber(timing.x1)}, ${formatNumber(timing.y1)}, ${formatNumber(timing.x2)}, ${formatNumber(timing.y2)})`;
+  return serializeCssTimingFunction(timing);
 }
 
 function escapeCssString(value: string): string {

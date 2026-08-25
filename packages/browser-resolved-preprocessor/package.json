@@ -1,0 +1,7 @@
+{
+  "name": "@lineage-motion/browser-resolved-preprocessor",
+  "version": "0.0.0-private",
+  "private": true,
+  "type": "module",
+  "exports": "./src/index.ts"
+}

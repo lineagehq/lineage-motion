@@ -8,7 +8,7 @@ import {
 } from './index.js';
 
 describe('controlled visual proof primitives', () => {
-  test('derives stable samples and both valid sides of every discrete/steps boundary', () => {
+  test('derives stable samples and both valid sides of every exact visibility/steps boundary', () => {
     const imported = importMotionHtml(`<!doctype html><html><head><style>
       @keyframes snap { 0% { visibility: hidden; } 50% { visibility: visible; } 100% { visibility: hidden; } }
       .target { animation: snap 100ms steps(2, end) 0ms both; }

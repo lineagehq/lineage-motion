@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { canonicalBytes, canonicalJson, isValidAuthoringOperationId, sha256Hex, validateMotionDocument,
-  type MotionDocument } from '../../domain/src/index.ts';
+  type HistoryOperation, type MotionDocument, type TrajectoryAuthoringOperation } from '../../domain/src/index.ts';
 
 export const PROTOCOL_VERSION = 'motion.protocol.v1' as const;
 export const MAIN_BRANCH_ID = 'main' as const;
@@ -16,6 +16,21 @@ const trackCreate = z.object({ schemaVersion: z.literal('motion.operation.v1'), 
   elementId: z.enum(['el_a2849ff826f3e167', 'el_2dbee68b1ea318c8']),
   payload: z.object({ property: z.literal('opacity'), durationMs: z.literal(1000), delayMs: z.literal(610),
     easing: z.literal('linear'), startValue: z.literal(0), endValue: z.literal(1) }).strict() }).strict();
+const target = z.object({ elementId: z.string().min(1), trackId: z.string().min(1), keyframeId: z.string().min(1), expectedTransform: z.string().min(1) }).strict();
+const targets = z.array(target).min(1).superRefine((value, context) => { const keys = value.map((item) => `${item.elementId}\0${item.trackId}\0${item.keyframeId}`);
+  if (new Set(keys).size !== keys.length || keys.some((key, index) => index > 0 && key <= keys[index - 1]!)) context.addIssue({ code: 'custom', message: 'TARGET_ORDER' }); });
+const stage = z.object({ stageDigest: z.string().regex(/^[a-f0-9]{64}$/), widthMicrounits: z.number().int().positive().safe(), heightMicrounits: z.number().int().positive().safe() }).strict();
+const pose = z.object({ translateXMicrounits: z.number().int().safe(), translateYMicrounits: z.number().int().safe(), scalePpm: z.number().int().positive().max(10_000_000), rotateMicrodegrees: z.number().int().safe() }).strict();
+const timing = z.discriminatedUnion('kind', [z.object({ kind: z.literal('keyword'), value: z.enum(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out']) }).strict(),
+  z.object({ kind: z.literal('steps'), count: z.number().int().positive(), position: z.string().min(1) }).strict(),
+  z.object({ kind: z.literal('cubic-bezier'), x1: z.number(), y1: z.number(), x2: z.number(), y2: z.number() }).strict()]);
+const authorBase = { schemaVersion: z.literal('motion.operation.v1'), operationId, documentId: z.string().min(1), expectedRevision: revision } as const;
+const poseSet = z.object({ ...authorBase, kind: z.literal('motion.transform-pose.set'), ...target.shape, payload: z.object({ pose, stage }).strict() }).strict();
+const waypointTranslate = z.object({ ...authorBase, kind: z.literal('motion.transform-waypoints.translate'), payload: z.object({ targets, deltaXPpm: z.number().int().min(-1_000_000).max(1_000_000), deltaYPpm: z.number().int().min(-1_000_000).max(1_000_000), stage }).strict() }).strict();
+const groupTime = z.object({ ...authorBase, kind: z.literal('motion.keyframe-group-time.set'), payload: z.object({ targets, sourceTimeMs: z.number().int().min(0).max(2100), targetTimeMs: z.number().int().min(1).max(2100), landingTimeMs: z.number().int().min(1).max(2099), settledTimeMs: z.number().int().min(2).max(2100) }).strict() }).strict();
+const groupEasing = z.object({ ...authorBase, kind: z.literal('motion.keyframe-group-easing.set'), payload: z.object({ targets, expectedEasing: timing, easing: timing }).strict() }).strict();
+const settledHold = z.object({ ...authorBase, kind: z.literal('motion.settled-hold.set'), payload: z.object({ targets, sourceTimeMs: z.number().int().min(1).max(2100), settledTimeMs: z.number().int().min(2).max(2099), landingTimeMs: z.number().int().min(1).max(2098), boundaryTimeMs: z.literal(2100) }).strict() }).strict();
+const history = z.object({ ...authorBase, kind: z.enum(['motion.history.undo', 'motion.history.redo']) }).strict();
 const controlBase = { schemaVersion: z.literal('motion.control.v1'), operationId, documentId: z.string().min(1),
   expectedRevision: revision } as const;
 const branchCreate = z.object({ ...controlBase, kind: z.literal('motion.branch.create'),
@@ -26,7 +41,7 @@ const claimAcquire = z.object({ ...controlBase, kind: z.literal('motion.claim.ac
 const leaseControl = (kind: 'motion.claim.renew' | 'motion.claim.release' | 'motion.claim.revoke') => z.object({
   ...controlBase, kind: z.literal(kind), payload: z.object({ claimId: z.string().regex(/^claim_[a-f0-9]{24}$/),
     leaseVersion: z.number().int().positive().safe() }).strict() }).strict();
-export const operationSchema = z.discriminatedUnion('kind', [trackCreate, branchCreate, claimAcquire,
+export const operationSchema = z.discriminatedUnion('kind', [trackCreate, poseSet, waypointTranslate, groupTime, groupEasing, settledHold, history, branchCreate, claimAcquire,
   leaseControl('motion.claim.renew'), leaseControl('motion.claim.release'), leaseControl('motion.claim.revoke')]);
 export const commandSchema = z.object({ protocolVersion: z.literal(PROTOCOL_VERSION), operationId,
   documentId: z.string().min(1), branchId, expectedRevision: revision, command: operationSchema }).strict()
@@ -39,13 +54,15 @@ export const commandSchema = z.object({ protocolVersion: z.literal(PROTOCOL_VERS
 
 export type MotionCommand = z.infer<typeof commandSchema>;
 export type TrackCreateCommand = MotionCommand & { command: z.infer<typeof trackCreate> };
+export type TrajectoryCommand = MotionCommand & { command: TrajectoryAuthoringOperation };
+export type ClaimAcquireCommand = MotionCommand & { command: z.infer<typeof claimAcquire> };
 export type ProtocolErrorCode = 'VALIDATION' | 'STALE_REVISION' | 'UNAUTHORIZED_CLAIM' | 'OPERATION_ID_CONFLICT'
   | 'UNSUPPORTED_VERSION' | 'STORAGE_FAILURE';
 export type RevisionReceipt = { schemaVersion: 'motion.revision-receipt.v1'; protocolVersion: typeof PROTOCOL_VERSION;
   documentId: string; branchId: string; expectedRevision: number; resultingRevision: number; operationDigest: string;
   canonicalDigest: string; inventory: { ruleCount: number; applicationCount: number; slotCount: number; trackCount: number } };
 export type ControlReceipt = { schemaVersion: 'motion.control-receipt.v1'; protocolVersion: typeof PROTOCOL_VERSION;
-  kind: Exclude<MotionCommand['command']['kind'], 'motion.track.create'>; documentId: string; branchId: string;
+  kind: Exclude<MotionCommand['command']['kind'], 'motion.track.create' | TrajectoryAuthoringOperation['kind'] | 'motion.history.undo' | 'motion.history.redo'>; documentId: string; branchId: string;
   expectedRevision: number; resultingRevision: number; operationDigest: string; claimId?: string; leaseVersion?: number };
 export type CommandSuccess = { ok: true; protocolVersion: typeof PROTOCOL_VERSION; operationId: string; documentId: string;
   branchId: string; expectedRevision: number; resultingRevision: number; operationDigest: string; canonicalDigest?: string;
@@ -99,7 +116,7 @@ const immutableRevisionSchema = z.object({ document: z.custom<MotionDocument>((v
   canonicalDigest: digest }).strict().superRefine((value, context) => { if (sha256Hex(canonicalBytes(value.document)) !== value.canonicalDigest)
     context.addIssue({ code: 'custom', message: 'REVISION_DIGEST' }); });
 const commitMetadataSchema = z.object({ documentId: z.string(), branchId, revision, digest,
-  kind: z.enum(['motion.track.create', 'motion.branch.create', 'motion.claim.acquire', 'motion.claim.renew',
+  kind: z.enum(['motion.track.create', 'motion.transform-pose.set', 'motion.transform-waypoints.translate', 'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set', 'motion.history.undo', 'motion.history.redo', 'motion.branch.create', 'motion.claim.acquire', 'motion.claim.renew',
     'motion.claim.release', 'motion.claim.revoke']), commitSeq: z.number().int().positive() }).strict();
 
 export function parseCommand(input: unknown): { ok: true; command: MotionCommand } | { ok: false; code: ProtocolErrorCode } {
@@ -182,15 +199,18 @@ export function makeTrackCreateCommand(input: { operationId: string; documentId:
   return envelope({ schemaVersion: 'motion.operation.v1', kind: 'motion.track.create', operationId: input.operationId,
     documentId: input.documentId, expectedRevision: input.expectedRevision, elementId: input.elementId,
     payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear', startValue: 0, endValue: 1 } }, input.branchId ?? MAIN_BRANCH_ID) as TrackCreateCommand; }
+export function makeTrajectoryCommand(operation: TrajectoryAuthoringOperation | HistoryOperation, branchIdValue: string = MAIN_BRANCH_ID): MotionCommand {
+  return envelope(operation as MotionCommand['command'], branchIdValue);
+}
 export function makeBranchCreateCommand(input: { operationId: string; documentId: string; sourceBranchId?: string;
   expectedRevision: number; branchId: string }): MotionCommand { return envelope({ schemaVersion: 'motion.control.v1',
     kind: 'motion.branch.create', operationId: input.operationId, documentId: input.documentId,
     expectedRevision: input.expectedRevision, payload: { branchId: input.branchId } }, input.sourceBranchId ?? MAIN_BRANCH_ID); }
 export function makeClaimAcquireCommand(input: { operationId: string; documentId: string; branchId?: string;
-  expectedRevision: number; scope: 'document' | 'branch' }): MotionCommand { const branch = input.branchId ?? MAIN_BRANCH_ID;
+  expectedRevision: number; scope: 'document' | 'branch' }): ClaimAcquireCommand { const branch = input.branchId ?? MAIN_BRANCH_ID;
   return envelope({ schemaVersion: 'motion.control.v1', kind: 'motion.claim.acquire', operationId: input.operationId,
     documentId: input.documentId, expectedRevision: input.expectedRevision,
-    payload: input.scope === 'document' ? { scope: 'document' } : { scope: 'branch', branchId: branch } }, branch); }
+    payload: input.scope === 'document' ? { scope: 'document' } : { scope: 'branch', branchId: branch } }, branch) as ClaimAcquireCommand; }
 export function makeClaimControlCommand(input: { kind: 'motion.claim.renew' | 'motion.claim.release' | 'motion.claim.revoke';
   operationId: string; documentId: string; branchId?: string; expectedRevision: number; claimId: string;
   leaseVersion: number }): MotionCommand { return envelope({ schemaVersion: 'motion.control.v1', kind: input.kind,

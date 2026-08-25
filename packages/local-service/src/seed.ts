@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { importMotionHtml } from '../../css-import/src/index.ts';
-import type { MotionDocument } from '../../domain/src/index.ts';
+import { validateMotionDocument, type MotionDocument } from '../../domain/src/index.ts';
 
 export function createPhase3Seed(repositoryRoot = resolve(import.meta.dirname, '../../..')): MotionDocument {
   const source = readFileSync(resolve(repositoryRoot, 'fixtures/public-synthetic/preview.html'), 'utf8');
@@ -18,6 +18,28 @@ export function createPhase3Seed(repositoryRoot = resolve(import.meta.dirname, '
       { schemaVersion: 'motion.cue.v1', id: 'cue_hold', label: 'Hold inspected', timeMs: 4310 },
       { schemaVersion: 'motion.cue.v1', id: 'cue_rest', label: 'Rest', timeMs: 4660 },
     ],
-    reducedMotion: { mode: 'source-snapshot', css: '@media (prefers-reduced-motion: reduce) { .stage { scroll-behavior: auto; } }' },
+    reducedMotion: { mode: 'source-snapshot', css: '@media (prefers-reduced-motion: reduce) { .stage * { animation: none; } }' },
   };
+}
+
+export function createTrajectorySeed(repositoryRoot = resolve(import.meta.dirname, '../../..')): MotionDocument {
+  const source = readFileSync(resolve(repositoryRoot, 'fixtures/public-synthetic/landing-shot1.html'), 'utf8');
+  const imported = importMotionHtml(source);
+  if (!imported.document) throw new Error(imported.diagnostics[0]?.code ?? 'TRAJECTORY_SEED_IMPORT_FAILED');
+  return { ...imported.document, cues: [
+    { schemaVersion: 'motion.cue.v1', id: 'trajectory_start', label: 'Start', timeMs: 0 },
+    { schemaVersion: 'motion.cue.v1', id: 'trajectory_landed', label: 'Landed', timeMs: 700 },
+    { schemaVersion: 'motion.cue.v1', id: 'trajectory_settled', label: 'Settled', timeMs: 2100 },
+    { schemaVersion: 'motion.cue.v1', id: 'trajectory_later', label: 'Later continuity', timeMs: 2800 },
+  ] };
+}
+
+export function createLandingShot1EditorSeed(
+  repositoryRoot = resolve(import.meta.dirname, '../../..'),
+  privateDocumentPath?: string,
+): MotionDocument {
+  if (!privateDocumentPath) return createTrajectorySeed(repositoryRoot);
+  const document = JSON.parse(readFileSync(resolve(privateDocumentPath), 'utf8')) as MotionDocument;
+  if (!validateMotionDocument(document).ok) throw new Error('LANDING_SHOT1_EDITOR_SEED_INVALID');
+  return document;
 }

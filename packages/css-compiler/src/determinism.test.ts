@@ -10,6 +10,9 @@ import { compileMotionDocument } from './index.js';
 const fixturePath = fileURLToPath(
   new URL('../../../fixtures/public-synthetic/foundation.html', import.meta.url),
 );
+const longhandFixturePath = fileURLToPath(
+  new URL('../../../fixtures/public-synthetic/animation-longhands-reduced-motion.html', import.meta.url),
+);
 
 describe('deterministic pure HTML/CSS compiler', () => {
   test('emits deterministic compiler-native source-to-story hold CSS', async () => {
@@ -87,6 +90,36 @@ describe('deterministic pure HTML/CSS compiler', () => {
     );
     expect(runs[0]!.receipt.documentDigest).toMatch(/^[a-f0-9]{64}$/);
     expect(new TextDecoder().decode(canonical).endsWith('\n')).toBe(true);
+  });
+
+  test('revalidates the reduced-motion snapshot and compiles longhands to canonical shorthand', async () => {
+    const imported = importMotionHtml(await readFile(longhandFixturePath, 'utf8'));
+    expect(imported.document).not.toBeNull();
+
+    const runs = [0, 1, 2].map(() => compileMotionDocument(imported.document!));
+
+    expect(runs.map((run) => run.html)).toEqual(Array(3).fill(runs[0]!.html));
+    expect(runs.map((run) => run.css)).toEqual(Array(3).fill(runs[0]!.css));
+    expect(runs.map((run) => run.exportDigest)).toEqual(Array(3).fill(runs[0]!.exportDigest));
+    expect(runs[0]!.css).toContain('animation: motion_rule_0000 1200ms linear 100ms 1 normal both running;');
+    expect(runs[0]!.css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(runs[0]!.css).toContain('animation: none');
+    expect(runs[0]!.css).not.toContain('animation-name:');
+  });
+
+  test.each([
+    '.target { animation: none; }',
+    '@media (prefers-reduced-motion: no-preference) { .target { animation: none; } }',
+    '@media (prefers-reduced-motion: reduce) { .target { transition: none; } }',
+    '@media (prefers-reduced-motion: reduce) { .target::before { animation: none; } }',
+    '@media (prefers-reduced-motion: reduce) { .target { animation: none; background: url(live.png); } }',
+  ])('rejects a mutated reduced-motion canonical snapshot', async (snapshot) => {
+    const imported = importMotionHtml(await readFile(longhandFixturePath, 'utf8'));
+    imported.document!.reducedMotion.css = snapshot;
+
+    expect(() => compileMotionDocument(imported.document!)).toThrowError(
+      'COMPILER_REDUCED_MOTION_INVALID',
+    );
   });
 
   test('compiles parameterized Cursor and Orb opacity bundles deterministically with distinct identities', async () => {

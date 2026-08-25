@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { createServer as createNetServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
@@ -12,19 +13,48 @@ if (process.argv[2] === '--real-cli') {
   const { runCli } = await import('../../../packages/motion-cli/src/cli.ts');
   process.exit(await runCli(argv));
 }
+if (process.argv[2] === '--materialize-public-asymmetric-seed') {
+  await materializePublicAsymmetricSeed(resolve(import.meta.dirname, '../../..'), process.argv[3]);
+  process.exit();
+}
+if (process.argv[2] === '--vite-listen-ready') {
+  const { createServer } = await import('vite');
+  const requestedPort = Number(process.argv[3]);
+  const readyPort = requestedPort === 0 ? await reserveEphemeralPort() : requestedPort;
+  const readyRoot = resolve(import.meta.dirname, '../../..');
+  const vite = await createServer({ configFile: resolve(readyRoot, 'apps/editor/vite.config.ts'),
+    server: { host: '127.0.0.1', port: readyPort, strictPort: true }, logLevel: 'error' });
+  await vite.listen();
+  const address = vite.httpServer?.address();
+  if (!address || typeof address === 'string') throw new Error('CHROME_QA_EDITOR_ADDRESS_UNAVAILABLE');
+  process.stdout.write(`${JSON.stringify({ editorUrl: `http://127.0.0.1:${address.port}` })}\n`);
+  let closing = false;
+  const close = async () => { if (closing) return; closing = true; await vite.close(); process.exit(0); };
+  process.on('SIGTERM', () => { void close(); }); process.on('SIGINT', () => { void close(); });
+  await new Promise(() => {});
+}
+if (process.argv[2] === '--assert-shot1-proof-routing') {
+  assertShot1ProofRouting();
+  process.stdout.write('{"schemaVersion":"motion.shot1-proof-routing.v1","passed":true}\n');
+  process.exit();
+}
+if (process.argv[2] === '--shot1-spatial-parity-public') {
+  await runLandingShot1Qa({ authority: 'public', workspaceSmokeOnly: false });
+  process.exit();
+}
+if (process.argv[2] === '--landing-shot1') {
+  await runLandingShot1Qa({ authority: 'private', workspaceSmokeOnly: process.argv.includes('--workspace-smoke-only') });
+  process.exit();
+}
 
 const root = resolve(import.meta.dirname, '../../..');
-const port = 41739;
-const url = `http://127.0.0.1:${port}`;
-const server = spawn('npm', ['exec', '--', 'vite',
-  '--config', resolve(root, 'apps/editor/vite.config.ts'),
-  '--host', '127.0.0.1',
-  '--port', String(port),
-], { cwd: root, stdio: ['ignore', 'ignore', 'pipe'] });
+const port = 0;
+const server = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/qa-chrome.mjs'),
+  '--vite-listen-ready', String(port)], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
 
 let browser;
 try {
-  await waitForServer(url);
+  const { editorUrl: url } = await observeServerAddress(server, 'CHROME_QA');
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const consoleErrors = [];
@@ -429,7 +459,7 @@ try {
     .every((width) => responsive[width].historyAnchor);
 
   const persistenceDirectory = await mkdtemp(join(tmpdir(), 'lineage-motion-chrome-'));
-  const persistencePort = 41740;
+  const persistencePort = 0;
   const humanCapability = randomBytes(32).toString('base64url');
   const agentCapability = randomBytes(32).toString('base64url');
   const persistence = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
@@ -439,13 +469,7 @@ try {
   });
   let persistenceChecks;
   try {
-    const addresses = await new Promise((resolveAddress, reject) => {
-      let output = ''; const timer = setTimeout(() => reject(new Error('PERSISTENCE_CHROME_TIMEOUT')), 10000);
-      persistence.stdout.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((value) => value.startsWith('{'));
-        if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); } });
-      persistence.once('exit', (code) => { clearTimeout(timer); reject(new Error(`PERSISTENCE_CHROME_EXIT_${code}`)); });
-    });
-    await waitForServer(addresses.editorUrl);
+    const addresses = await observeServerAddress(persistence, 'PERSISTENCE_CHROME');
     const persistencePage = await browser.newPage({ viewport: { width: 1280, height: 720 } });
     const persistenceErrors = []; const persistencePageErrors = []; const persistenceFailedRequests = [];
     const expectedFailedRequests = []; let allowExpectedEventAbort = false;
@@ -684,18 +708,31 @@ try {
   server.kill('SIGTERM');
 }
 
-async function waitForServer(target) {
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    if (server.exitCode !== null) throw new Error('CHROME_QA_SERVER_EXITED');
-    try {
-      const response = await fetch(target);
-      if (response.ok) return;
-    } catch {
-      // The local server is still starting.
-    }
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
-  }
-  throw new Error('CHROME_QA_SERVER_TIMEOUT');
+async function observeServerAddress(processHandle, label) {
+  return new Promise((resolveAddress, reject) => {
+    let output = '';
+    const timer = setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), 10000);
+    processHandle.stdout.on('data', (chunk) => {
+      output += chunk.toString();
+      const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
+      if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); }
+    });
+    processHandle.once('exit', (code) => { clearTimeout(timer); reject(new Error(`${label}_EXIT_${code}`)); });
+  });
+}
+
+async function ensureAdvancedOpen(page) {
+  const advanced = page.locator('[data-shot-advanced]');
+  if (await advanced.getAttribute('open') === null) await advanced.locator('summary').click();
+}
+
+async function reserveEphemeralPort() {
+  const server = createNetServer();
+  await new Promise((resolveListen, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolveListen); });
+  const address = server.address();
+  if (!address || typeof address === 'string') throw new Error('CHROME_QA_EPHEMERAL_PORT_UNAVAILABLE');
+  await new Promise((resolveClose, reject) => server.close((error) => error ? reject(error) : resolveClose()));
+  return address.port;
 }
 
 function roundTimes(values) {
@@ -734,4 +771,858 @@ async function runRealCli(args) {
   child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
   const code = await new Promise((resolveExit) => child.once('exit', resolveExit));
   if (code !== 0) throw new Error(`REAL_CLI_FAILED_${code}_${stderr.length}`); return JSON.parse(stdout);
+}
+
+function resolveShot1ProofAuthority(authority, availability) {
+  if (authority === 'public') {
+    if (!availability.publicFixture) throw new Error('SHOT1_PUBLIC_FIXTURE_REQUIRED');
+    return { authority, source: 'fixtures/public-synthetic/landing-shot1.html' };
+  }
+  if (authority === 'private') {
+    if (!availability.privateManifest || !availability.privateCanonical) throw new Error('SHOT1_PRIVATE_AUTHORITY_REQUIRED');
+    return { authority, source: 'authenticated-ignored-manifest' };
+  }
+  throw new Error('SHOT1_PROOF_AUTHORITY_INVALID');
+}
+
+function assertShot1ProofRouting() {
+  const publicRoute = resolveShot1ProofAuthority('public', { publicFixture: true, privateManifest: false, privateCanonical: false });
+  const privateRoute = resolveShot1ProofAuthority('private', { publicFixture: false, privateManifest: true, privateCanonical: true });
+  if (publicRoute.source !== 'fixtures/public-synthetic/landing-shot1.html' || privateRoute.source !== 'authenticated-ignored-manifest') {
+    throw new Error('SHOT1_PROOF_ROUTE_MISMATCH');
+  }
+  for (const assertion of [
+    () => resolveShot1ProofAuthority('public', { publicFixture: false, privateManifest: true, privateCanonical: true }),
+    () => resolveShot1ProofAuthority('private', { publicFixture: true, privateManifest: false, privateCanonical: false }),
+  ]) {
+    let rejected = false; try { assertion(); } catch { rejected = true; }
+    if (!rejected) throw new Error('SHOT1_PROOF_FALLBACK_DETECTED');
+  }
+}
+
+async function observeActionCommit(page, expected) {
+  try {
+    await page.waitForFunction((contract) => { const inspected = window.__motionEditor.inspectAuthoring();
+      const workspace = window.__motionEditor.inspectShotWorkspace();
+      if (inspected.revision !== contract.revision || !workspace.previewMatchesCompiler) return false;
+      const moments = [...document.querySelectorAll('input[name="shot-moment"]')].map((input) => Number(input.value));
+      if (contract.moments && JSON.stringify(moments) !== JSON.stringify(contract.moments)) return false;
+      if (contract.landing !== undefined && Number(document.querySelector('[data-shot-landing]').value) !== contract.landing) return false;
+      if (contract.settled !== undefined && Number(document.querySelector('[data-shot-settled]').value) !== contract.settled) return false;
+      if (contract.easing !== undefined && document.querySelector('[data-shot-easing]').value !== contract.easing) return false;
+      return true;
+    }, expected);
+  } catch (error) {
+    const observed = await page.evaluate(() => ({ authoring: window.__motionEditor.inspectAuthoring(), workspace: window.__motionEditor.inspectShotWorkspace(),
+      moments: [...document.querySelectorAll('input[name="shot-moment"]')].map((input) => Number(input.value)),
+      landing: Number(document.querySelector('[data-shot-landing]').value), settled: Number(document.querySelector('[data-shot-settled]').value),
+      easing: document.querySelector('[data-shot-easing]').value, status: document.querySelector('[data-shot-status]').value }));
+    throw new Error(`ACTION_COMMIT_MISMATCH_${JSON.stringify({ expected, observed })}`, { cause: error });
+  }
+  return page.evaluate(() => window.__motionEditor.inspectAuthoring());
+}
+
+async function observeGeometryCommit(page, { sampleCount, previousRequestId = null, moments = null }) {
+  await page.waitForFunction((contract) => { const inspected = window.__motionEditor.inspectShotWorkspace();
+    const frame = document.querySelector('[data-preview]'); const overlay = document.querySelector('[data-trajectory-overlay]');
+    const handle = document.querySelector('[data-trajectory-overlay] [aria-pressed="true"]'); const pump = inspected.geometryPump;
+    if (overlay.getAttribute('aria-busy') !== 'false' || pump.running || pump.activeSamplers !== 0 || pump.pendingRequestId !== null
+      || pump.lastCommittedRequestId === null || pump.lastCommittedRequestId !== pump.latestRequestId
+      || (contract.previousRequestId !== null && pump.lastCommittedRequestId <= contract.previousRequestId)
+      || (contract.sampleCount !== null && inspected.geometry.length !== contract.sampleCount)
+      || inspected.geometry.some((sample) => Object.values(sample.deltasDevicePixels).some((delta) => delta > 1))
+      || !inspected.previewMatchesCompiler) return false;
+    const animations = frame.contentDocument?.getAnimations() ?? []; const state = window.__motionEditor.readState();
+    if (animations.length === 0 || animations.some((animation) => animation.constructor.name !== 'CSSAnimation'
+      || animation.effect?.constructor.name !== 'KeyframeEffect' || animation.timeline?.constructor.name !== 'DocumentTimeline'
+      || animation.currentTime !== state.playheadMs)) return false;
+    if (contract.moments && JSON.stringify([...document.querySelectorAll('input[name="shot-moment"]')].map((input) => Number(input.value)))
+      !== JSON.stringify(contract.moments)) return false;
+    if (!(handle instanceof HTMLElement)) return false; const rect = handle.getBoundingClientRect(); const style = getComputedStyle(handle);
+    return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+  }, { sampleCount, previousRequestId, moments });
+  return page.evaluate(() => window.__motionEditor.inspectShotWorkspace().geometryPump);
+}
+
+async function currentGeometryRequestId(page) {
+  return page.evaluate(() => window.__motionEditor.inspectShotWorkspace().geometryPump.lastCommittedRequestId);
+}
+
+async function materializePublicAsymmetricSeed(repositoryRoot, seedPath) {
+  const { createLandingShot1EditorSeed } = await import('../../../packages/local-service/src/seed.ts');
+  const seed = createLandingShot1EditorSeed(repositoryRoot); const targetElementIds = seed.elements.map((element) => element.id).sort();
+  const track = seed.tracks.find((candidate) => candidate.elementId === targetElementIds[0] && candidate.property === 'transform');
+  const ruleTrack = track && seed.rules.find((rule) => rule.id === track.ruleId)?.tracks.find((candidate) => candidate.property === 'transform');
+  const landed = ruleTrack?.keyframes.find((keyframe) => keyframe.offset === 0.1);
+  if (!ruleTrack || !landed || targetElementIds.length !== 2) throw new Error('ASYMMETRIC_CHROME_SEED_INVALID');
+  landed.value = landed.value.replace(/translate\([^)]*\)/, 'translate(-40px, 170px)');
+  ruleTrack.keyframes.push({ ...landed, id: 'kf_asymmetric_1400', offset: 0.2 });
+  ruleTrack.keyframes.sort((left, right) => left.offset - right.offset);
+  for (const expanded of seed.tracks.filter((candidate) => candidate.ruleId === track.ruleId && candidate.property === 'transform')) {
+    expanded.keyframeIds = ruleTrack.keyframes.map((keyframe) => keyframe.id);
+  }
+  await writeFile(seedPath, `${JSON.stringify(seed)}\n`); process.stdout.write(`${JSON.stringify({ targetElementIds })}\n`);
+}
+
+async function runAsymmetricAlternatePrimaryQa({ repositoryRoot, directory, browser, port }) {
+  const seedPath = resolve(directory, 'public-asymmetric.json');
+  const seedProcess = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/qa-chrome.mjs'),
+    '--materialize-public-asymmetric-seed', seedPath], { cwd: repositoryRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+  const { targetElementIds } = await observeServerAddress(seedProcess, 'ASYMMETRIC_SEED');
+  const seedExitCode = seedProcess.exitCode ?? await new Promise((resolveExit) => seedProcess.once('exit', resolveExit));
+  if (seedExitCode !== 0) throw new Error('ASYMMETRIC_SEED_EXIT');
+  const humanCapability = randomBytes(32).toString('base64url'); const agentCapability = randomBytes(32).toString('base64url');
+  const processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: repositoryRoot, env: { ...process.env, PHASE3_DATABASE_PATH: resolve(directory, 'public-asymmetric.sqlite'),
+      PHASE3_EDITOR_PORT: String(port), PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability,
+      LANDING_SHOT1_WORKSPACE: '1', LANDING_SHOT1_DOCUMENT_PATH: seedPath }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let page;
+  try {
+    const addresses = await observeServerAddress(processHandle, 'ASYMMETRIC_CHROME_SERVER');
+    page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const diagnostics = { consoleErrors: [], pageErrors: [], failedRequests: [], unexpectedNetwork: [], httpErrors: [] };
+    monitorPage(page, [addresses.editorUrl, addresses.serviceUrl], diagnostics);
+    const commands = []; page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) commands.push(request.postDataJSON().command); });
+    await page.goto(addresses.editorUrl); await page.locator('[data-editor-ready="true"]').waitFor();
+    await observeGeometryCommit(page, { sampleCount: 4, moments: [0, 700, 1400, 2100] });
+    const primaries = page.locator('[data-shot-targets] input[name="shot-primary"]');
+    if (await primaries.count() !== 2 || await page.locator('[data-shot-targets] input[type="checkbox"]').count() !== 0) throw new Error('ASYMMETRIC_SCOPE_CONTROLS');
+    if (await page.getByRole('button', { name: 'Path' }).getAttribute('aria-pressed') !== 'true') await page.getByRole('button', { name: 'Path' }).click();
+    await observeGeometryCommit(page, { sampleCount: 4, moments: [0, 700, 1400, 2100] });
+    const polishBaseline = await page.evaluate(() => ({ revision: window.__motionEditor.inspectAuthoring().revision,
+      contentDigest: window.__motionEditor.inspectAuthoring().contentDigest, exportDigest: window.__motionEditor.inspectAuthoring().exportDigest,
+      native: window.__motionEditor.readState(), srcdoc: document.querySelector('[data-preview]').srcdoc,
+      guidance: document.querySelector('[data-shot-guidance]').textContent, groupCopy: document.querySelector('.move-together').textContent }));
+    await ensureAdvancedOpen(page);
+    const landingDraft = page.locator('[data-shot-landing]'); await landingDraft.fill('2200'); await page.locator('[data-shot-apply-time]').click();
+    const polishRejected = await page.evaluate(() => ({ revision: window.__motionEditor.inspectAuthoring().revision,
+      contentDigest: window.__motionEditor.inspectAuthoring().contentDigest, exportDigest: window.__motionEditor.inspectAuthoring().exportDigest,
+      native: window.__motionEditor.readState(), srcdoc: document.querySelector('[data-preview]').srcdoc,
+      value: document.querySelector('[data-shot-landing]').value, invalid: document.querySelector('[data-shot-landing]').getAttribute('aria-invalid'),
+      focused: document.activeElement === document.querySelector('[data-shot-landing]'), status: document.querySelector('[data-shot-status]').value }));
+    if (!polishBaseline.guidance.includes('Editing Object 1 at 700 ms.')
+      || !polishBaseline.guidance.includes('square handle to scale')
+      || !polishBaseline.groupCopy.includes('Move together') || !polishBaseline.groupCopy.includes('Translation only')
+      || polishRejected.value !== '2200' || polishRejected.invalid !== 'true' || !polishRejected.focused
+      || polishRejected.status !== 'Landing must be a whole number from 1 to 2099 ms. Revision 0 unchanged.'
+      || polishRejected.revision !== polishBaseline.revision || polishRejected.contentDigest !== polishBaseline.contentDigest
+      || polishRejected.exportDigest !== polishBaseline.exportDigest || polishRejected.srcdoc !== polishBaseline.srcdoc
+      || JSON.stringify(polishRejected.native) !== JSON.stringify(polishBaseline.native) || commands.length !== 0) {
+      throw new Error('ASYMMETRIC_PATH_UX_POLISH_INVALID');
+    }
+    await landingDraft.fill('700');
+    const readAlignment = () => page.evaluate(() => { const state = window.__motionEditor.readState(); const inspected = window.__motionEditor.inspectShotWorkspace();
+      return { revision: window.__motionEditor.inspectAuthoring().revision, momentMs: inspected.momentMs, playheadMs: state.playheadMs,
+        currentTimes: state.currentTimes, playStates: state.playStates, slider: Number(document.querySelector('[data-scrub]').value),
+        visibleTime: document.querySelector('[data-playhead]').value, requestId: inspected.geometryPump.lastCommittedRequestId }; });
+    const aligned = (state, timeMs, revision = 0) => state.revision === revision && state.momentMs === timeMs && state.playheadMs === timeMs
+      && state.currentTimes.length > 0 && state.currentTimes.every((time) => time === timeMs)
+      && state.playStates.every((playState) => playState === 'paused') && state.slider === timeMs && state.visibleTime === `${timeMs} ms`;
+    await page.locator('input[name="shot-moment"][value="1400"]').check(); const primaryBaseline = await readAlignment();
+    let priorRequestId = await currentGeometryRequestId(page); await primaries.nth(1).check();
+    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: [0, 700, 2100] });
+    if (!aligned(primaryBaseline, 1400) || !aligned(await readAlignment(), 700) || commands.length !== 0
+      || (await currentGeometryRequestId(page)) !== priorRequestId + 1) throw new Error('ASYMMETRIC_PRIMARY_RECONCILIATION_INVALID');
+    const editBoth = page.locator('[data-move-together]'); await editBoth.check();
+    const assertGrouped = async (moments) => {
+      await observeGeometryCommit(page, { sampleCount: moments.length, moments });
+      const scope = await page.evaluate(() => ({ primary: document.querySelector('[data-shot-targets] input[name="shot-primary"]:checked')?.value,
+        grouped: document.querySelector('[data-move-together]').checked, selected: window.__motionEditor.inspectShotWorkspace().selectedElementIds,
+        status: document.querySelector('[data-shot-status]').value }));
+      if (scope.primary !== targetElementIds[1] || !scope.grouped || JSON.stringify(scope.selected) !== JSON.stringify(targetElementIds)
+        || /INVALID|MISSING|DIVERGED/.test(scope.status)) throw new Error('ASYMMETRIC_GROUPED_SCOPE_DIVERGED');
+    };
+    await assertGrouped([0, 700, 2100]);
+    await ensureAdvancedOpen(page);
+    const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 1));
+    priorRequestId = await currentGeometryRequestId(page); await page.getByRole('button', { name: 'Apply pose' }).click();
+    await observeActionCommit(page, { revision: 1, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' });
+    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: [0, 700, 2100] }); await assertGrouped([0, 700, 2100]);
+    priorRequestId = await currentGeometryRequestId(page); await page.locator('[data-shot-landing]').fill('840'); await page.locator('[data-shot-apply-time]').click();
+    await observeActionCommit(page, { revision: 2, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-out' });
+    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: [0, 840, 2100] }); await assertGrouped([0, 840, 2100]);
+    priorRequestId = await currentGeometryRequestId(page); await page.locator('[data-shot-easing]').selectOption('ease-in-out'); await page.locator('[data-shot-apply-easing]').click();
+    await observeActionCommit(page, { revision: 3, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-in-out' });
+    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: [0, 840, 2100] }); await assertGrouped([0, 840, 2100]);
+    const history = [
+      ['undo', 4, [0, 840, 2100], 840, 'ease-out'], ['undo', 5, [0, 700, 2100], 700, 'ease-out'],
+      ['undo', 6, [0, 700, 2100], 700, 'ease-out'], ['redo', 7, [0, 700, 2100], 700, 'ease-out'],
+      ['redo', 8, [0, 840, 2100], 840, 'ease-out'], ['redo', 9, [0, 840, 2100], 840, 'ease-in-out'],
+    ];
+    for (const [direction, revision, moments, landing, easing] of history) {
+      priorRequestId = await currentGeometryRequestId(page); await page.locator(`[data-${direction}]`).click();
+      await observeActionCommit(page, { revision, moments, landing, settled: 2100, easing });
+      await observeGeometryCommit(page, { sampleCount: moments.length, previousRequestId: priorRequestId, moments }); await assertGrouped(moments);
+    }
+    await editBoth.uncheck(); priorRequestId = await currentGeometryRequestId(page); await x.fill(String(Number(await x.inputValue()) + 1));
+    await page.getByRole('button', { name: 'Apply pose' }).click();
+    await observeActionCommit(page, { revision: 10, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-in-out' });
+    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: [0, 840, 2100] });
+    const operationProof = commands.length === 10 && commands[0]?.kind === 'motion.transform-waypoints.translate'
+      && JSON.stringify(commands[0]?.payload.targets.map((target) => target.elementId)) === JSON.stringify(targetElementIds)
+      && commands[1]?.kind === 'motion.keyframe-group-time.set' && commands[2]?.kind === 'motion.keyframe-group-easing.set'
+      && commands.at(-1)?.kind === 'motion.transform-pose.set' && commands.at(-1)?.elementId === targetElementIds[1];
+    if (!operationProof || diagnostics.consoleErrors.length || diagnostics.pageErrors.length || diagnostics.failedRequests.length
+      || diagnostics.unexpectedNetwork.length || diagnostics.httpErrors.length) throw new Error('ASYMMETRIC_CHROME_PROOF_FAILED');
+    return { passed: true, primaryIndex: 1, perObjectEditCheckboxesAbsent: true, groupedInventories: [[0, 700, 2100], [0, 840, 2100]],
+      groupedOperationCount: 3, undoCount: 3, redoCount: 3, singlePrimaryOperation: true, nativeGeometryExact: true };
+  } finally {
+    await page?.close(); processHandle.kill('SIGTERM'); if (processHandle.exitCode === null) await new Promise((done) => processHandle.once('exit', done));
+  }
+}
+
+async function runHitOwnershipQa({ repositoryRoot, directory, browser }) {
+  const humanCapability = randomBytes(32).toString('base64url'); const agentCapability = randomBytes(32).toString('base64url');
+  const processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: repositoryRoot, env: { ...process.env, PHASE3_DATABASE_PATH: resolve(directory, 'hit-ownership.sqlite'),
+      PHASE3_EDITOR_PORT: '0', PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability,
+      LANDING_SHOT1_WORKSPACE: '1' }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let page;
+  try {
+    const addresses = await observeServerAddress(processHandle, 'HIT_OWNERSHIP_CHROME_SERVER');
+    page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    const diagnostics = { consoleErrors: [], pageErrors: [], failedRequests: [], unexpectedNetwork: [], httpErrors: [] };
+    monitorPage(page, [addresses.editorUrl, addresses.serviceUrl], diagnostics);
+    const commands = []; page.on('request', (request) => {
+      if (request.url().endsWith('/api/v1/commands')) commands.push(request.postDataJSON().command);
+    });
+    await page.goto(addresses.editorUrl); await page.locator('[data-editor-ready="true"]').waitFor();
+    await observeGeometryCommit(page, { sampleCount: 3, moments: [0, 700, 2100] });
+    const targets = page.locator('[data-shot-targets] input[name="shot-primary"]');
+    const targetElementIds = await targets.evaluateAll((inputs) => inputs.map((input) => input.value));
+    if (targetElementIds.length !== 2) throw new Error('HIT_OWNERSHIP_TARGET_COUNT');
+    const moveTogether = page.locator('[data-move-together]'); if (await moveTogether.isChecked()) await moveTogether.uncheck();
+    const pathToggle = page.locator('[data-shot-workspace] [data-shot-mode="path"]');
+    if (await pathToggle.getAttribute('aria-pressed') === 'true') await pathToggle.click();
+    const baselineDigest = await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest);
+    const naturalCenter = (elementId) => page.evaluate((id) => {
+      const frame = document.querySelector('[data-preview]'); const target = frame.contentDocument.querySelector(`[data-motion-id="${id}"]`);
+      const frameRect = frame.getBoundingClientRect(); const targetRect = target.getBoundingClientRect();
+      const x = frameRect.left + (targetRect.left + targetRect.width / 2) * frameRect.width / frame.clientWidth;
+      const y = frameRect.top + (targetRect.top + targetRect.height / 2) * frameRect.height / frame.clientHeight;
+      const hit = document.elementFromPoint(x, y);
+      return { x, y, objectId: hit?.closest('[data-preview-object-id]')?.dataset.previewObjectId ?? null,
+        waypointTimeMs: hit?.closest('[data-keyframe-id]')?.dataset.timeMs ?? null };
+    }, elementId);
+    const poseCenters = [];
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 900 }]) {
+      await page.setViewportSize(viewport); await page.locator('[data-trajectory-overlay][aria-busy="false"]').waitFor();
+      await targets.nth(1).check(); await page.locator('[data-trajectory-overlay][aria-busy="false"]').waitFor();
+      const center = await naturalCenter(targetElementIds[1]);
+      if (center.objectId !== targetElementIds[1] || center.waypointTimeMs !== null) {
+        throw new Error(`HIT_OWNERSHIP_POSE_CENTER_${viewport.width}_${JSON.stringify(center)}`);
+      }
+      const beforeRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
+      await page.mouse.move(center.x, center.y); await page.mouse.down();
+      await page.mouse.move(center.x + 12, center.y + 6, { steps: 3 }); await page.mouse.up();
+      await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision, beforeRevision + 1);
+      if (commands.at(-1)?.kind !== 'motion.transform-pose.set') throw new Error('HIT_OWNERSHIP_POSE_OPERATION');
+      await page.locator('[data-undo]').click();
+      await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision, beforeRevision + 2);
+      if (await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest) !== baselineDigest) {
+        throw new Error('HIT_OWNERSHIP_POSE_UNDO');
+      }
+      poseCenters.push({ viewport, objectId: center.objectId, operation: 'motion.transform-pose.set', exactUndo: true });
+    }
+    await pathToggle.click(); await page.locator('[data-trajectory-overlay][aria-busy="false"]').waitFor();
+    await page.locator('input[name="shot-moment"][value="700"]').check();
+    await page.locator('[data-trajectory-overlay][aria-busy="false"]').waitFor();
+    const currentCenter = await naturalCenter(targetElementIds[1]);
+    if (currentCenter.waypointTimeMs !== '700') throw new Error(`HIT_OWNERSHIP_CURRENT_PATH_${JSON.stringify(currentCenter)}`);
+    const dragWaypoint = async (timeMs) => {
+      const waypoint = page.locator(`[data-trajectory-overlay] [data-keyframe-id][data-time-ms="${timeMs}"]`);
+      const box = await waypoint.boundingBox(); if (!box) throw new Error(`HIT_OWNERSHIP_WAYPOINT_MISSING_${timeMs}`);
+      const hitTimeMs = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-keyframe-id]')?.dataset.timeMs ?? null,
+        { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+      if (hitTimeMs !== String(timeMs)) throw new Error(`HIT_OWNERSHIP_WAYPOINT_HIT_${timeMs}_${hitTimeMs}`);
+      const beforeRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
+      await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+      await page.mouse.move(box.x + box.width / 2 + 12, box.y + box.height / 2 + 6, { steps: 3 }); await page.mouse.up();
+      await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision, beforeRevision + 1);
+      if (commands.at(-1)?.kind !== 'motion.transform-waypoints.translate') throw new Error(`HIT_OWNERSHIP_PATH_OPERATION_${timeMs}`);
+      await page.locator('[data-undo]').click();
+      await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision, beforeRevision + 2);
+      if (await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest) !== baselineDigest) {
+        throw new Error(`HIT_OWNERSHIP_PATH_UNDO_${timeMs}`);
+      }
+    };
+    await dragWaypoint(700);
+    await page.locator('input[name="shot-moment"][value="700"]').check();
+    await page.locator('[data-trajectory-overlay][aria-busy="false"]').waitFor();
+    await dragWaypoint(0);
+    if (diagnostics.consoleErrors.length || diagnostics.pageErrors.length || diagnostics.failedRequests.length
+      || diagnostics.unexpectedNetwork.length || diagnostics.httpErrors.length) throw new Error('HIT_OWNERSHIP_DIAGNOSTICS');
+    return { passed: true, poseCenters, currentPathWaypoint: true, nonCurrentPathWaypoint: true,
+      operationKinds: ['motion.transform-pose.set', 'motion.transform-waypoints.translate'], exactUndo: true };
+  } finally {
+    await page?.close(); processHandle.kill('SIGTERM');
+    if (processHandle.exitCode === null) await new Promise((done) => processHandle.once('exit', done));
+  }
+}
+
+async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
+  const repositoryRoot = resolve(import.meta.dirname, '../../..');
+  const publicFixturePath = resolve(repositoryRoot, 'fixtures/public-synthetic/landing-shot1.html');
+  const privateManifestPath = resolve(repositoryRoot, '.private-corpus/landing-shot1-approved-reference-v3-r2-manifest.json');
+  const privateDirectory = resolve(repositoryRoot, '.motion/private/landing-shot1-canonical-editing');
+  const privateDocumentPath = resolve(privateDirectory, 'canonical-document.json');
+  if (authority === 'public') {
+    await access(publicFixturePath);
+    resolveShot1ProofAuthority(authority, { publicFixture: true, privateManifest: false, privateCanonical: false });
+  } else {
+    await access(privateManifestPath); await access(privateDocumentPath);
+    resolveShot1ProofAuthority(authority, { publicFixture: false, privateManifest: true, privateCanonical: true });
+  }
+  const seed = authority === 'private' ? JSON.parse(await readFile(privateDocumentPath, 'utf8')) : null;
+  let targetElementIds = seed?.elements.map((element) => element.id).sort() ?? [];
+  if (authority === 'private' && targetElementIds.length !== 2) throw new Error('LANDING_SHOT1_TARGET_COUNT');
+  const directory = await mkdtemp(join(tmpdir(), 'lineage-motion-shot1-qa-'));
+  const humanCapability = randomBytes(32).toString('base64url'); const agentCapability = randomBytes(32).toString('base64url');
+  const port = 43500 + Math.floor(Math.random() * 300);
+  const processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: repositoryRoot, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: String(port),
+      PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
+      ...(authority === 'private' ? { LANDING_SHOT1_DOCUMENT_PATH: privateDocumentPath } : {}) }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let shotBrowser;
+  try {
+    const addresses = await observeServerAddress(processHandle, 'LANDING_SHOT1_SERVER');
+    shotBrowser = await chromium.launch({ channel: 'chrome', headless: true }); const page = await shotBrowser.newPage({ viewport: { width: 1440, height: 900 } });
+    const diagnostics = { consoleErrors: [], pageErrors: [], failedRequests: [], unexpectedNetwork: [], httpErrors: [] };
+    monitorPage(page, [addresses.editorUrl, addresses.serviceUrl], diagnostics); await page.goto(addresses.editorUrl); await page.locator('[data-editor-ready="true"]').waitFor();
+    await observeGeometryCommit(page, { sampleCount: authority === 'public' ? 3 : null });
+    const workspaceState = await page.evaluate(() => { const workspace = document.querySelector('[data-shot-workspace]');
+      const objects = [...document.querySelectorAll('[data-shot-targets] input[name="shot-primary"]')];
+      const editCheckboxes = [...document.querySelectorAll('[data-shot-targets] input[type="checkbox"]')];
+      const moments = [...document.querySelectorAll('input[name="shot-moment"]')];
+      const pose = document.querySelector('[data-pose-form] input[name="x"]');
+      const inspected = window.__motionEditor.inspectShotWorkspace();
+      return { visible: workspace instanceof HTMLElement && !workspace.hidden, objectCount: objects.length, editCheckboxCount: editCheckboxes.length,
+        selectedCount: objects.filter((input) => input.checked).length, targetElementIds: objects.map((input) => input.value),
+        moments: moments.map((input) => Number(input.value)), landedSelected: moments.some((input) => input.value === '700' && input.checked),
+        momentSelected: moments.some((input) => input.checked),
+        poseEditable: pose instanceof HTMLInputElement && !pose.disabled, open: inspected.open, momentMs: inspected.momentMs,
+        previewMatchesCompiler: inspected.previewMatchesCompiler }; });
+    if (authority === 'public') targetElementIds = [...workspaceState.targetElementIds].sort();
+    if (targetElementIds.length !== 2) throw new Error('LANDING_SHOT1_TARGET_COUNT');
+    const workspaceChecks = { visible: workspaceState.visible, objectCount: workspaceState.objectCount === 2, noPerObjectEditCheckboxes: workspaceState.editCheckboxCount === 0,
+      selectedCount: workspaceState.selectedCount === 1,
+      targetBinding: JSON.stringify(workspaceState.targetElementIds) === JSON.stringify(targetElementIds),
+      moments: authority === 'public' ? JSON.stringify(workspaceState.moments) === JSON.stringify([0, 700, 2100])
+        : workspaceState.moments.length >= 2 && workspaceState.moments.every((timeMs, index, moments) => Number.isSafeInteger(timeMs)
+          && (index === 0 || timeMs > moments[index - 1])),
+      landedSelected: authority === 'public' ? workspaceState.landedSelected : workspaceState.momentSelected,
+      poseEditable: workspaceState.poseEditable, open: workspaceState.open,
+      moment: authority === 'public' ? workspaceState.momentMs === 700 : workspaceState.moments.includes(workspaceState.momentMs),
+      previewMatchesCompiler: workspaceState.previewMatchesCompiler };
+    if (!Object.values(workspaceChecks).every(Boolean)) throw new Error(`LANDING_SHOT1_WORKSPACE_NOT_INITIALIZED_${Object.entries(workspaceChecks).filter(([, passed]) => !passed).map(([name]) => name).join('_')}`);
+    if (workspaceSmokeOnly) {
+      const nativePreview = await page.evaluate(() => { const frame = document.querySelector('[data-preview]'); const animations = frame.contentDocument.getAnimations();
+        return frame.srcdoc === window.__motionEditor.compiledHtml && animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation'
+          && animation.effect?.constructor.name === 'KeyframeEffect' && animation.timeline?.constructor.name === 'DocumentTimeline'); });
+      await observeGeometryCommit(page, { sampleCount: null });
+      const original = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+      const projectionSafe = await page.evaluate(() => { const projection = window.__motionEditor.inspectShotWorkspace().projection;
+        if (!projection) return false; const widthMicrounits = projection.sourceWidthCssPixels * 1_000_000;
+        const heightMicrounits = projection.sourceHeightCssPixels * 1_000_000;
+        return Number.isSafeInteger(projection.sourceWidthCssPixels) && projection.sourceWidthCssPixels > 0
+          && Number.isSafeInteger(projection.sourceHeightCssPixels) && projection.sourceHeightCssPixels > 0
+          && Number.isSafeInteger(widthMicrounits) && Number.isSafeInteger(heightMicrounits)
+          && Math.abs(projection.scaleX - projection.scaleY) * projection.sourceWidthCssPixels * projection.devicePixelRatio <= 1; });
+      await ensureAdvancedOpen(page);
+      const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 1));
+      const poseGeometryRequestId = await currentGeometryRequestId(page);
+      await page.getByRole('button', { name: 'Apply pose' }).click();
+      await observeActionCommit(page, { revision: 1 });
+      await observeGeometryCommit(page, { sampleCount: null, previousRequestId: poseGeometryRequestId });
+      const undoGeometryRequestId = await currentGeometryRequestId(page);
+      await page.locator('[data-undo]').click(); await observeActionCommit(page, { revision: 2 });
+      await observeGeometryCommit(page, { sampleCount: null, previousRequestId: undoGeometryRequestId });
+      const restored = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+      const reversibleEdit = restored.contentDigest === original.contentDigest && restored.exportDigest === original.exportDigest;
+      if (!nativePreview || !projectionSafe || !reversibleEdit || diagnostics.consoleErrors.length || diagnostics.pageErrors.length || diagnostics.failedRequests.length
+        || diagnostics.unexpectedNetwork.length || diagnostics.httpErrors.length) throw new Error('LANDING_SHOT1_PRIVATE_WORKSPACE_SMOKE_FAILED');
+      process.stdout.write('{"schemaVersion":"motion.shot1-private-workspace-smoke.v1","passed":true,"uniformProjection":true,"reversibleEdit":true,"trackedPrivateDetails":false}\n');
+      return;
+    }
+    let pathAlignmentCommandCount = 0; page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) pathAlignmentCommandCount += 1; });
+    const beforePathAlignment = await page.evaluate(() => ({ revision: window.__motionEditor.inspectAuthoring().revision,
+      momentMs: window.__motionEditor.inspectShotWorkspace().momentMs, native: window.__motionEditor.readState(),
+      slider: Number(document.querySelector('[data-scrub]').value), visibleTime: document.querySelector('[data-playhead]').value }));
+    if (await page.getByRole('button', { name: 'Path' }).getAttribute('aria-pressed') !== 'true') await page.getByRole('button', { name: 'Path' }).click();
+    await observeGeometryCommit(page, { sampleCount: 3, moments: [0, 700, 2100] });
+    const readMomentAlignment = () => page.evaluate(() => ({ revision: window.__motionEditor.inspectAuthoring().revision,
+      momentMs: window.__motionEditor.inspectShotWorkspace().momentMs, native: window.__motionEditor.readState(),
+      slider: Number(document.querySelector('[data-scrub]').value), visibleTime: document.querySelector('[data-playhead]').value }));
+    let momentAlignment = await readMomentAlignment();
+    const exactlyAligned = (state, timeMs, revision = beforePathAlignment.revision) => state.revision === revision && state.momentMs === timeMs
+      && state.native.playheadMs === timeMs && state.native.currentTimes.length > 0 && state.native.currentTimes.every((time) => time === timeMs)
+      && state.native.playStates.every((playState) => playState === 'paused') && state.slider === timeMs && state.visibleTime === `${timeMs} ms`;
+    if (!exactlyAligned(momentAlignment, beforePathAlignment.momentMs) || pathAlignmentCommandCount !== 0) throw new Error('LANDING_SHOT1_PATH_ALIGNMENT_INVALID');
+    if (authority === 'public') {
+      await page.evaluate(() => { const handles = [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')];
+        window.__shotAlignmentNodes = new Map(handles.map((handle) => [handle.dataset.keyframeId, handle])); });
+      for (const timeMs of [0, 700, 2100, 700]) { await page.locator(`input[name="shot-moment"][value="${timeMs}"]`).check();
+        momentAlignment = await readMomentAlignment(); if (!exactlyAligned(momentAlignment, timeMs)) throw new Error('LANDING_SHOT1_RADIO_ALIGNMENT_INVALID'); }
+      await page.locator('[data-trajectory-overlay] [data-keyframe-id][data-time-ms="0"]').click();
+      if (!exactlyAligned(await readMomentAlignment(), 0)) throw new Error('LANDING_SHOT1_WAYPOINT_ALIGNMENT_INVALID');
+      await page.locator('input[name="shot-moment"][value="700"]').check(); momentAlignment = await readMomentAlignment();
+      const retained = await page.evaluate(() => [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')]
+        .every((handle) => window.__shotAlignmentNodes.get(handle.dataset.keyframeId) === handle && handle.isConnected));
+      if (!exactlyAligned(momentAlignment, 700) || !retained || pathAlignmentCommandCount !== 0) throw new Error('LANDING_SHOT1_WAYPOINT_IDENTITY_ALIGNMENT_INVALID');
+    }
+    const focusedSurface = await page.evaluate(() => { const visible = (selector) => { const node = document.querySelector(selector);
+      if (!(node instanceof HTMLElement)) return false; const rect = node.getBoundingClientRect(); const style = getComputedStyle(node);
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.top >= 0 && rect.bottom <= innerHeight && rect.left >= 0 && rect.right <= innerWidth; };
+      return { controls: visible('[data-shot-workspace]'), history: visible('[data-undo]'), frame: visible('[data-preview]'),
+        transport: visible('.transport'), handle: visible('[data-trajectory-overlay] [aria-pressed="true"]'),
+        genericWorkflowAbsent: getComputedStyle(document.querySelector('.workflow')).display === 'none',
+        branchControlsAbsent: !document.querySelector('.branch-controls') || getComputedStyle(document.querySelector('.branch-controls')).display === 'none' }; });
+    if (!Object.values(focusedSurface).every(Boolean)) throw new Error(`LANDING_SHOT1_FOCUSED_SURFACE_INVALID_${JSON.stringify(focusedSurface)}`);
+    const readSpatialProof = async (targetIndex, expectedSampleCount) => {
+      await page.waitForFunction((count) => document.querySelector('[data-trajectory-overlay]').getAttribute('aria-busy') === 'false'
+        && window.__motionEditor.inspectShotWorkspace().geometry.length === count, expectedSampleCount);
+      return page.evaluate((index) => { const inspected = window.__motionEditor.inspectShotWorkspace(); const frame = document.querySelector('[data-preview]');
+        const overlay = document.querySelector('[data-trajectory-overlay]'); const frameRect = frame.getBoundingClientRect(); const overlayRect = overlay.getBoundingClientRect();
+        const animations = frame.contentDocument.getAnimations(); return { targetIndex: index,
+          projection: { schemaVersion: inspected.projection.schemaVersion, sourceWidthCssPixels: inspected.projection.sourceWidthCssPixels,
+            sourceHeightCssPixels: inspected.projection.sourceHeightCssPixels, scaleX: inspected.projection.scaleX, scaleY: inspected.projection.scaleY,
+            devicePixelRatio: inspected.projection.devicePixelRatio },
+          rootEdgeDeltasDevicePixels: { left: Math.abs(frameRect.left - overlayRect.left) * devicePixelRatio,
+            top: Math.abs(frameRect.top - overlayRect.top) * devicePixelRatio, right: Math.abs(frameRect.right - overlayRect.right) * devicePixelRatio,
+            bottom: Math.abs(frameRect.bottom - overlayRect.bottom) * devicePixelRatio },
+          samples: inspected.geometry.map((sample) => ({ timeMs: sample.timeMs, deltasDevicePixels: sample.deltasDevicePixels })),
+          fontsReady: frame.contentDocument.fonts.status === 'loaded', nativeTypes: animations.map((animation) => ({ animation: animation.constructor.name,
+            effect: animation.effect?.constructor.name, timeline: animation.timeline?.constructor.name, currentTime: animation.currentTime,
+            playState: animation.playState })) }; }, targetIndex);
+    };
+    const spatialTargets = authority === 'public' ? [await readSpatialProof(0, 3)] : [];
+    const primaryInputs = page.locator('[data-shot-targets] input[name="shot-primary"]');
+    if (authority === 'public') { let priorRequestId = await currentGeometryRequestId(page); await primaryInputs.nth(1).check();
+      await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: [0, 700, 2100] });
+      spatialTargets.push(await readSpatialProof(1, 3)); priorRequestId = await currentGeometryRequestId(page); await primaryInputs.nth(0).check();
+      await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: [0, 700, 2100] }); }
+    const spatialParity = authority !== 'public' || (spatialTargets.length === 2 && spatialTargets.every((target) => target.projection.schemaVersion === 'motion.preview-overlay-projection.v1'
+      && target.projection.sourceWidthCssPixels === 800 && target.projection.sourceHeightCssPixels === 450
+      && Math.abs(target.projection.scaleX - target.projection.scaleY) * 800 * target.projection.devicePixelRatio <= 1
+      && Object.values(target.rootEdgeDeltasDevicePixels).every((delta) => delta <= 1)
+      && JSON.stringify(target.samples.map((sample) => sample.timeMs)) === JSON.stringify([0, 700, 2100])
+      && target.samples.every((sample) => Object.values(sample.deltasDevicePixels).every((delta) => delta <= 1))
+      && target.fontsReady && target.nativeTypes.length > 0 && target.nativeTypes.every((native) => native.animation === 'CSSAnimation'
+        && native.effect === 'KeyframeEffect' && native.timeline === 'DocumentTimeline'
+        && native.currentTime === momentAlignment.momentMs && native.playState === 'paused')));
+    if (!spatialParity) throw new Error('LANDING_SHOT1_SPATIAL_PARITY');
+    const original = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    await page.locator('[data-scrub]').fill('700');
+    let handle = page.locator('[data-trajectory-overlay] [aria-pressed="true"]'); let box = await handle.boundingBox(); if (!box) throw new Error('LANDING_SHOT1_HANDLE_MISSING');
+    const cancelGeometryRequestId = await currentGeometryRequestId(page);
+    const draftBaseline = await page.evaluate((elementId) => { const frame = document.querySelector('[data-preview]');
+      const target = [...frame.contentDocument.querySelectorAll('[data-motion-id]')].find((item) => item.dataset.motionId === elementId);
+      const rect = target.getBoundingClientRect(); frame.dataset.draftLoadCount = '0'; frame.addEventListener('load', () => {
+        frame.dataset.draftLoadCount = String(Number(frame.dataset.draftLoadCount) + 1); }); window.__shotDraftDocument = frame.contentDocument;
+      return { bounds: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }, native: window.__motionEditor.readState() }; }, targetElementIds[0]);
+    await page.evaluate(({ elementId, baselineBounds }) => {
+      const frame = document.querySelector('[data-preview]'); const frameDocument = frame.contentDocument;
+      const activeCss = window.__motionEditor.inspectShotWorkspace().compilerCommit.activeCompilerCss;
+      const compilerStyle = [...frameDocument.querySelectorAll('style')].find((style) => style.textContent === `\n${activeCss}`);
+      const handles = [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')];
+      const keys = handles.map((handle) => handle.dataset.keyframeId); const nodes = new Map(keys.map((key, index) => [key, handles[index]]));
+      const oracle = { frameCount: 0, releaseFrameCount: 0, documentChanges: 0, styleChanges: 0, nativeStateViolations: 0,
+        oldLocationReleaseFrames: 0, handleIdentityGaps: 0, handleOrderGaps: 0, activeHandleGaps: 0, terminalFeedbackGaps: 0,
+        stopAfter: null, resolve: null }; window.__shotPaintOracle = oracle;
+      const tick = () => {
+        const inspected = window.__motionEditor.inspectShotWorkspace(); const currentDocument = frame.contentDocument;
+        const animations = currentDocument?.getAnimations() ?? []; const state = window.__motionEditor.readState();
+        const currentHandles = [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')];
+        const currentKeys = currentHandles.map((handle) => handle.dataset.keyframeId);
+        const target = currentDocument && [...currentDocument.querySelectorAll('[data-motion-id]')].find((item) => item.dataset.motionId === elementId);
+        const rect = target?.getBoundingClientRect(); const atOldLocation = rect
+          ? JSON.stringify({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }) === JSON.stringify(baselineBounds) : true;
+        oracle.frameCount += 1; if (currentDocument !== frameDocument) oracle.documentChanges += 1;
+        if (!compilerStyle?.isConnected || compilerStyle.ownerDocument !== currentDocument) oracle.styleChanges += 1;
+        if (animations.length === 0 || animations.some((animation, index) => animation.constructor.name !== 'CSSAnimation'
+          || animation.effect?.constructor.name !== 'KeyframeEffect' || animation.timeline?.constructor.name !== 'DocumentTimeline'
+          || animation.currentTime !== state.currentTimes[index] || animation.playState !== state.playStates[index])) oracle.nativeStateViolations += 1;
+        if (JSON.stringify(currentKeys) !== JSON.stringify(keys)) oracle.handleOrderGaps += 1;
+        if (currentHandles.some((handle) => nodes.get(handle.dataset.keyframeId) !== handle || !handle.isConnected)) oracle.handleIdentityGaps += 1;
+        if (currentHandles.filter((handle) => handle.getAttribute('aria-pressed') === 'true').length !== 1) oracle.activeHandleGaps += 1;
+        if (inspected.waypointReleasePhase !== 'idle') { oracle.releaseFrameCount += 1;
+          if (atOldLocation) oracle.oldLocationReleaseFrames += 1;
+          const active = currentHandles.find((handle) => handle.getAttribute('aria-pressed') === 'true');
+          if (!active || (atOldLocation && active.style.translate === '')) oracle.terminalFeedbackGaps += 1; }
+        if (oracle.stopAfter !== null && --oracle.stopAfter === 0) { oracle.resolve({ ...oracle, stopAfter: undefined, resolve: undefined }); return; }
+        requestAnimationFrame(tick);
+      };
+      requestAnimationFrame(tick);
+    }, { elementId: targetElementIds[0], baselineBounds: draftBaseline.bounds });
+    await page.locator('[data-play]').click();
+    await page.waitForFunction(() => window.__motionEditor.readState().playStates.every((playState) => playState === 'running'));
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+    if (!exactlyAligned(await readMomentAlignment(), momentAlignment.momentMs)
+      || (await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)) !== original.revision) throw new Error('LANDING_SHOT1_DRAG_ALIGNMENT_INVALID');
+    await page.evaluate(({ x, y }) => { for (let index = 1; index <= 24; index += 1) window.dispatchEvent(new PointerEvent('pointermove', {
+      pointerId: 1, buttons: 1, clientX: x + index / 2, clientY: y - index / 3, bubbles: true })); },
+    { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+    await page.waitForFunction(() => window.__motionEditor.inspectShotWorkspace().activeDraft?.appliedCount > 0);
+    const sustainedDraft = await page.evaluate((elementId) => { const frame = document.querySelector('[data-preview]');
+      const inspected = window.__motionEditor.inspectShotWorkspace(); const target = [...frame.contentDocument.querySelectorAll('[data-motion-id]')]
+        .find((item) => item.dataset.motionId === elementId); const rect = target.getBoundingClientRect();
+      return { stableDocument: frame.contentDocument === window.__shotDraftDocument, loadCount: Number(frame.dataset.draftLoadCount),
+        geometryRequestId: inspected.geometryPump.lastCommittedRequestId, moveCount: inspected.activeDraft.moveCount,
+        appliedCount: inspected.activeDraft.appliedCount, controllerActive: inspected.activeDraft.controllerDraft.active,
+        handleFeedback: document.querySelector('[data-trajectory-overlay] [aria-pressed="true"]').style.translate !== '',
+        native: window.__motionEditor.readState(), bounds: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } }; }, targetElementIds[0]);
+    if (!sustainedDraft.stableDocument || sustainedDraft.loadCount !== 0 || sustainedDraft.geometryRequestId !== cancelGeometryRequestId
+      || sustainedDraft.moveCount <= 10 || sustainedDraft.appliedCount >= sustainedDraft.moveCount || !sustainedDraft.controllerActive
+      || !sustainedDraft.handleFeedback || JSON.stringify(sustainedDraft.native) !== JSON.stringify(draftBaseline.native)
+      || JSON.stringify(sustainedDraft.bounds) === JSON.stringify(draftBaseline.bounds)) throw new Error('LANDING_SHOT1_SUSTAINED_DRAFT_INVALID');
+    await page.keyboard.press('Escape');
+    await observeActionCommit(page, { revision: original.revision, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' });
+    await page.waitForFunction(() => window.__motionEditor.inspectShotWorkspace().activeDraft === null
+      && !window.__motionEditor.inspectShotWorkspace().compilerDraft.active);
+    await observeGeometryCommit(page, { sampleCount: 3, moments: [0, 700, 2100] });
+    const cancelRestoration = await page.evaluate((elementId) => { const frame = document.querySelector('[data-preview]');
+      const target = [...frame.contentDocument.querySelectorAll('[data-motion-id]')].find((item) => item.dataset.motionId === elementId);
+      const rect = target.getBoundingClientRect(); const inspected = window.__motionEditor.inspectShotWorkspace(); return {
+        stableDocument: frame.contentDocument === window.__shotDraftDocument, loadCount: Number(frame.dataset.draftLoadCount),
+        geometryRequestId: inspected.geometryPump.lastCommittedRequestId, native: window.__motionEditor.readState(),
+        bounds: { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom } }; }, targetElementIds[0]);
+    if ((await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)) !== original.revision || !cancelRestoration.stableDocument
+      || cancelRestoration.loadCount !== 0 || cancelRestoration.geometryRequestId !== cancelGeometryRequestId
+      || JSON.stringify(cancelRestoration.native) !== JSON.stringify(draftBaseline.native)
+      || JSON.stringify(cancelRestoration.bounds) !== JSON.stringify(draftBaseline.bounds)) throw new Error('LANDING_SHOT1_IMMEDIATE_CANCEL_MUTATED');
+    handle = page.locator('[data-trajectory-overlay] [aria-pressed="true"]');
+    box = await handle.boundingBox(); if (!box) throw new Error('LANDING_SHOT1_HANDLE_MISSING_AFTER_CANCEL');
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 2 + 7, box.y + box.height / 2 - 5);
+    await page.waitForFunction(() => window.__motionEditor.inspectShotWorkspace().compilerDraft.active);
+    await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1 })));
+    await page.mouse.up(); await page.waitForFunction(() => window.__motionEditor.inspectShotWorkspace().activeDraft === null
+      && !window.__motionEditor.inspectShotWorkspace().compilerDraft.active);
+    if ((await currentGeometryRequestId(page)) !== cancelGeometryRequestId
+      || (await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)) !== original.revision) throw new Error('LANDING_SHOT1_POINTER_CANCEL_MUTATED');
+    handle = page.locator('[data-trajectory-overlay] [aria-pressed="true"]'); box = await handle.boundingBox(); if (!box) throw new Error('LANDING_SHOT1_HANDLE_MISSING_AFTER_POINTER_CANCEL');
+    const frameBox = await page.locator('[data-preview]').boundingBox(); if (!frameBox) throw new Error('LANDING_SHOT1_FRAME_MISSING');
+    const offFrameDelta = { x: frameBox.x - 1 - (box.x + box.width / 2), y: -4 };
+    const releaseGeometryRequestId = await currentGeometryRequestId(page);
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+    const pointer = await page.evaluate(async ({ start, deltaClientCssPixels, elementId, baselineBounds }) => { for (let index = 1; index <= 24; index += 1) {
+      window.dispatchEvent(new PointerEvent('pointermove', { pointerId: 1, buttons: 1, clientX: start.x + deltaClientCssPixels.x * index / 24,
+        clientY: start.y + deltaClientCssPixels.y * index / 24, bubbles: true })); }
+      const draft = window.__motionEditor.inspectShotWorkspace().activeDraft; window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1, bubbles: true }));
+      await new Promise((resolve) => requestAnimationFrame(() => resolve()));
+      const frame = document.querySelector('[data-preview]'); const target = [...frame.contentDocument.querySelectorAll('[data-motion-id]')]
+        .find((item) => item.dataset.motionId === elementId); const rect = target.getBoundingClientRect();
+      const terminalHandle = document.querySelector('[data-trajectory-overlay] [aria-pressed="true"]');
+      return { deltaClientCssPixels, emitted: { deltaXPpm: draft.operation.payload.deltaXPpm, deltaYPpm: draft.operation.payload.deltaYPpm },
+        stage: draft.operation.payload.stage, moveCount: draft.moveCount, appliedCount: draft.appliedCount,
+        terminal: { stableDocument: frame.contentDocument === window.__shotDraftDocument, loadCount: Number(frame.dataset.draftLoadCount),
+          handleFeedback: terminalHandle?.style.translate !== '', phase: window.__motionEditor.inspectShotWorkspace().waypointReleasePhase,
+          oldLocation: JSON.stringify({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }) === JSON.stringify(baselineBounds) } }; },
+    { start: { x: box.x + box.width / 2, y: box.y + box.height / 2 }, deltaClientCssPixels: offFrameDelta,
+      elementId: targetElementIds[0], baselineBounds: draftBaseline.bounds });
+    if (!pointer.terminal.stableDocument || pointer.terminal.loadCount !== 0 || !pointer.terminal.handleFeedback
+      || pointer.terminal.phase === 'idle' || pointer.terminal.oldLocation) throw new Error('LANDING_SHOT1_TERMINAL_HANDOFF_INVALID');
+    await page.mouse.up();
+    await observeActionCommit(page, { revision: 1, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' });
+    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: releaseGeometryRequestId, moments: [0, 700, 2100] });
+    const releaseState = await page.evaluate(() => { const frame = document.querySelector('[data-preview]'); const workspace = window.__motionEditor.inspectShotWorkspace(); return {
+      activeDraft: workspace.activeDraft, loadCount: Number(frame.dataset.draftLoadCount), releasePhase: workspace.waypointReleasePhase,
+      remountedDocument: frame.contentDocument !== window.__shotDraftDocument, compilerEqual: workspace.previewMatchesCompiler,
+      navigationSourceEqual: workspace.previewNavigationSourceMatchesCompiler, promotion: workspace.lastPreviewCommitPromotion }; });
+    if (releaseState.activeDraft !== null || releaseState.loadCount !== 0 || releaseState.remountedDocument || !releaseState.compilerEqual
+      || releaseState.navigationSourceEqual || releaseState.releasePhase !== 'idle' || !releaseState.promotion.promoted
+      || releaseState.promotion.fallbackCode !== null) {
+      throw new Error(`LANDING_SHOT1_RELEASE_DRAFT_RESURRECTED_${JSON.stringify({ releaseState, pointer })}`);
+    }
+    const paintedFrames = await page.evaluate(() => new Promise((resolve) => {
+      window.__shotPaintOracle.stopAfter = 2; window.__shotPaintOracle.resolve = resolve;
+    }));
+    if (paintedFrames.frameCount <= 2 || paintedFrames.releaseFrameCount === 0 || paintedFrames.documentChanges !== 0
+      || paintedFrames.styleChanges !== 0 || paintedFrames.nativeStateViolations !== 0 || paintedFrames.oldLocationReleaseFrames !== 0
+      || paintedFrames.handleIdentityGaps !== 0 || paintedFrames.handleOrderGaps !== 0 || paintedFrames.activeHandleGaps !== 0
+      || paintedFrames.terminalFeedbackGaps !== 0) throw new Error(`LANDING_SHOT1_PAINT_CONTINUITY_INVALID_${JSON.stringify(paintedFrames)}`);
+    handle = page.locator('[data-trajectory-overlay] [aria-pressed="true"]');
+    const runway = await handle.evaluate((node) => { const frameRect = document.querySelector('[data-preview]').getBoundingClientRect();
+      const stageRect = document.querySelector('.preview-stage').getBoundingClientRect(); const handleRect = node.getBoundingClientRect();
+      const center = { x: (handleRect.left + handleRect.right) / 2, y: (handleRect.top + handleRect.bottom) / 2 };
+      return { partial: handleRect.left < frameRect.left && handleRect.right > frameRect.left,
+        whollyVisible: handleRect.left >= stageRect.left && handleRect.right <= stageRect.right && handleRect.top >= stageRect.top && handleRect.bottom <= stageRect.bottom,
+        hitTestable: document.elementFromPoint(center.x, center.y) === node }; });
+    if (!Object.values(runway).every(Boolean)) throw new Error('LANDING_SHOT1_OFF_FRAME_RUNWAY_INVALID');
+    await page.locator('[data-move-together]').check();
+    await observeGeometryCommit(page, { sampleCount: 3, moments: [0, 700, 2100] });
+    const groupedScope = await page.evaluate(() => ({ grouped: document.querySelector('[data-move-together]').checked,
+      selectedCount: window.__motionEditor.inspectShotWorkspace().selectedElementIds.length }));
+    if (!groupedScope.grouped || groupedScope.selectedCount !== 2) throw new Error('LANDING_SHOT1_GROUP_SCOPE_NOT_COMMITTED');
+    await ensureAdvancedOpen(page);
+    const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 8));
+    let transitionRequestId = await currentGeometryRequestId(page);
+    await page.getByRole('button', { name: 'Apply pose' }).click();
+    await observeActionCommit(page, { revision: 2, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' });
+    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: transitionRequestId, moments: [0, 700, 2100] });
+    transitionRequestId = await currentGeometryRequestId(page);
+    const retimeCommandCount = pathAlignmentCommandCount;
+    await page.locator('[data-shot-landing]').fill('840'); await page.locator('[data-shot-apply-time]').click();
+    await observeActionCommit(page, { revision: 3, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-out' });
+    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: transitionRequestId, moments: [0, 840, 2100] });
+    if (!exactlyAligned(await readMomentAlignment(), 840, 3) || pathAlignmentCommandCount !== retimeCommandCount + 1
+      || (await currentGeometryRequestId(page)) !== transitionRequestId + 1) throw new Error('LANDING_SHOT1_RETIME_RECONCILIATION_INVALID');
+    transitionRequestId = await currentGeometryRequestId(page);
+    await page.locator('[data-shot-easing]').selectOption('ease-in-out'); await page.locator('[data-shot-apply-easing]').click();
+    await observeActionCommit(page, { revision: 4, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-in-out' });
+    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: transitionRequestId, moments: [0, 840, 2100] });
+    transitionRequestId = await currentGeometryRequestId(page);
+    await page.locator('[data-shot-settled]').fill('1820'); await page.locator('[data-shot-hold]').click();
+    await observeActionCommit(page, { revision: 5, moments: [0, 840, 1820, 2100], landing: 840, settled: 1820, easing: 'ease-in-out' });
+    await observeGeometryCommit(page, { sampleCount: 4, previousRequestId: transitionRequestId, moments: [0, 840, 1820, 2100] });
+    const edited = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    const readInteractiveInventory = () => page.evaluate(() => ({
+      controls: [...document.querySelectorAll('input[name="shot-moment"]')].map((input) => Number(input.value)),
+      handles: [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')].map((handle) => ({ keyframeId: handle.dataset.keyframeId,
+        timeMs: Number(handle.dataset.timeMs) })),
+    }));
+    let editedSpatialTargets = []; let editedSpatialParity = authority !== 'public'; let racePreviousRequestId = null; let atomicSwitchProof = null;
+    if (authority === 'public') {
+      const editedTarget0 = await readSpatialProof(0, 4); let priorRequestId = await currentGeometryRequestId(page); await primaryInputs.nth(1).check();
+      await observeGeometryCommit(page, { sampleCount: 4, previousRequestId: priorRequestId, moments: [0, 840, 1820, 2100] });
+      const editedTarget1 = await readSpatialProof(1, 4); priorRequestId = await currentGeometryRequestId(page);
+      await page.evaluate(() => { const handles = [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')];
+        const retained = new Map(handles.map((handle) => [handle.dataset.keyframeId, handle])); window.__atomicSwitchNodes = retained;
+        const frames = { frameCount: 0, busyFrames: 0, identityGaps: 0, stopAfter: null, resolve: null }; window.__atomicSwitchFrames = frames;
+        const tick = () => { const current = [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')]; frames.frameCount += 1;
+          if (document.querySelector('[data-trajectory-overlay]').getAttribute('aria-busy') !== 'false') frames.busyFrames += 1;
+          if (current.length !== handles.length || current.some((handle) => (retained.has(handle.dataset.keyframeId)
+            && retained.get(handle.dataset.keyframeId) !== handle) || !handle.isConnected)) frames.identityGaps += 1;
+          if (frames.stopAfter !== null && --frames.stopAfter === 0) { frames.resolve({ ...frames, stopAfter: undefined, resolve: undefined }); return; }
+          requestAnimationFrame(tick); }; requestAnimationFrame(tick); });
+      await primaryInputs.nth(0).check();
+      await observeGeometryCommit(page, { sampleCount: 4, previousRequestId: priorRequestId, moments: [0, 840, 1820, 2100] });
+      atomicSwitchProof = await page.evaluate(() => new Promise((resolve) => {
+        const inspected = window.__motionEditor.inspectShotWorkspace(); const handles = [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')];
+        const retained = window.__atomicSwitchNodes; const settled = inspected.geometryPump.latestRequestId === inspected.geometryPump.lastCommittedRequestId
+          && inspected.geometryPump.lastCommittedRequestId > 0 && !inspected.geometryPump.running && inspected.geometryPump.activeSamplers === 0
+          && inspected.geometryPump.pendingRequestId === null && inspected.geometry.length === 4
+          && inspected.geometry.every((sample) => Object.values(sample.deltasDevicePixels).every((delta) => delta <= 1))
+          && JSON.stringify(handles.map((handle) => Number(handle.dataset.timeMs))) === JSON.stringify([0, 840, 1820, 2100])
+          && new Set(handles.map((handle) => handle.dataset.keyframeId)).size === 4
+          && handles.every((handle) => (!retained.has(handle.dataset.keyframeId)
+            || retained.get(handle.dataset.keyframeId) === handle) && handle.isConnected);
+        window.__atomicSwitchFrames.stopAfter = 2; window.__atomicSwitchFrames.resolve = (frames) => resolve({ settled, frames }); }));
+      if (!atomicSwitchProof.settled || atomicSwitchProof.frames.frameCount === 0 || atomicSwitchProof.frames.busyFrames !== 0
+        || atomicSwitchProof.frames.identityGaps !== 0) throw new Error('LANDING_SHOT1_ATOMIC_SWITCH_INVALID');
+      racePreviousRequestId = await currentGeometryRequestId(page); editedSpatialTargets = [editedTarget0, editedTarget1];
+      const inventory = await readInteractiveInventory();
+      editedSpatialParity = JSON.stringify(inventory.controls) === JSON.stringify([0, 840, 1820, 2100])
+        && JSON.stringify(inventory.handles.map((handle) => handle.timeMs)) === JSON.stringify([0, 840, 1820, 2100])
+        && inventory.handles.every((handle) => handle.keyframeId) && new Set(inventory.handles.map((handle) => handle.keyframeId)).size === 4
+        && editedSpatialTargets.every((target) => JSON.stringify(target.samples.map((sample) => sample.timeMs)) === JSON.stringify([0, 840, 1820, 2100])
+          && target.samples.every((sample) => Object.values(sample.deltasDevicePixels).every((delta) => delta <= 1)));
+      if (!editedSpatialParity) throw new Error('LANDING_SHOT1_EDITED_SPATIAL_PARITY');
+    }
+    const scrubber = page.locator('[data-scrub]');
+    await scrubber.fill('2100');
+    const settledPlaybackBounds = await page.evaluate((elementIds) => { const frame = document.querySelector('[data-preview]');
+      return elementIds.map((elementId) => { const target = [...frame.contentDocument.querySelectorAll('[data-motion-id]')]
+        .find((item) => item.dataset.motionId === elementId); const rect = target.getBoundingClientRect();
+        return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }; }); }, targetElementIds);
+    const endpointCommandCount = pathAlignmentCommandCount;
+    await scrubber.fill('2088'); await page.locator('[data-play]').click();
+    await page.waitForFunction(() => { const state = window.__motionEditor.readState(); return state.playheadMs === 2100
+      && state.currentTimes.length > 0 && state.currentTimes.every((time) => time === 2100)
+      && state.playStates.every((playState) => playState === 'paused')
+      && Number(document.querySelector('[data-scrub]').value) === 2100 && document.querySelector('[data-playhead]').value === '2100 ms'; });
+    const playbackEndpointHold = pathAlignmentCommandCount === endpointCommandCount && await page.evaluate(({ elementIds, expected }) => {
+      const frame = document.querySelector('[data-preview]'); return elementIds.map((elementId) => {
+        const target = [...frame.contentDocument.querySelectorAll('[data-motion-id]')].find((item) => item.dataset.motionId === elementId);
+        const rect = target.getBoundingClientRect(); return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
+      }).every((bounds, index) => JSON.stringify(bounds) === JSON.stringify(expected[index]));
+    }, { elementIds: targetElementIds, expected: settledPlaybackBounds });
+    if (!playbackEndpointHold) throw new Error('LANDING_SHOT1_PLAYBACK_ENDPOINT_HOLD_INVALID');
+    const uiSampleTimesMs = [839, 840, 841, 1819, 1820, 1821, 2099, 2101, 2100];
+    await scrubber.fill('837'); await scrubber.fill('838');
+    const readRaceState = () => page.evaluate(() => { const frame = document.querySelector('[data-preview]'); const inspected = window.__motionEditor.inspectShotWorkspace();
+      const state = window.__motionEditor.readState(); const animations = frame.contentDocument.getAnimations();
+      return { sliderValueMs: Number(document.querySelector('[data-scrub]').value), playheadMs: state.playheadMs,
+        controllerCurrentTimesMs: state.currentTimes, nativeCurrentTimesMs: animations.map((animation) => animation.currentTime),
+        playStates: animations.map((animation) => animation.playState), geometryCount: inspected.geometry.length, geometryDeltas: inspected.geometry.map((sample) => sample.deltasDevicePixels),
+        geometryPump: inspected.geometryPump }; });
+    const immediateRaceState = await scrubber.evaluate((input) => { let immediate;
+      input.addEventListener('input', () => { const frame = document.querySelector('[data-preview]');
+        const inspected = window.__motionEditor.inspectShotWorkspace(); const state = window.__motionEditor.readState();
+        const animations = frame.contentDocument.getAnimations(); immediate = { sliderValueMs: Number(input.value), playheadMs: state.playheadMs,
+          controllerCurrentTimesMs: state.currentTimes, nativeCurrentTimesMs: animations.map((animation) => animation.currentTime),
+          playStates: animations.map((animation) => animation.playState), geometryCount: inspected.geometry.length,
+          geometryDeltas: inspected.geometry.map((sample) => sample.deltasDevicePixels), geometryPump: inspected.geometryPump }; }, { once: true });
+      input.value = '839'; input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText', data: '839' }));
+      if (!immediate) throw new Error('LANDING_SHOT1_IMMEDIATE_SAME_DISPATCH_CAPTURE_MISSING'); return immediate; });
+    await observeGeometryCommit(page, { sampleCount: 4, moments: [0, 840, 1820, 2100] });
+    const settledRaceState = await readRaceState();
+    const exactRace = [immediateRaceState, settledRaceState].every((state) => state.sliderValueMs === 839 && state.playheadMs === 839
+      && state.controllerCurrentTimesMs.every((time) => time === 839) && state.nativeCurrentTimesMs.every((time) => time === 839)
+      && state.playStates.every((playState) => playState === 'paused')) && settledRaceState.geometryCount === 4
+      && settledRaceState.geometryDeltas.every((deltas) => Object.values(deltas).every((delta) => delta <= 1))
+      && settledRaceState.geometryPump.maximumActiveSamplers === 1 && settledRaceState.geometryPump.activeSamplers === 0
+      && settledRaceState.geometryPump.pendingRequestId === null
+      && settledRaceState.geometryPump.lastCommittedRequestId === settledRaceState.geometryPump.latestRequestId;
+    if (!exactRace) throw new Error('LANDING_SHOT1_EXACT_RACE');
+    const committedGeometryIdentity = JSON.stringify(settledRaceState.geometryPump);
+    const intermediateAlignmentBaseline = { revision: (await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)),
+      commandCount: pathAlignmentCommandCount };
+    await page.locator('input[name="shot-moment"][value="1820"]').check();
+    if (!exactlyAligned(await readMomentAlignment(), 1820, intermediateAlignmentBaseline.revision)
+      || pathAlignmentCommandCount !== intermediateAlignmentBaseline.commandCount
+      || (await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)) !== intermediateAlignmentBaseline.revision) {
+      throw new Error('LANDING_SHOT1_INTERMEDIATE_ALIGNMENT_INVALID');
+    }
+    const momentOnlyGeometryIdentity = JSON.stringify((await readRaceState()).geometryPump) === committedGeometryIdentity;
+    if (!momentOnlyGeometryIdentity) throw new Error('LANDING_SHOT1_MOMENT_RESAMPLED');
+    const uiSamples = []; for (const sample of uiSampleTimesMs) { await scrubber.fill(String(sample));
+      const evidence = await page.evaluate((timeMs) => { const iframe = document.querySelector('[data-preview]'); const input = document.querySelector('[data-scrub]');
+        const animations = iframe.contentDocument.getAnimations(); const state = window.__motionEditor.readState();
+        return { category: 'uiScrub', timeMs, rangeMaxMs: Number(input.max), sliderValueMs: Number(input.value),
+          playheadMs: state.playheadMs, controllerCurrentTimesMs: state.currentTimes,
+          nativeCurrentTimesMs: animations.map((animation) => animation.currentTime),
+          nativeTypes: animations.map((animation) => ({ animation: animation.constructor.name,
+            effect: animation.effect?.constructor.name, timeline: animation.timeline?.constructor.name })),
+          playStates: animations.map((animation) => animation.playState), previewMatchesCompiler: iframe.srcdoc === window.__motionEditor.compiledHtml }; }, sample);
+      if (evidence.rangeMaxMs !== 2101 || evidence.sliderValueMs !== sample || evidence.playheadMs !== sample
+        || evidence.controllerCurrentTimesMs.length === 0 || !evidence.controllerCurrentTimesMs.every((time) => time === sample)
+        || !evidence.nativeCurrentTimesMs.every((time) => time === sample)
+        || !evidence.nativeTypes.every((types) => types.animation === 'CSSAnimation' && types.effect === 'KeyframeEffect'
+          && types.timeline === 'DocumentTimeline')
+        || !evidence.playStates.every((state) => state === 'paused') || !evidence.previewMatchesCompiler) throw new Error(`LANDING_SHOT1_UI_SAMPLE_${sample}`);
+      if (JSON.stringify((await readRaceState()).geometryPump) !== committedGeometryIdentity) throw new Error(`LANDING_SHOT1_IDLE_RESAMPLED_${sample}`);
+      uiSamples.push(evidence); }
+    const nativePostRange = await page.evaluate(async () => { const iframe = document.querySelector('[data-preview]'); const input = document.querySelector('[data-scrub]');
+      const animations = iframe.contentDocument.getAnimations(); animations.forEach((animation) => { animation.pause(); animation.currentTime = 2101; });
+      await Promise.all(animations.map((animation) => animation.ready));
+      await new Promise((resolveRender) => iframe.contentWindow.requestAnimationFrame(() => iframe.contentWindow.requestAnimationFrame(resolveRender)));
+      const state = window.__motionEditor.readState(); return { category: 'nativePostRange', timeMs: 2101, rangeMaxMs: Number(input.max),
+        sliderValueMs: Number(input.value), playheadMs: state.playheadMs, controllerCurrentTimesMs: state.currentTimes,
+        nativeCurrentTimesMs: animations.map((animation) => animation.currentTime), nativeTypes: animations.map((animation) => ({
+          animation: animation.constructor.name, effect: animation.effect?.constructor.name, timeline: animation.timeline?.constructor.name })),
+        playStates: animations.map((animation) => animation.playState), previewMounted: iframe.isConnected && iframe.contentDocument?.readyState === 'complete',
+        previewMatchesCompiler: iframe.srcdoc === window.__motionEditor.compiledHtml }; });
+    if (nativePostRange.rangeMaxMs !== 2101 || nativePostRange.sliderValueMs !== 2100 || nativePostRange.playheadMs !== 2100
+      || nativePostRange.nativeCurrentTimesMs.length === 0 || !nativePostRange.nativeCurrentTimesMs.every((time) => time === 2101)
+      || !nativePostRange.controllerCurrentTimesMs.every((time) => time === 2101)
+      || !nativePostRange.nativeTypes.every((types) => types.animation === 'CSSAnimation' && types.effect === 'KeyframeEffect'
+        && types.timeline === 'DocumentTimeline')
+      || !nativePostRange.playStates.every((state) => state === 'paused') || !nativePostRange.previewMounted
+      || !nativePostRange.previewMatchesCompiler) throw new Error('LANDING_SHOT1_NATIVE_POST_RANGE_2101');
+    await scrubber.fill('2100'); const restoration = await page.evaluate(() => { const iframe = document.querySelector('[data-preview]');
+      const input = document.querySelector('[data-scrub]'); const animations = iframe.contentDocument.getAnimations(); const state = window.__motionEditor.readState();
+      return { method: 'uiScrub', rangeMaxMs: Number(input.max), sliderValueMs: Number(input.value), playheadMs: state.playheadMs,
+        controllerCurrentTimesMs: state.currentTimes, nativeCurrentTimesMs: animations.map((animation) => animation.currentTime),
+        playStates: animations.map((animation) => animation.playState), previewMatchesCompiler: iframe.srcdoc === window.__motionEditor.compiledHtml }; });
+    const exactRestoration = restoration.rangeMaxMs === 2101 && restoration.sliderValueMs === 2100 && restoration.playheadMs === 2100
+      && restoration.controllerCurrentTimesMs.length > 0 && restoration.controllerCurrentTimesMs.every((time) => time === 2100)
+      && restoration.nativeCurrentTimesMs.every((time) => time === 2100)
+      && restoration.playStates.every((state) => state === 'paused') && restoration.previewMatchesCompiler;
+    if (!exactRestoration) throw new Error('LANDING_SHOT1_UI_RESTORATION_2100');
+    const nativeBoundaryProof = uiSamples.length === 9 && nativePostRange.category === 'nativePostRange' && exactRestoration;
+    await page.locator('input[name="shot-moment"][value="840"]').check();
+    if (!exactlyAligned(await readMomentAlignment(), 840, 5)
+      || JSON.stringify((await readRaceState()).geometryPump) !== committedGeometryIdentity) throw new Error('LANDING_SHOT1_HISTORY_ALIGNMENT_SETUP_INVALID');
+    const undoContracts = [
+      { revision: 6, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-in-out' },
+      { revision: 7, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-out' },
+      { revision: 8, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
+      { revision: 9, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
+      { revision: 10, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
+    ];
+    for (const contract of undoContracts) { const priorRequestId = await currentGeometryRequestId(page); const priorCommandCount = pathAlignmentCommandCount;
+      await page.locator('[data-undo]').click(); await observeActionCommit(page, contract);
+      await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: contract.moments });
+      const expectedMoment = contract.moments.includes(840) ? 840 : 700;
+      if (!exactlyAligned(await readMomentAlignment(), expectedMoment, contract.revision)
+        || pathAlignmentCommandCount !== priorCommandCount + 1 || (await currentGeometryRequestId(page)) !== priorRequestId + 1) {
+        throw new Error('LANDING_SHOT1_UNDO_RECONCILIATION_INVALID');
+      } }
+    const undone = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    const undoneInventory = await readInteractiveInventory();
+    const redoContracts = [
+      { revision: 11, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
+      { revision: 12, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
+      { revision: 13, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-out' },
+      { revision: 14, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-in-out' },
+      { revision: 15, moments: [0, 840, 1820, 2100], landing: 840, settled: 1820, easing: 'ease-in-out' },
+    ];
+    for (const contract of redoContracts) { const priorRequestId = await currentGeometryRequestId(page); const priorCommandCount = pathAlignmentCommandCount;
+      await page.locator('[data-redo]').click(); await observeActionCommit(page, contract);
+      await observeGeometryCommit(page, { sampleCount: contract.moments.length, previousRequestId: priorRequestId, moments: contract.moments });
+      const expectedMoment = contract.moments.includes(840) ? 840 : 700;
+      if (!exactlyAligned(await readMomentAlignment(), expectedMoment, contract.revision)
+        || pathAlignmentCommandCount !== priorCommandCount + 1 || (await currentGeometryRequestId(page)) !== priorRequestId + 1) {
+        throw new Error('LANDING_SHOT1_REDO_RECONCILIATION_INVALID');
+      } }
+    const redone = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    const redoneInventory = await readInteractiveInventory(); const exports = await page.evaluate(() => [window.__motionEditor.compiledHtml, window.__motionEditor.compiledHtml, window.__motionEditor.compiledHtml]);
+    const asymmetricAlternatePrimary = authority === 'public'
+      ? await runAsymmetricAlternatePrimaryQa({ repositoryRoot, directory, browser: shotBrowser, port: port + 500 }) : null;
+    const hitOwnership = authority === 'public'
+      ? await runHitOwnershipQa({ repositoryRoot, directory, browser: shotBrowser }) : null;
+    const checks = { workspaceOpened: workspaceState.open, fiveOperations: edited.revision === 5, exactUndo: undone.contentDigest === original.contentDigest,
+      exactRedo: redone.contentDigest === edited.contentDigest && redone.exportDigest === edited.exportDigest,
+      historyInventories: JSON.stringify(undoneInventory.controls) === JSON.stringify([0, 700, 2100])
+        && JSON.stringify(undoneInventory.handles.map((handle) => handle.timeMs)) === JSON.stringify([0, 700, 2100])
+        && JSON.stringify(redoneInventory.controls) === JSON.stringify([0, 840, 1820, 2100])
+        && JSON.stringify(redoneInventory.handles.map((handle) => handle.timeMs)) === JSON.stringify([0, 840, 1820, 2100]),
+      tripleExportEqual: exports.every((value) => value === exports[0]), nativeBoundaryProof, playbackEndpointHold, spatialParity, editedSpatialParity, exactRace,
+      momentOnlyGeometryIdentity, smoothDrag: true, asymmetricAlternatePrimary: authority !== 'public' || asymmetricAlternatePrimary?.passed === true,
+      hitOwnership: authority !== 'public' || hitOwnership?.passed === true,
+      previewMatchesCompiler: (await page.evaluate(() => window.__motionEditor.inspectShotWorkspace())).previewMatchesCompiler,
+      zeroConsoleErrors: diagnostics.consoleErrors.length === 0, zeroPageErrors: diagnostics.pageErrors.length === 0,
+      zeroFailedRequests: diagnostics.failedRequests.length === 0, zeroUnexpectedNetwork: diagnostics.unexpectedNetwork.length === 0, zeroHttpErrors: diagnostics.httpErrors.length === 0 };
+    const receipt = { schemaVersion: 'motion.landing-shot1-chrome-qa.v2', passed: Object.values(checks).every(Boolean),
+      browser: { name: 'Google Chrome', version: shotBrowser.version() }, privateReference: authority === 'private',
+      targetCount: targetElementIds.length, operationCount: 5,
+      revisions: { original: original.revision, edited: edited.revision, undone: undone.revision, redone: redone.revision },
+      history: { edited: { undoCount: edited.undoCount, redoCount: edited.redoCount }, undone: { undoCount: undone.undoCount, redoCount: undone.redoCount },
+        redone: { undoCount: redone.undoCount, redoCount: redone.redoCount } },
+      samples: { semanticsVersion: 'motion.landing-shot1-samples.v2', uiScrub: uiSamples, nativePostRange, restoration },
+      originalDigest: original.contentDigest, editedDigest: edited.contentDigest, exportDigest: edited.exportDigest,
+      errors: diagnostics, checks };
+    const sanitizeRaceState = ({ geometryPump, ...state }) => ({ ...state, geometryPump: { running: geometryPump.running,
+      activeSamplers: geometryPump.activeSamplers, maximumActiveSamplers: geometryPump.maximumActiveSamplers,
+      pending: geometryPump.pendingRequestId !== null, latestCommitted: geometryPump.lastCommittedRequestId === geometryPump.latestRequestId } });
+    const spatialReceipt = { schemaVersion: 'motion.shot1-spatial-parity.v1', environment: 'installed-chrome-public-synthetic', passed: spatialParity,
+      corpusAuthority: 'fixtures/public-synthetic/landing-shot1.html', browser: { name: 'Google Chrome', version: shotBrowser.version() }, viewport: { width: 1440, height: 900 },
+      reviewOracle: { timesMs: [0, 700, 2100], combinations: 6, targets: spatialTargets },
+      editedWaypointInventory: { timesMs: [0, 840, 1820, 2100], combinations: 8, targets: editedSpatialTargets },
+      focusedUx: { ...focusedSurface, offFrameRunway: runway },
+      smoothDrag: { stableDocumentDuringDraft: sustainedDraft.stableDocument, iframeLoadsDuringDraft: sustainedDraft.loadCount,
+        pointerMoveCount: sustainedDraft.moveCount, compilerDraftApplicationCount: sustainedDraft.appliedCount,
+        geometryRequestIdentityPreserved: sustainedDraft.geometryRequestId === cancelGeometryRequestId,
+        nativeStatePreserved: JSON.stringify(sustainedDraft.native) === JSON.stringify(draftBaseline.native),
+        escapeRestoredExactly: cancelRestoration.stableDocument && cancelRestoration.loadCount === 0,
+        pointerCancelRestoredExactly: true, committedIframeLoads: releaseState.loadCount,
+        terminalHandleRetainedUntilCommit: pointer.terminal.handleFeedback, noOldLocationReleaseFrame: !pointer.terminal.oldLocation,
+        cssCommitPromoted: releaseState.promotion.promoted, navigationSourceSeparated: !releaseState.navigationSourceEqual,
+        committedCompilerEqual: releaseState.compilerEqual, latestReleaseCommitted: true },
+      paintContinuity: { everyFrameObserved: paintedFrames.frameCount > 2 && paintedFrames.releaseFrameCount > 0,
+        everyFrameNativeExact: paintedFrames.nativeStateViolations === 0,
+        stableDocumentAndStyle: paintedFrames.documentChanges === 0 && paintedFrames.styleChanges === 0,
+        noOldLocationReleaseFrame: paintedFrames.oldLocationReleaseFrames === 0,
+        retainedHandleIdentity: paintedFrames.handleIdentityGaps === 0 && paintedFrames.handleOrderGaps === 0,
+        activeAndTerminalContinuous: paintedFrames.activeHandleGaps === 0 && paintedFrames.terminalFeedbackGaps === 0,
+        atomicSwitchRequestSettled: authority !== 'public' || atomicSwitchProof.settled,
+        atomicSwitchNoPaintedBusy: authority !== 'public' || atomicSwitchProof.frames.busyFrames === 0,
+        atomicSwitchRetainedNodes: authority !== 'public' || atomicSwitchProof.frames.identityGaps === 0 },
+      asymmetricAlternatePrimary,
+      hitOwnership,
+      pointer, history: { operationCount: 5, undoCount: 5, redoCount: 5, exactUndo: checks.exactUndo, exactRedo: checks.exactRedo },
+      race: { requestedTimeMs: 839, immediate: sanitizeRaceState(immediateRaceState), settled: sanitizeRaceState(settledRaceState) },
+      geometryValidity: { idleBoundaryRequestIdentityPreserved: true, momentOnlyRequestIdentityPreserved: momentOnlyGeometryIdentity },
+      compiler: { previewMatchesCompiler: checks.previewMatchesCompiler, tripleExportEqual: checks.tripleExportEqual } };
+    if (authority === 'public') await writeFile(resolve(directory, 'installed-chrome-spatial-parity.json'), `${JSON.stringify(spatialReceipt, null, 2)}\n`);
+    if (authority === 'private') await writeFile(resolve(privateDirectory, 'chrome-qa.json'), `${JSON.stringify(receipt, null, 2)}\n`, { mode: 0o600 });
+    process.stdout.write(`${JSON.stringify(receipt)}\n`); if (!receipt.passed) process.exitCode = 1;
+  } finally {
+    await shotBrowser?.close(); processHandle.kill('SIGTERM'); if (processHandle.exitCode === null) await new Promise((done) => processHandle.once('exit', done));
+    await rm(directory, { recursive: true, force: true });
+  }
 }

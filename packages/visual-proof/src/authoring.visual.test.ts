@@ -127,11 +127,32 @@ describe('Phase 2 controlled authoring proof', () => {
       1309, 1310, 1311, 1609, 1610, 1611, 2009, 2010, 2011, 2099, 2100, 2101,
       states.get('S6')!.document.durationMs,
     ]);
-    expect(samplePlan.boundaries).toHaveLength(8);
-    expect(samplePlan.sampleTimesMs).toEqual(expect.arrayContaining([
-      609, 610, 611, 699, 700, 701, 1109, 1110, 1111, 1309, 1310, 1311,
-      1399, 1400, 1401, 1609, 1610, 1611, 2009, 2010, 2011, 2099, 2100, 2101,
-    ]));
+    expect(samplePlan.boundaries.map((boundary) => boundary.timeMs)).toEqual([
+      360, 610, 700, 820, 1510, 1835, 2100, 2410, 2520, 3310, 3720, 4210, 4660,
+    ]);
+    expect(samplePlan.boundaries.flatMap((boundary) => boundary.reasons)
+      .map((reason) => reason.replace(/^application_[^:]+:/, '')).sort()).toEqual([
+      'application-step', 'application-step', 'application-step', 'application-step',
+      'discrete:visibility',
+      'iteration-end', 'iteration-end', 'iteration-end', 'iteration-end', 'iteration-end',
+      'iteration-end',
+      'iteration-start', 'iteration-start', 'iteration-start', 'iteration-start',
+      'iteration-start', 'iteration-start',
+      'keyframe', 'keyframe', 'keyframe', 'keyframe', 'keyframe', 'keyframe', 'keyframe',
+      'keyframe', 'keyframe', 'keyframe', 'keyframe', 'keyframe', 'keyframe',
+      'segment-step', 'segment-step', 'segment-step', 'segment-step',
+    ]);
+    expect(samplePlan.sampleTimesMs).toEqual([
+      0, 359, 361, 609, 610, 611, 699, 700, 701, 819, 821, 1109, 1110, 1111,
+      1309, 1310, 1311, 1399, 1400, 1401, 1509, 1511, 1609, 1610, 1611, 1834,
+      1836, 2009, 2010, 2011, 2099, 2100, 2101, 2409, 2411, 2519, 2521, 3309,
+      3311, 3719, 3721, 4209, 4211, 4659, 4660,
+    ]);
+    expect(samplePlan.endpointHandling.at(-1)).toEqual({
+      boundaryTimeMs: 4660,
+      before: { status: 'sampled', timeMs: 4659 },
+      after: { status: 'out-of-range' },
+    });
     const browser = await chromium.launch({ headless: true, args: [...controlledChromiumArgs] });
     const browserVersion = browser.version();
     const processAttestation = await attestBrowserProcess(browser, browserVersion);

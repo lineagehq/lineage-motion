@@ -1,13 +1,47 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, test } from 'vitest';
 
-import { canonicalJson } from '../../domain/src/index.ts';
-import { MotionServiceClient } from '../../motion-protocol/src/index.ts';
+import { canonicalContentBytes, canonicalJson, projectTrajectorySelection, sha256Hex } from '../../domain/src/index.ts';
+import { makeTrajectoryCommand, MotionServiceClient } from '../../motion-protocol/src/index.ts';
 import { startLocalMotionService } from './index.ts';
+import { createTrajectorySeed } from './seed.ts';
 import { SqliteProjectStore } from './sqlite-project-store.ts';
 import { phase3Command, phase3Seed, temporaryStore } from './test-support.ts';
 
 describe('loopback sole-writer service', () => {
+  test('durably commits and reconstructs exact trajectory undo/redo lineage', async () => {
+    const temporary = await temporaryStore(); const seed = createTrajectorySeed(); const ids = seed.elements.map((element) => element.id).sort();
+    const selected = projectTrajectorySelection(seed, ids, 700); if (!selected.eligible) throw new Error(selected.code!);
+    const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed }); const client = new MotionServiceClient(service.url);
+    const operation = { schemaVersion: 'motion.operation.v1' as const, kind: 'motion.transform-waypoints.translate' as const, operationId: 'trajectory-service', documentId: seed.documentId, expectedRevision: 0,
+      payload: { targets: selected.targets, deltaXPpm: 10_000, deltaYPpm: 0, stage: { stageDigest: 'a'.repeat(64), widthMicrounits: 800_000_000, heightMicrounits: 450_000_000 } } };
+    expect(await client.dispatch(makeTrajectoryCommand(operation))).toMatchObject({ ok: true, resultingRevision: 1 });
+    const edited = sha256Hex(canonicalContentBytes(service.store.readHead(seed.documentId)!.document));
+    expect(await client.dispatch(makeTrajectoryCommand({ schemaVersion: 'motion.operation.v1', kind: 'motion.history.undo', operationId: 'trajectory-undo', documentId: seed.documentId, expectedRevision: 1 }))).toMatchObject({ ok: true, resultingRevision: 2 });
+    expect(sha256Hex(canonicalContentBytes(service.store.readHead(seed.documentId)!.document))).toBe(sha256Hex(canonicalContentBytes(seed)));
+    expect(await client.dispatch(makeTrajectoryCommand({ schemaVersion: 'motion.operation.v1', kind: 'motion.history.redo', operationId: 'trajectory-redo', documentId: seed.documentId, expectedRevision: 2 }))).toMatchObject({ ok: true, resultingRevision: 3 });
+    expect(sha256Hex(canonicalContentBytes(service.store.readHead(seed.documentId)!.document))).toBe(edited);
+    await service.close(); await temporary.cleanup();
+  });
+  test('commits one atomic settled hold and restores its exact bytes through durable history', async () => {
+    const temporary = await temporaryStore(); const seed = createTrajectorySeed(); const ids = seed.elements.map((element) => element.id).sort();
+    const selected = projectTrajectorySelection(seed, ids, 2100); if (!selected.eligible) throw new Error(selected.code!);
+    const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed }); const client = new MotionServiceClient(service.url);
+    const before = sha256Hex(canonicalContentBytes(seed));
+    const operation = { schemaVersion: 'motion.operation.v1' as const, kind: 'motion.settled-hold.set' as const,
+      operationId: 'settled-hold-service', documentId: seed.documentId, expectedRevision: 0,
+      payload: { targets: selected.targets, sourceTimeMs: 2100, settledTimeMs: 1820, landingTimeMs: 840, boundaryTimeMs: 2100 as const } };
+    expect(await client.dispatch(makeTrajectoryCommand(operation))).toMatchObject({ ok: true, resultingRevision: 1 });
+    const held = sha256Hex(canonicalContentBytes(service.store.readHead(seed.documentId)!.document));
+    expect(held).not.toBe(before);
+    expect(await client.dispatch(makeTrajectoryCommand({ schemaVersion: 'motion.operation.v1', kind: 'motion.history.undo',
+      operationId: 'settled-hold-undo', documentId: seed.documentId, expectedRevision: 1 }))).toMatchObject({ ok: true, resultingRevision: 2 });
+    expect(sha256Hex(canonicalContentBytes(service.store.readHead(seed.documentId)!.document))).toBe(before);
+    expect(await client.dispatch(makeTrajectoryCommand({ schemaVersion: 'motion.operation.v1', kind: 'motion.history.redo',
+      operationId: 'settled-hold-redo', documentId: seed.documentId, expectedRevision: 2 }))).toMatchObject({ ok: true, resultingRevision: 3 });
+    expect(sha256Hex(canonicalContentBytes(service.store.readHead(seed.documentId)!.document))).toBe(held);
+    await service.close(); await temporary.cleanup();
+  });
   test('rejects a second lock holder before listen and commits one atomic fixed-main revision', async () => {
     const temporary = await temporaryStore(); const seed = phase3Seed();
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });

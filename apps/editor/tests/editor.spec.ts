@@ -33,6 +33,9 @@ test('renders exact compiled output and controls native animations without mutat
   await page.goto(editorUrl);
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
   await expect(page).toHaveTitle('Motion Editor');
+  await expect(page.locator('[data-shot-workspace]')).toBeHidden();
+  await expect(page.locator('[data-shot-targets] input')).toHaveCount(0);
+  expect(await page.evaluate(() => window.__motionEditor.inspectShotWorkspace())).toMatchObject({ open: false });
 
   const proof = await page.evaluate(() => {
     const editor = window.__motionEditor;
@@ -134,7 +137,7 @@ test('renders exact compiled output and controls native animations without mutat
   await page.getByRole('button', { name: 'Inspect reduced motion' }).click();
   await expect(page.locator('[data-reduced-motion-panel]')).toBeVisible();
   await expect(page.locator('[data-reduced-motion-panel]')).toContainText('source-snapshot');
-  expect(await page.locator('input[type="number"]').count()).toBe(4);
+  expect(await page.locator('input[type="number"]:visible').count()).toBe(4);
   expect(consoleErrors).toEqual([]);
 });
 

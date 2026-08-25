@@ -1,8 +1,12 @@
 import { describe, expect, test } from 'vitest';
 import { randomBytes } from 'node:crypto';
+import { writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { runCli } from './cli.ts';
 import { startLocalMotionService } from '../../local-service/src/index.ts';
+import { createTrajectorySeed } from '../../local-service/src/seed.ts';
 import { phase3Seed, temporaryStore } from '../../local-service/src/test-support.ts';
+import { projectTrajectorySelection } from '../../domain/src/index.ts';
 
 const capabilities = {
   human: randomBytes(32).toString('base64url'),
@@ -10,6 +14,25 @@ const capabilities = {
 };
 
 describe('branch and claim CLI', () => {
+  test('dispatches a strict local trajectory bundle without echoing its bytes or path', async () => {
+    const temp = await temporaryStore(); const seed = createTrajectorySeed(); const service = await startLocalMotionService({ databasePath: temp.databasePath, seed, capabilities });
+    const ids = seed.elements.map((element) => element.id).sort(); const selected = projectTrajectorySelection(seed, ids, 700); if (!selected.eligible) throw new Error(selected.code!);
+    const bundlePath = join(temp.directory, 'private-operation.json'); const operation = { schemaVersion: 'motion.operation.v1', kind: 'motion.transform-waypoints.translate', operationId: 'cli-trajectory', documentId: seed.documentId, expectedRevision: 0,
+      payload: { targets: selected.targets, deltaXPpm: 1000, deltaYPpm: 0, stage: { stageDigest: 'a'.repeat(64), widthMicrounits: 800_000_000, heightMicrounits: 450_000_000 } } };
+    await writeFile(bundlePath, JSON.stringify(operation), { mode: 0o600 }); let stdout = ''; let stderr = '';
+    const code = await runCli(['waypoints-translate', '--service', service.url, '--operation-id', 'cli-trajectory', '--document-id', seed.documentId, '--expected-revision', '0', '--bundle', bundlePath, '--capability', capabilities.human], { stdout: (value) => { stdout += value; }, stderr: (value) => { stderr += value; } });
+    expect(code).toBe(0); expect(JSON.parse(stdout)).toMatchObject({ ok: true, resultingRevision: 1 }); expect(`${stdout}${stderr}`).not.toContain(bundlePath); expect(stdout).not.toContain('expectedTransform');
+    stdout = ''; stderr = '';
+    expect(await runCli(['undo', '--service', service.url, '--operation-id', 'cli-undo', '--document-id', seed.documentId,
+      '--expected-revision', '1', '--capability', capabilities.human], { stdout: (value) => { stdout += value; }, stderr: (value) => { stderr += value; } })).toBe(0);
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, expectedRevision: 1, resultingRevision: 2 });
+    stdout = ''; stderr = '';
+    expect(await runCli(['redo', '--service', service.url, '--operation-id', 'cli-redo', '--document-id', seed.documentId,
+      '--expected-revision', '2', '--capability', capabilities.human], { stdout: (value) => { stdout += value; }, stderr: (value) => { stderr += value; } })).toBe(0);
+    expect(JSON.parse(stdout)).toMatchObject({ ok: true, expectedRevision: 2, resultingRevision: 3 });
+    expect(`${stdout}${stderr}`).not.toContain(bundlePath); expect(stdout).not.toContain('expectedTransform');
+    await service.close(); await temp.cleanup();
+  });
   test('uses shared commands and maps authorization distinctly', async () => {
     const temp = await temporaryStore(); const seed = phase3Seed(); const service = await startLocalMotionService({
       databasePath: temp.databasePath, seed, capabilities });

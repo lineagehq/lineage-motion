@@ -7,6 +7,9 @@ import { importMotionHtml } from './index.js';
 const fixturePath = fileURLToPath(
   new URL('../../../fixtures/public-synthetic/foundation.html', import.meta.url),
 );
+const longhandFixturePath = fileURLToPath(
+  new URL('../../../fixtures/public-synthetic/animation-longhands-reduced-motion.html', import.meta.url),
+);
 
 describe('structural CSS motion import', () => {
   test('creates complete ordered rule, application, slot, delay, timing, and track inventories', async () => {
@@ -120,7 +123,7 @@ describe('structural CSS motion import', () => {
     ['IMPORT_TIMELINE_UNSUPPORTED', '.shape { animation-timeline: scroll(); }'],
     ['IMPORT_RANGE_UNSUPPORTED', '.shape { animation-range: entry 0% exit 100%; }'],
     ['IMPORT_TRIGGER_UNSUPPORTED', '.shape { animation-trigger: --enter; }'],
-    ['IMPORT_ANIMATION_LONGHAND_UNSUPPORTED', '.shape { animation-timing-function: linear; }'],
+    ['IMPORT_ANIMATION_LONGHAND_INCOMPLETE', '.shape { animation-timing-function: linear; }'],
   ])('fails atomically with %s', (code, extraCss) => {
     const result = importMotionHtml(`<!doctype html><html><head><style>
       .shape { width: 10px; }
@@ -180,6 +183,57 @@ describe('structural CSS motion import', () => {
       'IMPORT_EXTERNAL_RESOURCE',
       'IMPORT_EXTERNAL_RESOURCE',
     ]);
+  });
+
+  test('imports one complete distributed longhand tuple and retains exact reduced presentation', async () => {
+    const result = importMotionHtml(await readFile(longhandFixturePath, 'utf8'));
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.document).not.toBeNull();
+    expect(result.inventory).toMatchObject({
+      ruleCount: 1, applicationCount: 1, slotCount: 1, trackCount: 2,
+      unsupportedCount: 0, missingCount: 0,
+    });
+    expect(result.document!.applications[0]!.slots[0]).toMatchObject({
+      durationMs: 1200, delayMs: 100, iterationCount: 1,
+      direction: 'normal', fillMode: 'both', playState: 'running',
+      timingFunction: { kind: 'keyword', value: 'linear' },
+    });
+    expect(result.document!.applications[0]!.bindings[0]!.delayOverridesMs).toEqual([100]);
+    expect(result.document!.presentation.css).not.toMatch(/animation-|@media|@keyframes/);
+    expect(result.document!.reducedMotion.css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(result.document!.reducedMotion.css).toContain('animation: none');
+    expect(result.document!.reducedMotion.css).toContain('background: rgb(90, 99, 116)');
+    expect(result.document!.reducedMotion.css).toContain('.proof-peer { opacity: 1; }');
+  });
+
+  test.each([
+    ['IMPORT_ANIMATION_LONGHAND_INCOMPLETE', '.target { animation-name: move; }'],
+    ['IMPORT_ANIMATION_LONGHAND_INVALID', completeLonghands('animation-duration: var(--duration);')],
+    ['IMPORT_ANIMATION_LONGHAND_INVALID', completeLonghands('animation-fill-mode: inherit;')],
+    ['IMPORT_ANIMATION_LONGHAND_INVALID', completeLonghands('animation-name: move, other;')],
+    ['IMPORT_ANIMATION_LONGHAND_INVALID', completeLonghands('animation-duration: 1s !important;')],
+    ['IMPORT_ANIMATION_LONGHAND_CONFLICT', `${completeLonghands()} .target { animation-duration: 2s; }`],
+    ['IMPORT_ANIMATION_LONGHAND_INVALID', `${completeLonghands()} .target { animation: move 1s; }`],
+    ['IMPORT_COMPOSITION_UNSUPPORTED', '.target { animation-composition: add; }'],
+  ])('rejects hostile longhand grammar atomically with %s', (code, css) => {
+    const result = importMotionHtml(longhandSource(css));
+    expect(result.document).toBeNull();
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(code);
+  });
+
+  test.each([
+    '@media (prefers-reduced-motion: reduce) { .target { transition: none; } }',
+    '@media (prefers-reduced-motion: reduce) { .target::before { animation: none; } }',
+    '@media (prefers-reduced-motion: reduce) { @supports (display: grid) { .target { animation: none; } } }',
+    '@media (prefers-reduced-motion: reduce) { .target { animation: none !important; } }',
+    '@media (prefers-reduced-motion: reduce) { .target { animation-duration: 0s; } }',
+  ])('rejects reduced-motion branches outside the registered snapshot', (css) => {
+    const result = importMotionHtml(longhandSource(`${completeLonghands()} ${css}`));
+    expect(result.document).toBeNull();
+    expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toContain(
+      'IMPORT_RESPONSIVE_MOTION',
+    );
   });
 
   test.each([
@@ -242,3 +296,25 @@ describe('structural CSS motion import', () => {
     expect(JSON.stringify(result.diagnostics)).not.toContain('void 0');
   });
 });
+
+function completeLonghands(replacement = ''): string {
+  const declarations = [
+    'animation-name: move;', 'animation-duration: 1s;',
+    'animation-timing-function: linear;', 'animation-delay: 0ms;',
+    'animation-iteration-count: 1;', 'animation-direction: normal;',
+    'animation-fill-mode: both;', 'animation-play-state: running;',
+  ];
+  if (replacement) {
+    const property = replacement.slice(0, replacement.indexOf(':'));
+    const index = declarations.findIndex((declaration) => declaration.startsWith(`${property}:`));
+    declarations[index] = replacement;
+  }
+  return `.target { ${declarations.join(' ')} }`;
+}
+
+function longhandSource(css: string): string {
+  return `<!doctype html><html><head><style>
+    ${css}
+    @keyframes move { from { transform: translateX(0px); } to { transform: translateX(10px); } }
+  </style></head><body><div class="target"></div></body></html>`;
+}

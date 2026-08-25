@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Neutral longhand animation proof</title>
+    <style>
+      html, body { margin: 0; width: 100%; height: 100%; background: rgb(242, 244, 248); }
+      .proof-stage { position: relative; width: 320px; height: 180px; }
+      .proof-target {
+        position: absolute;
+        left: 30px;
+        top: 50px;
+        width: 48px;
+        height: 48px;
+        background: rgb(36, 92, 166);
+        animation-name: proof-travel;
+        animation-duration: 1200ms;
+        animation-timing-function: linear;
+      }
+      .proof-stage > .proof-target {
+        animation-delay: 100ms;
+        animation-iteration-count: 1;
+        animation-direction: normal;
+      }
+      [data-proof-target="primary"] {
+        animation-fill-mode: both;
+        animation-play-state: running;
+      }
+      .proof-peer { opacity: 0.75; }
+      @keyframes proof-travel {
+        from { transform: translateX(0px); opacity: 0.4; }
+        to { transform: translateX(180px); opacity: 1; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .proof-target { animation: none; background: rgb(90, 99, 116); }
+        .proof-peer { opacity: 1; }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="proof-stage">
+      <div class="proof-target" data-proof-target="primary"></div>
+      <div class="proof-peer">stationary reference</div>
+    </main>
+  </body>
+</html>
