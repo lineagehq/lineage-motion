@@ -1,0 +1,996 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Unified canvas interaction reference</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg: #10131b;
+      --panel: #181d28;
+      --panel-2: #222938;
+      --ink: #f6f7fb;
+      --muted: #b7c0d2;
+      --line: #3f4960;
+      --accent: #8ee7ff;
+      --focus: #ffe074;
+      --object-1: #69d8b5;
+      --object-2: #ff9f79;
+      --danger: #ffb6ac;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { margin: 0; min-height: 100%; background: var(--bg); color: var(--ink); }
+    body { overflow-x: hidden; }
+    button, input, select { font: inherit; }
+    button { color: inherit; }
+    button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .app { min-height: 100vh; display: flex; flex-direction: column; }
+    .app-header {
+      min-height: 64px;
+      padding: 9px clamp(12px, 2vw, 28px);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      border-bottom: 1px solid var(--line);
+      background: #121722;
+    }
+    .title-wrap { min-width: 0; }
+    h1 { font-size: clamp(17px, 2vw, 22px); margin: 0 0 2px; letter-spacing: -.02em; }
+    .disclaimer { margin: 0; color: var(--muted); font-size: 12px; line-height: 1.3; }
+    .chrome-button, .segmented button, .toggle, .transport button, .moment-button, .drawer-close {
+      min-height: 44px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: var(--panel-2);
+      padding: 8px 14px;
+      cursor: pointer;
+    }
+    .chrome-button:hover, .segmented button:hover, .toggle:hover, .transport button:hover,
+    .moment-button:hover, .drawer-close:hover { border-color: var(--accent); }
+    .chrome-button[aria-expanded="true"], .toggle[aria-pressed="true"],
+    .segmented button[aria-pressed="true"], .moment-button[aria-pressed="true"] {
+      background: #24475a;
+      border-color: var(--accent);
+      box-shadow: inset 0 0 0 1px var(--accent);
+    }
+
+    main {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 8px 12px 10px;
+      gap: 7px;
+    }
+    .toolbar, .transport {
+      width: min(1120px, 100%);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+    .segmented { display: inline-flex; gap: 4px; }
+    .segmented button { position: relative; }
+    .segmented button[aria-pressed="true"]::before {
+      content: "";
+      position: absolute;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: currentColor;
+      left: 6px;
+      top: 6px;
+    }
+    .toolbar-actions { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+    .toggle { min-width: 74px; }
+    .toggle-copy { display: inline-flex; flex-direction: column; align-items: flex-start; line-height: 1.15; }
+    .toggle-copy small { color: var(--muted); font-size: 10px; }
+    .group-status { color: var(--muted); font-size: 12px; min-width: 154px; }
+
+    .workspace {
+      position: relative;
+      width: min(1120px, 100%);
+      display: flex;
+      justify-content: center;
+      min-height: 0;
+    }
+    .canvas {
+      position: relative;
+      width: min(100%, calc((100vh - 242px) * 16 / 9));
+      aspect-ratio: 16 / 9;
+      min-width: 0;
+      overflow: hidden;
+      border: 1px solid #56627a;
+      border-radius: 16px;
+      background:
+        linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px),
+        radial-gradient(circle at 50% 42%, #263248 0, #171d29 62%, #111621 100%);
+      background-size: 5% 8.888%, 5% 8.888%, auto;
+      touch-action: none;
+      user-select: none;
+      isolation: isolate;
+    }
+    .canvas::after {
+      content: "Unified workspace";
+      position: absolute;
+      left: 12px;
+      bottom: 9px;
+      color: #9da9be;
+      font-size: 11px;
+      pointer-events: none;
+    }
+    .path-layer { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+    .path-line { fill: none; stroke-width: 3; stroke-dasharray: 8 7; opacity: .27; }
+    .path-line.selected { stroke-width: 5; opacity: .95; }
+    .path-layer[hidden], .waypoint[hidden] { display: none; }
+
+    .object-label {
+      position: absolute;
+      z-index: 8;
+      transform: translate(-50%, -100%);
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(11, 14, 21, .92);
+      color: white;
+      font-weight: 750;
+      font-size: clamp(10px, 1.15vw, 13px);
+      pointer-events: none;
+      white-space: nowrap;
+    }
+    .object-shell {
+      position: absolute;
+      z-index: 5;
+      width: 12.5%;
+      aspect-ratio: 1.35;
+      transform-origin: center;
+    }
+    .object-body {
+      position: absolute;
+      inset: 0;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      cursor: grab;
+      min-width: 44px;
+      min-height: 44px;
+    }
+    .object-body:active { cursor: grabbing; }
+    .shape { position: absolute; inset: 0; pointer-events: none; box-shadow: 0 12px 30px rgba(0,0,0,.28); }
+    [data-object="object-1"] .shape {
+      background: var(--object-1);
+      border-radius: 14%;
+      clip-path: polygon(8% 0, 92% 0, 100% 20%, 100% 80%, 92% 100%, 8% 100%, 0 80%, 0 20%);
+    }
+    [data-object="object-2"] .shape {
+      background: var(--object-2);
+      border-radius: 50%;
+      border: min(1.2vw, 10px) solid #ffd9c8;
+    }
+    .object-shell.secondary .shape { box-shadow: 0 0 0 3px rgba(255,255,255,.45), 0 12px 30px rgba(0,0,0,.28); }
+    .object-shell.selected { z-index: 12; }
+    .object-shell.selected::after {
+      content: "";
+      position: absolute;
+      inset: -7px;
+      border: 2px solid white;
+      pointer-events: none;
+    }
+    .handle {
+      position: absolute;
+      z-index: 15;
+      width: 44px;
+      height: 44px;
+      border: 0;
+      padding: 0;
+      background: transparent;
+      cursor: pointer;
+      display: none;
+    }
+    .handle.selected { display: block; }
+    .handle::after {
+      content: "";
+      position: absolute;
+      left: 50%; top: 50%;
+      width: 14px; height: 14px;
+      transform: translate(-50%, -50%);
+      border-radius: 3px;
+      background: var(--accent);
+      border: 2px solid #0a111b;
+    }
+    .handle-scale { transform: translate(-50%, -50%); cursor: nwse-resize; }
+    .handle-rotate { transform: translate(-50%, -50%); cursor: grab; }
+    .handle-rotate::before { content: ""; position: absolute; left: 21px; top: 25px; width: 2px; height: 25px; background: white; }
+    .handle-rotate::after { border-radius: 50%; background: var(--focus); }
+
+    .waypoint {
+      position: absolute;
+      z-index: 20;
+      width: 44px;
+      height: 44px;
+      transform: translate(-50%, -50%);
+      border: 0;
+      background: transparent;
+      padding: 0;
+      cursor: grab;
+      color: white;
+    }
+    .waypoint::before {
+      content: "";
+      position: absolute;
+      width: 14px; height: 14px;
+      left: 15px; top: 15px;
+      background: var(--waypoint-color);
+      border: 2px solid #0c1018;
+      transform: rotate(45deg);
+    }
+    .waypoint span {
+      position: absolute;
+      left: 50%; top: 35px;
+      transform: translateX(-50%);
+      padding: 2px 5px;
+      border-radius: 5px;
+      background: rgba(12,16,24,.9);
+      font-size: 10px;
+      white-space: nowrap;
+    }
+    .waypoint.dimmed { opacity: .4; }
+    .waypoint.current::before { box-shadow: 0 0 0 4px white; }
+
+    .moment-rail {
+      width: min(1120px, 100%);
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .moment-button { min-width: 0; padding-inline: 8px; }
+    .transport { justify-content: center; }
+    .transport-group { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+    .transport button[disabled] { opacity: .42; cursor: not-allowed; }
+
+    .scrim { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,.45); }
+    .scrim[hidden], .advanced[hidden] { display: none; }
+    .advanced {
+      position: fixed;
+      z-index: 100;
+      top: 0; right: 0; bottom: 0;
+      width: min(390px, 92vw);
+      overflow: auto;
+      padding: 18px;
+      border-left: 1px solid var(--line);
+      background: #161b26;
+      box-shadow: -18px 0 46px rgba(0,0,0,.45);
+    }
+    .drawer-header { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+    .drawer-header h2 { margin: 0; font-size: 20px; }
+    .advanced p { color: var(--muted); font-size: 13px; line-height: 1.45; }
+    .field-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .field { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
+    .field input, .field select {
+      width: 100%; min-height: 44px; border: 1px solid var(--line); border-radius: 8px;
+      padding: 8px 10px; background: #0f141e; color: var(--ink);
+    }
+    .field.wide { grid-column: 1 / -1; }
+    .field input[readonly] { color: #c4cede; }
+    .drawer-note { border-top: 1px solid var(--line); margin-top: 16px; padding-top: 12px; }
+    .live-region { position: fixed; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
+
+    @media (max-width: 800px) {
+      .app-header { min-height: 60px; padding-block: 7px; }
+      .disclaimer { max-width: 510px; }
+      main { padding-inline: 10px; }
+      .toolbar { justify-content: center; }
+      .toolbar-actions { justify-content: center; }
+      .group-status { width: 100%; text-align: center; min-width: 0; }
+      .canvas { width: 100%; }
+      .advanced {
+        top: auto; left: 0; right: 0; bottom: 0;
+        width: 100%; max-height: 72vh;
+        border-left: 0; border-top: 1px solid var(--line);
+        border-radius: 18px 18px 0 0;
+        box-shadow: 0 -18px 46px rgba(0,0,0,.5);
+      }
+    }
+
+    @media (max-height: 760px) and (min-width: 801px) {
+      .canvas { width: min(100%, calc((100vh - 218px) * 16 / 9)); }
+      .app-header { min-height: 56px; }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      * { scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="app-header">
+      <div class="title-wrap">
+        <h1>Unified canvas</h1>
+        <p class="disclaimer">Interaction reference — synthetic data; not compiler output or production behavior.</p>
+      </div>
+      <button id="advanced-toggle" class="chrome-button" type="button" aria-expanded="false" aria-controls="advanced-panel">Advanced</button>
+    </header>
+
+    <main>
+      <section class="toolbar" aria-label="Canvas controls">
+        <div class="segmented" role="group" aria-label="Select object">
+          <button id="select-object-1" type="button" aria-pressed="true">Object 1</button>
+          <button id="select-object-2" type="button" aria-pressed="false">Object 2</button>
+        </div>
+        <div class="toolbar-actions">
+          <button id="path-toggle" class="toggle" type="button" aria-pressed="true">Path: On</button>
+          <button id="group-toggle" class="toggle toggle-copy" type="button" aria-pressed="false">
+            <span>Move together: Off</span>
+            <small>Translation at active moment</small>
+          </button>
+          <span id="group-status" class="group-status">Object 1 is primary</span>
+        </div>
+      </section>
+
+      <section class="workspace" aria-label="One unified motion workspace">
+        <div id="canvas" class="canvas" data-workspace="unified" aria-label="Unified canvas with two editable objects">
+          <svg id="path-layer" class="path-layer" viewBox="0 0 960 540" preserveAspectRatio="none" aria-hidden="true">
+            <polyline id="path-object-1" class="path-line selected" stroke="#69d8b5"></polyline>
+            <polyline id="path-object-2" class="path-line" stroke="#ff9f79"></polyline>
+          </svg>
+
+          <div id="label-object-1" class="object-label">Object 1</div>
+          <div id="object-1" class="object-shell selected" data-object="object-1">
+            <div class="shape"></div>
+            <button class="object-body" type="button" aria-label="Object 1. Selected. Drag to move; use arrow keys to translate, Alt arrows to rotate or scale."></button>
+          </div>
+          <button id="handle-scale-object-1" class="handle handle-scale selected" type="button" role="slider" aria-label="Uniform scale for Object 1" aria-valuemin="0.25" aria-valuemax="3" aria-valuenow="0.8" aria-valuetext="0.80 times"></button>
+          <button id="handle-rotate-object-1" class="handle handle-rotate selected" type="button" role="slider" aria-label="Rotation for Object 1" aria-valuemin="-180" aria-valuemax="180" aria-valuenow="-10" aria-valuetext="-10 degrees"></button>
+
+          <div id="label-object-2" class="object-label">Object 2</div>
+          <div id="object-2" class="object-shell" data-object="object-2">
+            <div class="shape"></div>
+            <button class="object-body" type="button" aria-label="Object 2. Drag to move; use arrow keys to translate, Alt arrows to rotate or scale."></button>
+          </div>
+          <button id="handle-scale-object-2" class="handle handle-scale" type="button" role="slider" aria-label="Uniform scale for Object 2" aria-valuemin="0.25" aria-valuemax="3" aria-valuenow="0.72" aria-valuetext="0.72 times"></button>
+          <button id="handle-rotate-object-2" class="handle handle-rotate" type="button" role="slider" aria-label="Rotation for Object 2" aria-valuemin="-180" aria-valuemax="180" aria-valuenow="0" aria-valuetext="0 degrees"></button>
+        </div>
+      </section>
+
+      <nav class="moment-rail" aria-label="Select moment">
+        <button class="moment-button" type="button" data-moment="start" aria-pressed="true" aria-current="step">Start</button>
+        <button class="moment-button" type="button" data-moment="middle" aria-pressed="false">700 ms</button>
+        <button class="moment-button" type="button" data-moment="settled" aria-pressed="false">Settled</button>
+      </nav>
+
+      <section class="transport" aria-label="Preview and history">
+        <div class="transport-group">
+          <button id="play-pause" type="button">Play</button>
+          <button id="undo" type="button" disabled>Undo</button>
+          <button id="redo" type="button" disabled>Redo</button>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="scrim" class="scrim" hidden></div>
+  <aside id="advanced-panel" class="advanced" aria-labelledby="advanced-title" hidden>
+    <div class="drawer-header">
+      <h2 id="advanced-title">Advanced</h2>
+      <button id="advanced-close" class="drawer-close" type="button">Close</button>
+    </div>
+    <p>Exact values for the selected object and moment. This synthetic reference maps these edits to typed operation concepts; it is not compiler behavior.</p>
+    <div class="field-grid">
+      <label class="field">X <input id="advanced-x" type="number" step="1"></label>
+      <label class="field">Y <input id="advanced-y" type="number" step="1"></label>
+      <label class="field">Uniform scale <input id="advanced-scale" type="number" min="0.25" max="3" step="0.05"></label>
+      <label class="field">Rotation (degrees) <input id="advanced-rotation" type="number" step="1"></label>
+      <label class="field">Moment time (ms) <input id="advanced-time" type="number" min="0" step="1"></label>
+      <label class="field">Easing
+        <select id="advanced-easing">
+          <option>ease-out</option>
+          <option>ease-in-out</option>
+          <option>linear</option>
+        </select>
+      </label>
+      <label class="field">Settled hold (ms) <input id="advanced-hold" type="number" min="0" step="1"></label>
+      <label class="field wide">Stable synthetic ID <input id="advanced-id" type="text" readonly></label>
+    </div>
+    <p class="drawer-note">Grouped movement means translation only at the active moment. Grouped scale and rotation are unsupported.</p>
+  </aside>
+  <div id="live-region" class="live-region" role="status" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    (() => {
+      "use strict";
+
+      const W = 960;
+      const H = 540;
+      const moments = ["start", "middle", "settled"];
+      const momentLabels = { start: "Start", middle: "700 ms", settled: "Settled" };
+      const times = { start: 0, middle: 700, settled: 1400 };
+      const stableIds = { "object-1": "synthetic-object-a", "object-2": "synthetic-object-b" };
+      const initial = {
+        "object-1": {
+          start: { x: 235, y: 315, scale: 0.8, rotation: -10 },
+          middle: { x: 445, y: 205, scale: 1.15, rotation: 12 },
+          settled: { x: 720, y: 292, scale: 1, rotation: 0 }
+        },
+        "object-2": {
+          start: { x: 725, y: 170, scale: 0.72, rotation: 0 },
+          middle: { x: 610, y: 325, scale: 1, rotation: -18 },
+          settled: { x: 350, y: 330, scale: 0.9, rotation: 8 }
+        }
+      };
+
+      const clone = value => JSON.parse(JSON.stringify(value));
+      let poses = clone(initial);
+      let selectedObject = "object-1";
+      let selectedMoment = "start";
+      let pathVisible = true;
+      let moveTogether = false;
+      let undoStack = [];
+      let redoStack = [];
+      let gesture = null;
+      let animations = [];
+      let playing = false;
+      let playbackEndTimer = null;
+      let lastAdvancedFocus = null;
+      let suppressNextClick = false;
+      let settings = { middleTime: 700, easing: "ease-out", hold: 250 };
+
+      const canvas = document.querySelector("#canvas");
+      const live = document.querySelector("#live-region");
+      const pathLayer = document.querySelector("#path-layer");
+      const advancedPanel = document.querySelector("#advanced-panel");
+      const advancedToggle = document.querySelector("#advanced-toggle");
+      const scrim = document.querySelector("#scrim");
+      const objectElements = Object.fromEntries(["object-1", "object-2"].map(id => [id, document.querySelector(`#${id}`)]));
+      const handleElements = Object.fromEntries(["object-1", "object-2"].map(id => [id, {
+        scale: document.querySelector(`#handle-scale-${id}`),
+        rotate: document.querySelector(`#handle-rotate-${id}`)
+      }]));
+
+      function announce(message) {
+        live.textContent = "";
+        requestAnimationFrame(() => { live.textContent = message; });
+      }
+
+      function canvasPoint(event) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+          x: (event.clientX - rect.left) * W / rect.width,
+          y: (event.clientY - rect.top) * H / rect.height
+        };
+      }
+
+      function poseTransform(pose) {
+        return `translate(-50%, -50%) translate(${pose.x / W * 100}%, ${pose.y / H * 100}%) scale(${pose.scale}) rotate(${pose.rotation}deg)`;
+      }
+
+      function animationTransform(pose) {
+        return `translate(-50%, -50%) translate(${pose.x / W * canvas.clientWidth}px, ${pose.y / H * canvas.clientHeight}px) scale(${pose.scale}) rotate(${pose.rotation}deg)`;
+      }
+
+      function handlePosition(pose, kind) {
+        const rect = canvas.getBoundingClientRect();
+        const gapX = 26 * W / Math.max(1, rect.width);
+        const gapY = 26 * H / Math.max(1, rect.height);
+        const radians = pose.rotation * Math.PI / 180;
+        const rotateVector = (x, y) => ({
+          x: x * Math.cos(radians) - y * Math.sin(radians),
+          y: x * Math.sin(radians) + y * Math.cos(radians)
+        });
+        const vector = kind === "scale"
+          ? rotateVector(60 * pose.scale + gapX, 44 * pose.scale + gapY)
+          : rotateVector(0, -(44 * pose.scale + gapY));
+        return { left: `${(pose.x + vector.x) / W * 100}%`, top: `${(pose.y + vector.y) / H * 100}%` };
+      }
+
+      function renderObject(id) {
+        const pose = poses[id][selectedMoment];
+        const element = objectElements[id];
+        element.style.left = `${pose.x / W * 100}%`;
+        element.style.top = `${pose.y / H * 100}%`;
+        element.style.transform = `translate(-50%, -50%) scale(${pose.scale}) rotate(${pose.rotation}deg)`;
+        const label = document.querySelector(`#label-${id}`);
+        label.style.left = `${pose.x / W * 100}%`;
+        label.style.top = `${Math.max(34, pose.y - (58 * pose.scale)) / H * 100}%`;
+        const scaleHandle = handleElements[id].scale;
+        const rotateHandle = handleElements[id].rotate;
+        Object.assign(scaleHandle.style, handlePosition(pose, "scale"));
+        Object.assign(rotateHandle.style, handlePosition(pose, "rotate"));
+        scaleHandle.setAttribute("aria-valuenow", String(round(pose.scale, 2)));
+        scaleHandle.setAttribute("aria-valuetext", `${pose.scale.toFixed(2)} times`);
+        rotateHandle.setAttribute("aria-valuenow", String(round(exposedRotation(pose.rotation), 2)));
+        rotateHandle.setAttribute("aria-valuetext", `${round(exposedRotation(pose.rotation), 2)} degrees`);
+      }
+
+      function renderPaths() {
+        pathLayer.hidden = !pathVisible;
+        for (const id of ["object-1", "object-2"]) {
+          const line = document.querySelector(`#path-${id}`);
+          line.setAttribute("points", moments.map(moment => `${poses[id][moment].x},${poses[id][moment].y}`).join(" "));
+          line.classList.toggle("selected", id === selectedObject);
+          for (const moment of moments) {
+            let waypoint = canvas.querySelector(`[data-waypoint-object="${id}"][data-waypoint-moment="${moment}"]`);
+            if (!waypoint) {
+              waypoint = document.createElement("button");
+              waypoint.type = "button";
+              waypoint.className = "waypoint";
+              waypoint.dataset.waypointObject = id;
+              waypoint.dataset.waypointMoment = moment;
+              waypoint.style.setProperty("--waypoint-color", id === "object-1" ? "var(--object-1)" : "var(--object-2)");
+              waypoint.innerHTML = `<span>${momentLabels[moment]}</span>`;
+              waypoint.addEventListener("pointerdown", startWaypointGesture);
+              waypoint.addEventListener("click", selectWaypoint);
+              waypoint.addEventListener("keydown", waypointKeydown);
+              canvas.append(waypoint);
+            }
+            const pose = poses[id][moment];
+            waypoint.hidden = !pathVisible;
+            waypoint.style.left = `${pose.x / W * 100}%`;
+            waypoint.style.top = `${pose.y / H * 100}%`;
+            waypoint.classList.toggle("dimmed", id !== selectedObject);
+            waypoint.classList.toggle("current", id === selectedObject && moment === selectedMoment);
+            waypoint.setAttribute("aria-label", `${id === "object-1" ? "Object 1" : "Object 2"}, ${momentLabels[moment]} waypoint${id === selectedObject && moment === selectedMoment ? ", current" : ""}. Drag or use arrow keys to move.`);
+            waypoint.setAttribute("aria-current", id === selectedObject && moment === selectedMoment ? "step" : "false");
+          }
+        }
+      }
+
+      function renderSelection() {
+        for (const id of ["object-1", "object-2"]) {
+          const selected = id === selectedObject;
+          objectElements[id].classList.toggle("selected", selected);
+          objectElements[id].classList.toggle("secondary", moveTogether && !selected);
+          handleElements[id].scale.classList.toggle("selected", selected);
+          handleElements[id].rotate.classList.toggle("selected", selected);
+          document.querySelector(`#select-${id}`).setAttribute("aria-pressed", String(selected));
+          const body = objectElements[id].querySelector(".object-body");
+          body.setAttribute("aria-label", `${id === "object-1" ? "Object 1" : "Object 2"}.${selected ? " Selected." : ""} Drag to move; use arrow keys to translate, Alt arrows to rotate or scale.`);
+        }
+        for (const button of document.querySelectorAll(".moment-button")) {
+          const selected = button.dataset.moment === selectedMoment;
+          button.setAttribute("aria-pressed", String(selected));
+          if (selected) button.setAttribute("aria-current", "step");
+          else button.removeAttribute("aria-current");
+        }
+        document.querySelector("#group-status").textContent = moveTogether
+          ? `${selectedObject === "object-1" ? "Object 1" : "Object 2"} primary + ${selectedObject === "object-1" ? "Object 2" : "Object 1"} secondary · translation only`
+          : `${selectedObject === "object-1" ? "Object 1" : "Object 2"} is primary`;
+      }
+
+      function renderAdvanced() {
+        const pose = poses[selectedObject][selectedMoment];
+        document.querySelector("#advanced-x").value = String(round(pose.x));
+        document.querySelector("#advanced-y").value = String(round(pose.y));
+        document.querySelector("#advanced-scale").value = String(round(pose.scale, 2));
+        document.querySelector("#advanced-rotation").value = String(round(pose.rotation, 2));
+        document.querySelector("#advanced-time").value = String(selectedMoment === "middle" ? settings.middleTime : times[selectedMoment]);
+        document.querySelector("#advanced-time").disabled = selectedMoment !== "middle";
+        document.querySelector("#advanced-easing").value = settings.easing;
+        document.querySelector("#advanced-hold").value = String(settings.hold);
+        document.querySelector("#advanced-id").value = stableIds[selectedObject];
+      }
+
+      function render() {
+        if (!playing) {
+          renderObject("object-1");
+          renderObject("object-2");
+        }
+        renderSelection();
+        renderPaths();
+        renderAdvanced();
+        document.querySelector("#undo").disabled = undoStack.length === 0;
+        document.querySelector("#redo").disabled = redoStack.length === 0;
+      }
+
+      function round(number, places = 3) {
+        const factor = 10 ** places;
+        return Math.round(number * factor) / factor;
+      }
+
+      function normalizeRotation(value) {
+        return ((value + 180) % 360 + 360) % 360 - 180;
+      }
+
+      function exposedRotation(value) {
+        const normalized = normalizeRotation(value);
+        return normalized === -180 && value > 0 ? 180 : normalized;
+      }
+
+      function stateSnapshot() { return { poses: clone(poses), settings: clone(settings) }; }
+      function restoreSnapshot(snapshot) { poses = clone(snapshot.poses); settings = clone(snapshot.settings); }
+      function sameState(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+      function commit(before, message) {
+        const after = stateSnapshot();
+        if (sameState(before, after)) return false;
+        undoStack.push({ before, after });
+        redoStack = [];
+        render();
+        announce(message);
+        return true;
+      }
+
+      function stopAnimations(commitVisual = false) {
+        clearTimeout(playbackEndTimer);
+        for (const animation of animations) {
+          if (commitVisual && animation.playState !== "idle") {
+            try { animation.commitStyles(); } catch (_) {}
+          }
+          animation.cancel();
+        }
+        animations = [];
+        playing = false;
+        document.querySelector("#play-pause").textContent = "Play";
+      }
+
+      function seek(moment, announceChange = true) {
+        stopAnimations();
+        selectedMoment = moment;
+        render();
+        if (announceChange) announce(`${momentLabels[moment]} moment selected.`);
+      }
+
+      function selectObject(id, announceChange = true) {
+        if (playing) seek(selectedMoment, false);
+        selectedObject = id;
+        render();
+        if (announceChange) announce(`${id === "object-1" ? "Object 1" : "Object 2"} selected at ${momentLabels[selectedMoment]}.`);
+      }
+
+      function selectWaypoint(event) {
+        if (suppressNextClick) {
+          suppressNextClick = false;
+          return;
+        }
+        if (gesture?.moved) return;
+        selectedObject = event.currentTarget.dataset.waypointObject;
+        selectedMoment = event.currentTarget.dataset.waypointMoment;
+        stopAnimations();
+        render();
+        announce(`${selectedObject === "object-1" ? "Object 1" : "Object 2"}, ${momentLabels[selectedMoment]} waypoint selected.`);
+      }
+
+      function beginEdit() {
+        if (playing || animations.length) seek(selectedMoment, false);
+      }
+
+      function translate(id, moment, dx, dy, grouped) {
+        poses[id][moment].x = Math.max(45, Math.min(W - 45, poses[id][moment].x + dx));
+        poses[id][moment].y = Math.max(45, Math.min(H - 45, poses[id][moment].y + dy));
+        if (grouped) {
+          const other = id === "object-1" ? "object-2" : "object-1";
+          poses[other][moment].x = Math.max(45, Math.min(W - 45, poses[other][moment].x + dx));
+          poses[other][moment].y = Math.max(45, Math.min(H - 45, poses[other][moment].y + dy));
+        }
+      }
+
+      function startGesture(event, kind, id) {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        beginEdit();
+        selectObject(id, false);
+        const point = canvasPoint(event);
+        const pose = poses[id][selectedMoment];
+        gesture = {
+          kind, id, moment: selectedMoment, before: stateSnapshot(), start: point,
+          origin: clone(pose), otherOrigin: clone(poses[id === "object-1" ? "object-2" : "object-1"][selectedMoment]),
+          moved: false, pointerId: event.pointerId,
+          startAngle: Math.atan2(point.y - pose.y, point.x - pose.x),
+          startDistance: Math.hypot(point.x - pose.x, point.y - pose.y)
+        };
+        event.currentTarget.setPointerCapture(event.pointerId);
+        event.currentTarget.addEventListener("pointermove", moveGesture);
+        event.currentTarget.addEventListener("pointerup", endGesture);
+        event.currentTarget.addEventListener("pointercancel", cancelGesture);
+      }
+
+      function moveGesture(event) {
+        if (!gesture || event.pointerId !== gesture.pointerId) return;
+        const point = canvasPoint(event);
+        const dx = point.x - gesture.start.x;
+        const dy = point.y - gesture.start.y;
+        gesture.moved = gesture.moved || Math.abs(dx) + Math.abs(dy) > .2;
+        const pose = poses[gesture.id][gesture.moment];
+        if (gesture.kind === "translate" || gesture.kind === "waypoint") {
+          pose.x = gesture.origin.x;
+          pose.y = gesture.origin.y;
+          const other = gesture.id === "object-1" ? "object-2" : "object-1";
+          poses[other][gesture.moment] = clone(gesture.otherOrigin);
+          translate(gesture.id, gesture.moment, dx, dy, moveTogether);
+        } else if (gesture.kind === "scale") {
+          const distance = Math.hypot(point.x - gesture.origin.x, point.y - gesture.origin.y);
+          const next = gesture.origin.scale * distance / Math.max(1, gesture.startDistance);
+          pose.scale = Math.max(.25, Math.min(3, next));
+        } else if (gesture.kind === "rotate") {
+          const angle = Math.atan2(point.y - gesture.origin.y, point.x - gesture.origin.x);
+          pose.rotation = gesture.origin.rotation + (angle - gesture.startAngle) * 180 / Math.PI;
+        }
+        render();
+      }
+
+      function cleanupGesture(target) {
+        target.removeEventListener("pointermove", moveGesture);
+        target.removeEventListener("pointerup", endGesture);
+        target.removeEventListener("pointercancel", cancelGesture);
+      }
+
+      function endGesture(event) {
+        if (!gesture || event.pointerId !== gesture.pointerId) return;
+        const current = gesture;
+        cleanupGesture(event.currentTarget);
+        gesture = null;
+        const grouped = moveTogether && (current.kind === "translate" || current.kind === "waypoint");
+        commit(current.before, grouped ? "Moved both objects at the active moment." : `${current.kind === "scale" ? "Scaled" : current.kind === "rotate" ? "Rotated" : "Moved"} ${current.id === "object-1" ? "Object 1" : "Object 2"} at ${momentLabels[current.moment]}.`);
+      }
+
+      function cancelGesture(event) {
+        if (!gesture) return;
+        const before = gesture.before;
+        cleanupGesture(event.currentTarget);
+        gesture = null;
+        suppressNextClick = true;
+        restoreSnapshot(before);
+        render();
+        announce("Edit cancelled; exact prior state restored.");
+      }
+
+      function startWaypointGesture(event) {
+        selectedMoment = event.currentTarget.dataset.waypointMoment;
+        startGesture(event, "waypoint", event.currentTarget.dataset.waypointObject);
+      }
+
+      function keyboardEdit(event, id, isWaypoint = false) {
+        const arrow = ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key);
+        if (!arrow) return;
+        event.preventDefault();
+        beginEdit();
+        const before = stateSnapshot();
+        const amount = event.shiftKey ? 10 : 1;
+        const pose = poses[id][selectedMoment];
+        let verb = "Moved";
+        if (!isWaypoint && event.altKey && (event.key === "ArrowLeft" || event.key === "ArrowRight")) {
+          const step = event.shiftKey ? 15 : 1;
+          pose.rotation += event.key === "ArrowLeft" ? -step : step;
+          verb = "Rotated";
+        } else if (!isWaypoint && event.altKey && (event.key === "ArrowUp" || event.key === "ArrowDown")) {
+          const step = event.shiftKey ? .25 : .05;
+          const intended = pose.scale + (event.key === "ArrowUp" ? step : -step);
+          pose.scale = Math.max(.25, Math.min(3, intended));
+          verb = "Scaled";
+          if (pose.scale !== intended) announce(`Scale clamped at ${pose.scale.toFixed(2)}.`);
+        } else if (!event.altKey) {
+          const dx = event.key === "ArrowLeft" ? -amount : event.key === "ArrowRight" ? amount : 0;
+          const dy = event.key === "ArrowUp" ? -amount : event.key === "ArrowDown" ? amount : 0;
+          translate(id, selectedMoment, dx, dy, moveTogether);
+          verb = moveTogether ? "Moved both objects" : "Moved";
+        } else return;
+        render();
+        commit(before, `${verb} ${moveTogether && verb.startsWith("Moved") ? "at" : id === "object-1" ? "Object 1 at" : "Object 2 at"} ${momentLabels[selectedMoment]}.`);
+      }
+
+      function waypointKeydown(event) {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          selectWaypoint(event);
+          return;
+        }
+        selectedObject = event.currentTarget.dataset.waypointObject;
+        selectedMoment = event.currentTarget.dataset.waypointMoment;
+        keyboardEdit(event, selectedObject, true);
+      }
+
+      function handleKeydown(event, id, kind) {
+        const pose = poses[id][selectedMoment];
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          announce(kind === "scale"
+            ? `${id === "object-1" ? "Object 1" : "Object 2"} uniform scale ${pose.scale.toFixed(2)} times.`
+            : `${id === "object-1" ? "Object 1" : "Object 2"} rotation ${round(exposedRotation(pose.rotation), 2)} degrees.`);
+          return;
+        }
+        if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].includes(event.key)) return;
+        event.preventDefault();
+        beginEdit();
+        const before = stateSnapshot();
+        if (kind === "scale") {
+          const step = event.shiftKey ? .25 : .05;
+          if (event.key === "Home") pose.scale = .25;
+          else if (event.key === "End") pose.scale = 3;
+          else pose.scale = Math.max(.25, Math.min(3, pose.scale + (["ArrowRight", "ArrowUp"].includes(event.key) ? step : -step)));
+          render();
+          commit(before, `${id === "object-1" ? "Object 1" : "Object 2"} uniform scale ${pose.scale.toFixed(2)} times.`);
+        } else {
+          const step = event.shiftKey ? 15 : 1;
+          if (event.key === "Home") pose.rotation = -180;
+          else if (event.key === "End") pose.rotation = 180;
+          else pose.rotation = normalizeRotation(pose.rotation + (["ArrowRight", "ArrowUp"].includes(event.key) ? step : -step));
+          render();
+          commit(before, `${id === "object-1" ? "Object 1" : "Object 2"} rotation ${round(exposedRotation(pose.rotation), 2)} degrees.`);
+        }
+      }
+
+      function play() {
+        if (playing) {
+          animations.forEach(animation => animation.pause());
+          playing = false;
+          clearTimeout(playbackEndTimer);
+          document.querySelector("#play-pause").textContent = "Play";
+          announce("Preview paused; current visual state retained.");
+          return;
+        }
+        if (animations.length && animations.every(animation => animation.playState === "paused")) {
+          animations.forEach(animation => animation.play());
+          playing = true;
+          document.querySelector("#play-pause").textContent = "Pause";
+          announce("Preview resumed.");
+          const remaining = Math.max(...animations.map(a => a.effect.getTiming().duration - a.currentTime));
+          playbackEndTimer = setTimeout(finishPlayback, remaining + 30);
+          return;
+        }
+        stopAnimations();
+        const startTime = selectedMoment === "start" ? 0 : selectedMoment === "middle" ? settings.middleTime : 1400;
+        const motionDuration = 1400;
+        const duration = motionDuration + settings.hold;
+        animations = ["object-1", "object-2"].flatMap(id => {
+          const authored = moments.map(moment => ({
+            left: `${poses[id][moment].x / W * 100}%`,
+            top: `${poses[id][moment].y / H * 100}%`,
+            transform: `translate(-50%, -50%) scale(${poses[id][moment].scale}) rotate(${poses[id][moment].rotation}deg)`,
+            offset: moment === "start" ? 0 : moment === "middle" ? settings.middleTime / duration : motionDuration / duration,
+            easing: moment === "settled" ? "linear" : settings.easing
+          }));
+          const settled = authored[authored.length - 1];
+          const keyframes = settings.hold > 0 ? [...authored, { ...settled, offset: 1 }] : authored;
+          const objectAnimation = objectElements[id].animate(keyframes, { duration, fill: "forwards" });
+          const handleAnimations = ["scale", "rotate"].map(kind => {
+            const handleAuthored = moments.map(moment => ({
+              ...handlePosition(poses[id][moment], kind),
+              offset: moment === "start" ? 0 : moment === "middle" ? settings.middleTime / duration : motionDuration / duration,
+              easing: moment === "settled" ? "linear" : settings.easing
+            }));
+            const handleSettled = handleAuthored[handleAuthored.length - 1];
+            const handleFrames = settings.hold > 0 ? [...handleAuthored, { ...handleSettled, offset: 1 }] : handleAuthored;
+            return handleElements[id][kind].animate(handleFrames, { duration, fill: "forwards" });
+          });
+          const created = [objectAnimation, ...handleAnimations];
+          created.forEach(animation => { animation.currentTime = startTime; });
+          return created;
+        });
+        playing = true;
+        document.querySelector("#play-pause").textContent = "Pause";
+        announce("Preview playing browser-authored states.");
+        playbackEndTimer = setTimeout(finishPlayback, Math.max(0, duration - startTime) + 40);
+      }
+
+      function finishPlayback() {
+        const endTime = 1400 + settings.hold;
+        animations.forEach(animation => { animation.currentTime = endTime; animation.pause(); });
+        playing = false;
+        selectedMoment = "settled";
+        document.querySelector("#play-pause").textContent = "Play";
+        renderSelection();
+        renderPaths();
+        announce("Playback ended at Settled.");
+      }
+
+      function undo() {
+        if (!undoStack.length) return;
+        stopAnimations();
+        const item = undoStack.pop();
+        redoStack.push(item);
+        restoreSnapshot(item.before);
+        render();
+        announce("Undo restored the exact prior state.");
+      }
+
+      function redo() {
+        if (!redoStack.length) return;
+        stopAnimations();
+        const item = redoStack.pop();
+        undoStack.push(item);
+        restoreSnapshot(item.after);
+        render();
+        announce("Redo restored the exact edited state.");
+      }
+
+      function openAdvanced() {
+        lastAdvancedFocus = document.activeElement;
+        advancedPanel.hidden = false;
+        scrim.hidden = false;
+        advancedToggle.setAttribute("aria-expanded", "true");
+        renderAdvanced();
+        document.querySelector("#advanced-close").focus();
+      }
+
+      function closeAdvanced() {
+        advancedPanel.hidden = true;
+        scrim.hidden = true;
+        advancedToggle.setAttribute("aria-expanded", "false");
+        (lastAdvancedFocus || advancedToggle).focus();
+      }
+
+      function advancedChange(event) {
+        const before = stateSnapshot();
+        const pose = poses[selectedObject][selectedMoment];
+        const value = Number(event.target.value);
+        if (event.target.id === "advanced-x") pose.x = Math.max(45, Math.min(W - 45, value));
+        if (event.target.id === "advanced-y") pose.y = Math.max(45, Math.min(H - 45, value));
+        if (event.target.id === "advanced-scale") pose.scale = Math.max(.25, Math.min(3, value));
+        if (event.target.id === "advanced-rotation") pose.rotation = value;
+        if (event.target.id === "advanced-time") settings.middleTime = Math.max(1, Math.min(1399, value));
+        if (event.target.id === "advanced-easing") settings.easing = event.target.value;
+        if (event.target.id === "advanced-hold") settings.hold = Math.max(0, value);
+        render();
+        commit(before, "Advanced exact value committed.");
+      }
+
+      document.querySelector("#select-object-1").addEventListener("click", () => selectObject("object-1"));
+      document.querySelector("#select-object-2").addEventListener("click", () => selectObject("object-2"));
+      document.querySelector("#path-toggle").addEventListener("click", event => {
+        pathVisible = !pathVisible;
+        event.currentTarget.setAttribute("aria-pressed", String(pathVisible));
+        event.currentTarget.textContent = `Path: ${pathVisible ? "On" : "Off"}`;
+        renderPaths();
+        announce(`Path overlay ${pathVisible ? "shown" : "hidden"}.`);
+      });
+      document.querySelector("#group-toggle").addEventListener("click", event => {
+        moveTogether = !moveTogether;
+        event.currentTarget.setAttribute("aria-pressed", String(moveTogether));
+        event.currentTarget.querySelector("span").textContent = `Move together: ${moveTogether ? "On" : "Off"}`;
+        render();
+        announce(`Move together ${moveTogether ? "on" : "off"}; translation at the active moment only.`);
+      });
+      document.querySelectorAll(".moment-button").forEach(button => button.addEventListener("click", () => seek(button.dataset.moment)));
+      document.querySelector("#play-pause").addEventListener("click", play);
+      document.querySelector("#undo").addEventListener("click", undo);
+      document.querySelector("#redo").addEventListener("click", redo);
+      advancedToggle.addEventListener("click", openAdvanced);
+      document.querySelector("#advanced-close").addEventListener("click", closeAdvanced);
+      scrim.addEventListener("click", closeAdvanced);
+      document.querySelectorAll("#advanced-panel input:not([readonly]), #advanced-panel select").forEach(input => input.addEventListener("change", advancedChange));
+
+      for (const id of ["object-1", "object-2"]) {
+        const element = objectElements[id];
+        element.querySelector(".object-body").addEventListener("pointerdown", event => startGesture(event, "translate", id));
+        element.querySelector(".object-body").addEventListener("click", () => {
+          if (suppressNextClick) {
+            suppressNextClick = false;
+            return;
+          }
+          selectObject(id);
+        });
+        element.querySelector(".object-body").addEventListener("keydown", event => keyboardEdit(event, id));
+        handleElements[id].scale.addEventListener("pointerdown", event => startGesture(event, "scale", id));
+        handleElements[id].rotate.addEventListener("pointerdown", event => startGesture(event, "rotate", id));
+        handleElements[id].scale.addEventListener("keydown", event => handleKeydown(event, id, "scale"));
+        handleElements[id].rotate.addEventListener("keydown", event => handleKeydown(event, id, "rotate"));
+      }
+
+      document.addEventListener("keydown", event => {
+        if (event.key !== "Escape") return;
+        if (gesture) {
+          const active = document.querySelector(`[data-object="${gesture.id}"] .object-body`) || document.activeElement;
+          cancelGesture({ currentTarget: active });
+        } else if (!advancedPanel.hidden) closeAdvanced();
+      });
+
+      window.addEventListener("resize", () => { if (!playing) render(); });
+      window.__unifiedCanvasReference = {
+        snapshot: () => ({ poses: clone(poses), settings: clone(settings), selectedObject, selectedMoment, pathVisible, moveTogether, undoDepth: undoStack.length, redoDepth: redoStack.length, playing }),
+        dimensions: { width: W, height: H }
+      };
+      render();
+    })();
+  </script>
+</body>
+</html>

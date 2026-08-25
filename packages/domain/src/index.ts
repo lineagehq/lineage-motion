@@ -1,5 +1,13 @@
 import { z } from 'zod';
 
+import {
+  classifyAnimatedProperty,
+  normalizeCssTimingFunction,
+  projectTrackInterpolation,
+  type CssTimingFunction,
+} from './css-motion-semantics.js';
+import { sha256Hex } from './sha256.js';
+
 export type Diagnostic = {
   code: string;
   severity: 'error' | 'warning';
@@ -8,10 +16,7 @@ export type Diagnostic = {
   column?: number;
 };
 
-export type TimingFunction =
-  | { kind: 'keyword'; value: 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' }
-  | { kind: 'steps'; count: number; position: string }
-  | { kind: 'cubic-bezier'; x1: number; y1: number; x2: number; y2: number };
+export type TimingFunction = CssTimingFunction;
 
 export type RuleTrack = {
   id: string;
@@ -33,6 +38,8 @@ export type SourceProvenance = {
   stylesheetDigest: string | null;
   aggregateFontAssetDigest: string | null;
   fontAssetCount: number;
+  captureNamespaceSha256?: string;
+  admissionPackageSha256?: string;
 };
 
 export type MotionCue = {
@@ -224,6 +231,8 @@ const motionDocumentSchema = z.object({
     stylesheetDigest: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
     aggregateFontAssetDigest: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
     fontAssetCount: z.number().int().nonnegative(),
+    captureNamespaceSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
+    admissionPackageSha256: z.string().regex(/^[a-f0-9]{64}$/).optional(),
   }),
   reducedMotion: z.object({ mode: z.literal('source-snapshot'), css: z.string() }),
 });
@@ -305,6 +314,15 @@ export function validateMotionDocument(input: unknown): ValidationResult {
       return domainFailure('DOMAIN_DUPLICATE_ID', 'Rule properties must be unique.');
     }
     for (const track of rule.tracks) {
+      const classification = classifyAnimatedProperty(track.property);
+      if (!classification || (classification !== track.interpolation && track.interpolation !== 'step')) {
+        return domainFailure('DOMAIN_MOTION_PROPERTY_UNSUPPORTED', 'A track property is not registered by motion.css-motion-semantics.v1.');
+      }
+      try {
+        track.keyframes.forEach((keyframe) => { if (keyframe.easing) normalizeCssTimingFunction(keyframe.easing); });
+      } catch {
+        return domainFailure('DOMAIN_MOTION_TIMING_UNSUPPORTED', 'A keyframe timing function is not registered by motion.css-motion-semantics.v1.');
+      }
       const offsets = track.keyframes.map((keyframe) => keyframe.offset);
       if (hasDuplicates(offsets) || offsets.some((offset, index) =>
         index > 0 && offset <= offsets[index - 1]!,
@@ -315,6 +333,9 @@ export function validateMotionDocument(input: unknown): ValidationResult {
   }
 
   for (const application of document.applications) {
+    try { application.slots.forEach((slot) => normalizeCssTimingFunction(slot.timingFunction)); } catch {
+      return domainFailure('DOMAIN_MOTION_TIMING_UNSUPPORTED', 'An application timing function is not registered by motion.css-motion-semantics.v1.');
+    }
     if (hasDuplicates(application.bindings.map((binding) => binding.elementId))) {
       return domainFailure('DOMAIN_DUPLICATE_ID', 'Application bindings must be unique.');
     }
@@ -375,9 +396,7 @@ export function validateMotionDocument(input: unknown): ValidationResult {
     if (owner.slot.ruleId !== track.ruleId
       || !owner.application.bindings.some((binding) => binding.elementId === track.elementId)
       || !ruleTrack
-      || track.interpolation !== (owner.slot.timingFunction.kind === 'steps'
-        ? 'step'
-        : ruleTrack.interpolation)) {
+      || track.interpolation !== projectTrackInterpolation(ruleTrack.property, owner.slot.timingFunction)) {
       return domainFailure(
         'DOMAIN_TRACK_RELATIONSHIP_INVALID',
         'An expanded track is inconsistent with its application, slot, rule, or property.',
@@ -564,11 +583,45 @@ export type SlotEasingSetOperation = OperationEnvelope & {
 export type HoldInsertOperation = OperationEnvelope & {
   kind: 'motion.hold.insert'; payload: { cueId: 'cue_pair'; durationMs: 600 };
 };
+export type TransformPose = {
+  translateXMicrounits: number;
+  translateYMicrounits: number;
+  scalePpm: number;
+  rotateMicrodegrees: number;
+};
+export type StageProjection = {
+  stageDigest: string;
+  widthMicrounits: number;
+  heightMicrounits: number;
+};
+export type TrajectoryTarget = EditTarget & { expectedTransform: string };
+export type TransformPoseSetOperation = OperationEnvelope & TrajectoryTarget & {
+  kind: 'motion.transform-pose.set';
+  payload: { pose: TransformPose; stage: StageProjection };
+};
+export type TransformWaypointsTranslateOperation = OperationEnvelope & {
+  kind: 'motion.transform-waypoints.translate';
+  payload: { targets: TrajectoryTarget[]; deltaXPpm: number; deltaYPpm: number; stage: StageProjection };
+};
+export type KeyframeGroupTimeSetOperation = OperationEnvelope & {
+  kind: 'motion.keyframe-group-time.set';
+  payload: { targets: TrajectoryTarget[]; sourceTimeMs: number; targetTimeMs: number; landingTimeMs: number; settledTimeMs: number };
+};
+export type KeyframeGroupEasingSetOperation = OperationEnvelope & {
+  kind: 'motion.keyframe-group-easing.set';
+  payload: { targets: TrajectoryTarget[]; expectedEasing: TimingFunction; easing: TimingFunction };
+};
+export type SettledHoldSetOperation = OperationEnvelope & {
+  kind: 'motion.settled-hold.set';
+  payload: { targets: TrajectoryTarget[]; sourceTimeMs: number; settledTimeMs: number; landingTimeMs: number; boundaryTimeMs: 2100 };
+};
+export type TrajectoryAuthoringOperation = TransformPoseSetOperation | TransformWaypointsTranslateOperation
+  | KeyframeGroupTimeSetOperation | KeyframeGroupEasingSetOperation | SettledHoldSetOperation;
 export type StructuralAuthoringOperation = TrackCreateOperation | KeyframeAddOperation
   | KeyframeRemoveOperation | SlotDurationSetOperation | BindingDelaySetOperation
   | SlotEasingSetOperation | HoldInsertOperation;
 export type AuthoringOperation = KeyframeValueOperation | KeyframeTimeOperation
-  | StructuralAuthoringOperation | HistoryOperation;
+  | StructuralAuthoringOperation | TrajectoryAuthoringOperation | HistoryOperation;
 type EditOperation = Exclude<AuthoringOperation, HistoryOperation>;
 type KeyframeEditOperation = KeyframeValueOperation | KeyframeTimeOperation;
 type InternalTrackDeleteOperation = OperationEnvelope & {
@@ -582,8 +635,12 @@ type InternalKeyframeRestoreOperation = OperationEnvelope & {
 type InternalHoldRemoveOperation = OperationEnvelope & {
   kind: 'motion.internal.hold.remove'; payload: { holdId: string; contentDigest: string };
 };
+type InternalTrajectoryRestoreOperation = OperationEnvelope & {
+  kind: 'motion.internal.trajectory.restore';
+  payload: { expectedContentDigest: string; restore: MotionDocument };
+};
 type ReducerOperation = EditOperation | InternalTrackDeleteOperation | InternalKeyframeRestoreOperation
-  | InternalHoldRemoveOperation;
+  | InternalHoldRemoveOperation | InternalTrajectoryRestoreOperation;
 
 type EditRecord = {
   forward: ReducerOperation;
@@ -682,7 +739,26 @@ function applyOperation(
   if (operation.kind === 'motion.hold.insert' || operation.kind === 'motion.internal.hold.remove') {
     return applyHold(document, operation);
   }
-  return applyStructural(document, operation);
+  if (operation.kind === 'motion.internal.trajectory.restore') {
+    if (sha256Hex(canonicalContentBytes(document)) !== operation.payload.expectedContentDigest
+      || !validateMotionDocument(operation.payload.restore).ok) {
+      return { ok: false, code: 'AUTHORING_HISTORY_REPLAY_INVALID' };
+    }
+    const restored = structuredClone(operation.payload.restore);
+    const inverse: InternalTrajectoryRestoreOperation = {
+      schemaVersion: operation.schemaVersion, operationId: operation.operationId,
+      documentId: operation.documentId, expectedRevision: operation.expectedRevision,
+      kind: 'motion.internal.trajectory.restore',
+      payload: { expectedContentDigest: sha256Hex(canonicalContentBytes(restored)), restore: structuredClone(document) },
+    };
+    return { ok: true, document: restored, inverse };
+  }
+  if (operation.kind.startsWith('motion.transform-') || operation.kind.startsWith('motion.keyframe-group-')
+    || operation.kind === 'motion.settled-hold.set') {
+    return applyTrajectoryOperation(document, operation as TrajectoryAuthoringOperation);
+  }
+  return applyStructural(document, operation as Exclude<StructuralAuthoringOperation, HoldInsertOperation>
+    | InternalTrackDeleteOperation | InternalKeyframeRestoreOperation);
 }
 
 function applyHold(
@@ -1133,6 +1209,281 @@ function applyEdit(
   return { ok: true, document: nextDocument, inverse };
 }
 
+export type TransformTrajectoryWaypoint = {
+  keyframeId: string;
+  timeMs: number;
+  transformBytes: string;
+  pose: TransformPose;
+};
+export type TransformTrajectoryProjection = {
+  eligible: true;
+  elementId: string;
+  trackId: string;
+  ruleId: string;
+  slotId: string;
+  waypoints: TransformTrajectoryWaypoint[];
+} | { eligible: false; elementId: string; code: string };
+
+export type ShotWorkspaceConfig = {
+  startMs: number;
+  landedMs: number;
+  settledMs: number;
+  targetElementIds: string[];
+};
+
+export function parseTransformPose(value: string): TransformPose | null {
+  const source = value.trim();
+  if (source === 'none') return { translateXMicrounits: 0, translateYMicrounits: 0, scalePpm: 1_000_000, rotateMicrodegrees: 0 };
+  const functions = [...source.matchAll(/([a-zA-Z0-9]+)\(([^()]*)\)/g)];
+  if (functions.length === 0 || functions.map((item) => item[0]).join(' ') !== source.replace(/\s+/g, ' ')) return null;
+  const pose: TransformPose = { translateXMicrounits: 0, translateYMicrounits: 0, scalePpm: 1_000_000, rotateMicrodegrees: 0 };
+  const seen = new Set<string>();
+  const decimal = (raw: string): number | null => /^-?(?:\d+|\d*\.\d+)$/.test(raw.trim()) ? Number(raw) : null;
+  for (const [, rawName, rawArgs] of functions) {
+    const name = rawName!.toLowerCase();
+    if (seen.has(name)) return null;
+    seen.add(name);
+    const args = rawArgs!.split(/\s*,\s*|\s+/).filter(Boolean);
+    if (name === 'translate' || name === 'translate3d') {
+      if ((name === 'translate' && (args.length < 1 || args.length > 2)) || (name === 'translate3d' && args.length !== 3)) return null;
+      if (name === 'translate3d' && !/^0(?:px)?$/.test(args[2]!)) return null;
+      const x = parseTranslateLength(args[0]!);
+      const y = parseTranslateLength(args[1] ?? '0px');
+      if (x === null || y === null) return null;
+      pose.translateXMicrounits = x;
+      pose.translateYMicrounits = y;
+    } else if (name === 'translatex' || name === 'translatey') {
+      if (args.length !== 1) return null;
+      const length = parseTranslateLength(args[0]!); if (length === null) return null;
+      pose[name === 'translatex' ? 'translateXMicrounits' : 'translateYMicrounits'] = length;
+    } else if (name === 'scale') {
+      if (args.length < 1 || args.length > 2) return null;
+      const first = decimal(args[0]!); const second = args[1] ? decimal(args[1]) : first;
+      if (first === null || second === null || first !== second) return null;
+      pose.scalePpm = Math.round(first * 1_000_000);
+    } else if (name === 'rotate') {
+      if (args.length !== 1) return null;
+      const match = /^(-?(?:\d+|\d*\.\d+))deg$/.exec(args[0]!); if (!match) return null;
+      pose.rotateMicrodegrees = Math.round(Number(match[1]) * 1_000_000);
+    } else return null;
+  }
+  return validPose(pose) ? pose : null;
+}
+
+export function serializeTransformPose(pose: TransformPose): string {
+  if (!validPose(pose)) throw new Error('TRAJECTORY_POSE_INVALID');
+  const unit = (value: number, scale: number) => formatCanonicalDecimal(value / scale);
+  return `translate(${unit(pose.translateXMicrounits, 1_000_000)}px, ${unit(pose.translateYMicrounits, 1_000_000)}px) scale(${unit(pose.scalePpm, 1_000_000)}) rotate(${unit(pose.rotateMicrodegrees, 1_000_000)}deg)`;
+}
+
+export function projectTransformTrajectory(document: MotionDocument, elementId: string): TransformTrajectoryProjection {
+  if (!validateMotionDocument(document).ok) return { eligible: false, elementId, code: 'TRAJECTORY_DOCUMENT_INVALID' };
+  const tracks = document.tracks.filter((track) => track.elementId === elementId && track.property === 'transform');
+  if (tracks.length !== 1) return { eligible: false, elementId, code: tracks.length ? 'TRAJECTORY_TRACK_AMBIGUOUS' : 'TRAJECTORY_TRACK_MISSING' };
+  const track = tracks[0]!;
+  const rule = document.rules.find((candidate) => candidate.id === track.ruleId);
+  const ruleTrack = rule?.tracks.find((candidate) => candidate.property === 'transform');
+  const application = document.applications.find((candidate) => candidate.slots.some((slot) => slot.id === track.slotId));
+  const slotIndex = application?.slots.findIndex((slot) => slot.id === track.slotId) ?? -1;
+  const slot = application?.slots[slotIndex];
+  const binding = application?.bindings.find((candidate) => candidate.elementId === elementId);
+  if (!rule || !ruleTrack || !application || !slot || !binding || slotIndex < 0) return { eligible: false, elementId, code: 'TRAJECTORY_RELATIONSHIP_INVALID' };
+  if (document.tracks.filter((candidate) => candidate.ruleId === rule.id && candidate.property === 'transform').length !== 1) {
+    return { eligible: false, elementId, code: 'TRAJECTORY_SHARED_RULE_AMBIGUOUS' };
+  }
+  const delay = binding.delayOverridesMs[slotIndex]; if (delay === undefined || slot.iterationCount !== 1 || slot.direction !== 'normal') return { eligible: false, elementId, code: 'TRAJECTORY_TIMING_UNSUPPORTED' };
+  const projectedTimes = projectTrajectoryKeyframeTimes(ruleTrack, delay, slot.durationMs, document.durationMs);
+  if (!projectedTimes) return { eligible: false, elementId, code: 'TRAJECTORY_TIME_UNREPRESENTABLE' };
+  const waypoints: TransformTrajectoryWaypoint[] = [];
+  for (const keyframe of ruleTrack.keyframes) {
+    const timeMs = projectedTimes.get(keyframe.id)!;
+    const pose = parseTransformPose(keyframe.value);
+    if (!pose) return { eligible: false, elementId, code: 'TRAJECTORY_TRANSFORM_UNSUPPORTED' };
+    waypoints.push({ keyframeId: keyframe.id, timeMs, transformBytes: keyframe.value, pose });
+  }
+  return { eligible: true, elementId, trackId: track.id, ruleId: rule.id, slotId: slot.id, waypoints };
+}
+
+export function projectShotWorkspace(document: MotionDocument, config: ShotWorkspaceConfig): {
+  eligible: boolean; code: string | null; startMs: number; landedMs: number; settledMs: number;
+  trajectories: TransformTrajectoryProjection[]; continuityTimesMs: number[];
+} {
+  if (!exactShotConfig(config) || config.startMs !== 0 || config.landedMs !== 700 || config.settledMs !== 2100
+    || config.targetElementIds.length !== 2 || new Set(config.targetElementIds).size !== 2) {
+    return { eligible: false, code: 'SHOT_CONFIG_INVALID', startMs: config.startMs, landedMs: config.landedMs, settledMs: config.settledMs, trajectories: [], continuityTimesMs: [] };
+  }
+  const trajectories = config.targetElementIds.map((id) => projectTransformTrajectory(document, id));
+  if (trajectories.some((item) => !item.eligible)) return { eligible: false, code: 'SHOT_TARGET_INELIGIBLE', ...config, trajectories, continuityTimesMs: [] };
+  if (trajectories.some((item) => item.eligible && ![0, 700, 2100].every((time) => item.waypoints.some((point) => point.timeMs === time)))) {
+    return { eligible: false, code: 'SHOT_BOUNDARY_KEYFRAME_MISSING', ...config, trajectories, continuityTimesMs: [] };
+  }
+  return { eligible: true, code: null, ...config, trajectories,
+    continuityTimesMs: [...new Set(document.cues.map((cue) => cue.timeMs).filter((time) => time > 2100).concat(document.durationMs > 2100 ? [2101] : []))].sort((a, b) => a - b) };
+}
+
+export function projectTrajectorySelection(document: MotionDocument, orderedElementIds: string[], momentMs: number): {
+  eligible: boolean; code: string | null; targets: TrajectoryTarget[];
+} {
+  if (!Number.isSafeInteger(momentMs) || orderedElementIds.length === 0 || new Set(orderedElementIds).size !== orderedElementIds.length) return { eligible: false, code: 'TRAJECTORY_SELECTION_INVALID', targets: [] };
+  const targets: TrajectoryTarget[] = [];
+  for (const elementId of orderedElementIds) {
+    const projected = projectTransformTrajectory(document, elementId);
+    if (!projected.eligible) return { eligible: false, code: projected.code, targets: [] };
+    const waypoint = projected.waypoints.find((item) => item.timeMs === momentMs);
+    if (!waypoint) return { eligible: false, code: 'TRAJECTORY_MOMENT_MISSING', targets: [] };
+    targets.push({ elementId, trackId: projected.trackId, keyframeId: waypoint.keyframeId, expectedTransform: waypoint.transformBytes });
+  }
+  targets.sort((left, right) => `${left.elementId}\0${left.trackId}\0${left.keyframeId}`
+    .localeCompare(`${right.elementId}\0${right.trackId}\0${right.keyframeId}`));
+  return { eligible: true, code: null, targets };
+}
+
+function applyTrajectoryOperation(document: MotionDocument, operation: TrajectoryAuthoringOperation): { ok: true; document: MotionDocument; inverse: ReducerOperation } | { ok: false; code: string } {
+  const before = structuredClone(document);
+  const next = structuredClone(document);
+  const targets = operation.kind === 'motion.transform-pose.set' ? [{ elementId: operation.elementId, trackId: operation.trackId, keyframeId: operation.keyframeId, expectedTransform: operation.expectedTransform }] : operation.payload.targets;
+  if (!validTrajectoryTargets(targets)) return { ok: false, code: 'AUTHORING_TRAJECTORY_BUNDLE_INVALID' };
+  const resolved = targets.map((target) => resolveTrajectoryTarget(next, target));
+  if (resolved.some((item) => !item)) return { ok: false, code: 'AUTHORING_TRAJECTORY_TARGET_INVALID' };
+  const entries = resolved as NonNullable<ReturnType<typeof resolveTrajectoryTarget>>[];
+  if (operation.kind === 'motion.transform-pose.set') {
+    if (!validStage(operation.payload.stage) || !validPose(operation.payload.pose)) return { ok: false, code: 'AUTHORING_TRAJECTORY_PAYLOAD_INVALID' };
+    const value = serializeTransformPose(operation.payload.pose);
+    if (value === entries[0]!.keyframe.value) return { ok: false, code: 'AUTHORING_ZERO_CHANGE' };
+    entries[0]!.keyframe.value = value;
+  } else if (operation.kind === 'motion.transform-waypoints.translate') {
+    const { deltaXPpm, deltaYPpm, stage } = operation.payload;
+    if (!validStage(stage) || !Number.isSafeInteger(deltaXPpm) || !Number.isSafeInteger(deltaYPpm)
+      || (deltaXPpm === 0 && deltaYPpm === 0) || Math.abs(deltaXPpm) > 1_000_000 || Math.abs(deltaYPpm) > 1_000_000) return { ok: false, code: 'AUTHORING_TRAJECTORY_PAYLOAD_INVALID' };
+    const dx = stage.widthMicrounits * deltaXPpm / 1_000_000; const dy = stage.heightMicrounits * deltaYPpm / 1_000_000;
+    if (!Number.isSafeInteger(dx) || !Number.isSafeInteger(dy)) return { ok: false, code: 'AUTHORING_TRAJECTORY_PRECISION_INVALID' };
+    for (const entry of entries) { const pose = parseTransformPose(entry.keyframe.value)!;
+      entry.keyframe.value = serializeTransformPose({ ...pose, translateXMicrounits: pose.translateXMicrounits + dx, translateYMicrounits: pose.translateYMicrounits + dy }); }
+  } else if (operation.kind === 'motion.keyframe-group-time.set') {
+    const { sourceTimeMs, targetTimeMs, landingTimeMs, settledTimeMs } = operation.payload;
+    if (![sourceTimeMs, targetTimeMs, landingTimeMs, settledTimeMs].every(Number.isSafeInteger)
+      || targetTimeMs < 1 || targetTimeMs > 2100 || landingTimeMs < 1 || landingTimeMs >= settledTimeMs || settledTimeMs > 2100
+      || sourceTimeMs === targetTimeMs) return { ok: false, code: 'AUTHORING_TRAJECTORY_TIME_INVALID' };
+    if (!completeTrajectoryMomentBundle(next, entries, sourceTimeMs)) return { ok: false, code: 'AUTHORING_TRAJECTORY_BUNDLE_INCOMPLETE' };
+    for (const entry of uniqueRuleEntries(entries)) { if (entry.timeMs !== sourceTimeMs) return { ok: false, code: 'AUTHORING_TRAJECTORY_TIME_STALE' };
+      const offset = (targetTimeMs - entry.delayMs) / entry.slot.durationMs;
+      if (!Number.isFinite(offset) || offset < 0 || offset > 1 || !Number.isSafeInteger(offset * 1_000_000)
+        || entry.ruleTrack.keyframes.some((frame) => frame.id !== entry.keyframe.id && frame.offset === offset)) return { ok: false, code: 'AUTHORING_TRAJECTORY_TIME_COLLISION' };
+      entry.keyframe.offset = offset; entry.ruleTrack.keyframes.sort((a, b) => a.offset - b.offset);
+      entry.track.keyframeIds = entry.ruleTrack.keyframes.map((frame) => frame.id); }
+  } else if (operation.kind === 'motion.keyframe-group-easing.set') {
+    let expected: TimingFunction; let easing: TimingFunction;
+    try { expected = normalizeCssTimingFunction(operation.payload.expectedEasing); easing = normalizeCssTimingFunction(operation.payload.easing); } catch { return { ok: false, code: 'AUTHORING_TRAJECTORY_EASING_INVALID' }; }
+    if (canonicalJson(expected) === canonicalJson(easing)) return { ok: false, code: 'AUTHORING_ZERO_CHANGE' };
+    for (const entry of uniqueRuleEntries(entries)) { if (canonicalJson(entry.keyframe.easing ?? entry.slot.timingFunction) !== canonicalJson(expected)) return { ok: false, code: 'AUTHORING_TRAJECTORY_EASING_STALE' }; entry.keyframe.easing = easing; }
+  } else {
+    const { sourceTimeMs, settledTimeMs, landingTimeMs, boundaryTimeMs } = operation.payload;
+    if (boundaryTimeMs !== 2100 || !Number.isSafeInteger(settledTimeMs) || settledTimeMs <= landingTimeMs || settledTimeMs >= 2100 || sourceTimeMs !== 2100
+      || !completeTrajectoryMomentBundle(next, entries, sourceTimeMs)) return { ok: false, code: 'AUTHORING_TRAJECTORY_HOLD_INVALID' };
+    for (const entry of uniqueRuleEntries(entries)) {
+      const projectedTimes = projectTrajectoryKeyframeTimes(entry.ruleTrack, entry.delayMs,
+        entry.slot.durationMs, next.durationMs);
+      if (!projectedTimes || entry.timeMs !== sourceTimeMs
+        || entry.ruleTrack.keyframes.some((frame) => { const time = projectedTimes.get(frame.id)!;
+          return time > settledTimeMs && time < 2100; })) return { ok: false, code: 'AUTHORING_TRAJECTORY_HOLD_COLLISION' };
+      const settledOffset = trajectoryOffsetForTime(settledTimeMs, entry.delayMs, entry.slot.durationMs);
+      const boundaryOffset = trajectoryOffsetForTime(boundaryTimeMs, entry.delayMs, entry.slot.durationMs);
+      if (settledOffset === null || boundaryOffset === null || settledOffset <= 0 || settledOffset >= 1) {
+        return { ok: false, code: 'AUTHORING_TRAJECTORY_TIME_UNREPRESENTABLE' };
+      }
+      const holdKeyframeId = structuralId('hold_kf', `${entry.track.id}\0${boundaryTimeMs}`);
+      if (entry.ruleTrack.keyframes.some((frame) => frame.id === holdKeyframeId)) {
+        return { ok: false, code: 'AUTHORING_TRAJECTORY_HOLD_COLLISION' };
+      }
+      const candidate = structuredClone(entry.ruleTrack);
+      const sourceKeyframe = candidate.keyframes.find((frame) => frame.id === entry.keyframe.id)!;
+      sourceKeyframe.offset = settledOffset;
+      candidate.keyframes.push({ id: holdKeyframeId, offset: boundaryOffset, value: entry.keyframe.value });
+      candidate.keyframes.sort((a, b) => a.offset - b.offset);
+      const candidateTimes = projectTrajectoryKeyframeTimes(candidate, entry.delayMs,
+        entry.slot.durationMs, next.durationMs);
+      if (!candidateTimes || candidateTimes.get(sourceKeyframe.id) !== settledTimeMs
+        || candidateTimes.get(holdKeyframeId) !== boundaryTimeMs) {
+        return { ok: false, code: 'AUTHORING_TRAJECTORY_TIME_UNREPRESENTABLE' };
+      }
+      entry.ruleTrack.keyframes = candidate.keyframes;
+      entry.track.keyframeIds = entry.ruleTrack.keyframes.map((frame) => frame.id);
+    }
+  }
+  if (sha256Hex(canonicalContentBytes(before)) === sha256Hex(canonicalContentBytes(next))) return { ok: false, code: 'AUTHORING_ZERO_CHANGE' };
+  const inverse: InternalTrajectoryRestoreOperation = { schemaVersion: operation.schemaVersion, operationId: operation.operationId,
+    documentId: operation.documentId, expectedRevision: operation.expectedRevision, kind: 'motion.internal.trajectory.restore',
+    payload: { expectedContentDigest: sha256Hex(canonicalContentBytes(next)), restore: before } };
+  return { ok: true, document: next, inverse };
+}
+
+function resolveTrajectoryTarget(document: MotionDocument, target: TrajectoryTarget) {
+  const track = document.tracks.find((item) => item.id === target.trackId && item.elementId === target.elementId && item.property === 'transform');
+  const rule = track && document.rules.find((item) => item.id === track.ruleId); const ruleTrack = rule?.tracks.find((item) => item.property === 'transform');
+  const application = track && document.applications.find((item) => item.slots.some((slot) => slot.id === track.slotId));
+  const slotIndex = application?.slots.findIndex((slot) => slot.id === track?.slotId) ?? -1; const slot = application?.slots[slotIndex];
+  const binding = application?.bindings.find((item) => item.elementId === target.elementId); const delayMs = binding?.delayOverridesMs[slotIndex];
+  const keyframe = ruleTrack?.keyframes.find((item) => item.id === target.keyframeId);
+  if (!track || !ruleTrack || !application || !slot || delayMs === undefined || !keyframe || keyframe.value !== target.expectedTransform || !parseTransformPose(keyframe.value)) return null;
+  const projectedTimes = projectTrajectoryKeyframeTimes(ruleTrack, delayMs, slot.durationMs, document.durationMs);
+  if (!projectedTimes) return null;
+  const timeMs = projectedTimes.get(keyframe.id); if (timeMs === undefined) return null;
+  return { track, ruleTrack, application, slot, delayMs, keyframe, timeMs };
+}
+function uniqueRuleEntries<T extends { ruleTrack: RuleTrack }>(entries: T[]): T[] { return entries.filter((entry, index) => entries.findIndex((candidate) => candidate.ruleTrack.id === entry.ruleTrack.id) === index); }
+function completeTrajectoryMomentBundle(document: MotionDocument, entries: NonNullable<ReturnType<typeof resolveTrajectoryTarget>>[], timeMs: number): boolean {
+  const expected: string[] = [];
+  for (const track of document.tracks.filter((candidate) => candidate.property === 'transform')) {
+    const projection = projectTransformTrajectory(document, track.elementId); if (!projection.eligible) return false;
+    const point = projection.waypoints.find((item) => item.timeMs === timeMs);
+    if (point) expected.push(`${track.id}\0${point.keyframeId}`);
+  }
+  expected.sort();
+  const actual = entries.map((entry) => `${entry.track.id}\0${entry.keyframe.id}`).sort(); return canonicalJson(expected) === canonicalJson(actual);
+}
+function projectTrajectoryKeyframeTimes(ruleTrack: RuleTrack, delayMs: number, durationMs: number,
+  maximumTimeMs: number): Map<string, number> | null {
+  const maximumDeltaMilliseconds = 0.000001;
+  if (![delayMs, durationMs, maximumTimeMs].every(Number.isSafeInteger)
+    || delayMs < 0 || durationMs <= 0 || maximumTimeMs < 0
+    || new Set(ruleTrack.keyframes.map((keyframe) => keyframe.id)).size !== ruleTrack.keyframes.length) return null;
+  const projected = new Map<string, number>(); const occupied = new Set<number>();
+  for (const keyframe of ruleTrack.keyframes) {
+    if (!Number.isFinite(keyframe.offset) || keyframe.offset < 0 || keyframe.offset > 1) return null;
+    const sourceTimeMs = delayMs + keyframe.offset * durationMs;
+    const integerTimeMs = Math.round(sourceTimeMs);
+    const lowerBoundaryMs = integerTimeMs - maximumDeltaMilliseconds;
+    const upperBoundaryMs = integerTimeMs + maximumDeltaMilliseconds;
+    if (!Number.isFinite(sourceTimeMs) || !Number.isSafeInteger(integerTimeMs)
+      || sourceTimeMs < 0 || sourceTimeMs > maximumTimeMs
+      || !(sourceTimeMs > lowerBoundaryMs && sourceTimeMs < upperBoundaryMs)
+      || occupied.has(integerTimeMs)) return null;
+    occupied.add(integerTimeMs); projected.set(keyframe.id, integerTimeMs);
+  }
+  return projected;
+}
+function trajectoryOffsetForTime(timeMs: number, delayMs: number, durationMs: number): number | null {
+  if (![timeMs, delayMs, durationMs].every(Number.isSafeInteger) || delayMs < 0 || durationMs <= 0) return null;
+  const offset = (timeMs - delayMs) / durationMs;
+  return Number.isFinite(offset) && offset >= 0 && offset <= 1 ? offset : null;
+}
+function parseTranslateLength(raw: string): number | null {
+  const source = raw.trim();
+  if (/^[+-]?(?:0+(?:\.0*)?|\.0+)(?:e[+-]?\d+)?$/i.test(source)) return 0;
+  const px = /^(-?(?:\d+|\d*\.\d+))px$/.exec(source);
+  if (!px) return null;
+  const [, sign = '', whole = '', fraction = ''] = /^(-?)(\d*)(?:\.(\d+))?$/.exec(px[1]!)!;
+  if (fraction.length > 6 && /[1-9]/.test(fraction.slice(6))) return null;
+  const magnitude = BigInt(whole || '0') * 1_000_000n + BigInt(fraction.slice(0, 6).padEnd(6, '0') || '0');
+  const microunits = sign === '-' ? -magnitude : magnitude;
+  if (microunits < BigInt(Number.MIN_SAFE_INTEGER) || microunits > BigInt(Number.MAX_SAFE_INTEGER)) return null;
+  return Number(microunits);
+}
+function validTrajectoryTargets(value: TrajectoryTarget[]): boolean { return value.length > 0 && value.every((target) => target && typeof target.elementId === 'string' && typeof target.trackId === 'string' && typeof target.keyframeId === 'string' && typeof target.expectedTransform === 'string') && new Set(value.map((target) => `${target.elementId}\0${target.trackId}\0${target.keyframeId}`)).size === value.length && value.every((target, index) => index === 0 || `${value[index - 1]!.elementId}\0${value[index - 1]!.trackId}` < `${target.elementId}\0${target.trackId}`); }
+function validPose(pose: TransformPose): boolean { return [pose.translateXMicrounits, pose.translateYMicrounits, pose.scalePpm, pose.rotateMicrodegrees].every(Number.isSafeInteger) && pose.scalePpm > 0 && pose.scalePpm <= 10_000_000; }
+function validStage(stage: StageProjection): boolean { return /^[a-f0-9]{64}$/.test(stage.stageDigest) && Number.isSafeInteger(stage.widthMicrounits) && stage.widthMicrounits > 0 && Number.isSafeInteger(stage.heightMicrounits) && stage.heightMicrounits > 0; }
+function exactShotConfig(config: ShotWorkspaceConfig): boolean { return config && Object.keys(config).sort().join(',') === 'landedMs,settledMs,startMs,targetElementIds' && [config.startMs, config.landedMs, config.settledMs].every(Number.isSafeInteger) && Array.isArray(config.targetElementIds) && config.targetElementIds.every((id) => typeof id === 'string'); }
+
 export function isValidAuthoringOperationId(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
 }
@@ -1148,6 +1499,8 @@ function parseOperation(input: unknown): AuthoringOperation | null {
       'motion.keyframe.add', 'motion.keyframe.remove', 'motion.slot-duration.set',
       'motion.binding-delay.set', 'motion.slot-easing.set',
       'motion.hold.insert',
+      'motion.transform-pose.set', 'motion.transform-waypoints.translate',
+      'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set',
       'motion.history.undo', 'motion.history.redo'].includes(String(value.kind))) {
     return null;
   }
@@ -1161,6 +1514,30 @@ function parseOperation(input: unknown): AuthoringOperation | null {
     return hasExactObjectKeys(value, [...baseKeys, 'payload']) && payload
       && hasExactObjectKeys(payload, ['cueId', 'durationMs'])
       && payload.cueId === 'cue_pair' && payload.durationMs === 600 ? base : null;
+  }
+  if (base.kind === 'motion.transform-pose.set') {
+    const payload = plainRecord(value.payload); const pose = plainRecord(payload?.pose); const stage = plainRecord(payload?.stage);
+    return typeof value.elementId === 'string' && typeof value.trackId === 'string' && typeof value.keyframeId === 'string'
+      && typeof value.expectedTransform === 'string' && hasExactObjectKeys(value, [...baseKeys, 'elementId', 'trackId', 'keyframeId', 'expectedTransform', 'payload'])
+      && payload && hasExactObjectKeys(payload, ['pose', 'stage']) && pose && parsePoseRecord(pose) && stage && parseStageRecord(stage) ? base : null;
+  }
+  if (base.kind === 'motion.transform-waypoints.translate' || base.kind === 'motion.keyframe-group-time.set'
+    || base.kind === 'motion.keyframe-group-easing.set' || base.kind === 'motion.settled-hold.set') {
+    const payload = plainRecord(value.payload); if (!payload || !hasExactObjectKeys(value, [...baseKeys, 'payload'])) return null;
+    const targets = payload.targets; if (!Array.isArray(targets) || !targets.every((target) => {
+      const item = plainRecord(target); return item && hasExactObjectKeys(item, ['elementId', 'trackId', 'keyframeId', 'expectedTransform'])
+        && ['elementId', 'trackId', 'keyframeId', 'expectedTransform'].every((key) => typeof item[key] === 'string');
+    }) || !validTrajectoryTargets(targets as TrajectoryTarget[])) return null;
+    if (base.kind === 'motion.transform-waypoints.translate') {
+      const stage = plainRecord(payload.stage); return hasExactObjectKeys(payload, ['targets', 'deltaXPpm', 'deltaYPpm', 'stage'])
+        && Number.isSafeInteger(payload.deltaXPpm) && Number.isSafeInteger(payload.deltaYPpm) && stage && parseStageRecord(stage) ? base : null;
+    }
+    if (base.kind === 'motion.keyframe-group-time.set') return hasExactObjectKeys(payload, ['targets', 'sourceTimeMs', 'targetTimeMs', 'landingTimeMs', 'settledTimeMs'])
+      && ['sourceTimeMs', 'targetTimeMs', 'landingTimeMs', 'settledTimeMs'].every((key) => Number.isSafeInteger(payload[key])) ? base : null;
+    if (base.kind === 'motion.keyframe-group-easing.set') return hasExactObjectKeys(payload, ['targets', 'expectedEasing', 'easing'])
+      && timingFunctionSchema.safeParse(payload.expectedEasing).success && timingFunctionSchema.safeParse(payload.easing).success ? base : null;
+    return hasExactObjectKeys(payload, ['targets', 'sourceTimeMs', 'settledTimeMs', 'landingTimeMs', 'boundaryTimeMs'])
+      && ['sourceTimeMs', 'settledTimeMs', 'landingTimeMs', 'boundaryTimeMs'].every((key) => Number.isSafeInteger(payload[key])) && payload.boundaryTimeMs === 2100 ? base : null;
   }
   const fixedElement = STRUCTURAL_AUTHORING_ELEMENT_IDS.includes(value.elementId as StructuralAuthoringElementId);
   if (base.kind === 'motion.track.create') {
@@ -1204,6 +1581,9 @@ function parseOperation(input: unknown): AuthoringOperation | null {
     && (!hasExactObjectKeys(payload, ['timeMs']) || typeof payload.timeMs !== 'number')) return null;
   return base;
 }
+
+function parsePoseRecord(value: Record<string, unknown>): boolean { return hasExactObjectKeys(value, ['translateXMicrounits', 'translateYMicrounits', 'scalePpm', 'rotateMicrodegrees']) && Object.values(value).every(Number.isSafeInteger) && validPose(value as TransformPose); }
+function parseStageRecord(value: Record<string, unknown>): boolean { return hasExactObjectKeys(value, ['stageDigest', 'widthMicrounits', 'heightMicrounits']) && validStage(value as StageProjection); }
 
 function plainRecord(value: unknown): Record<string, unknown> | null {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -1257,60 +1637,5 @@ export function deriveElementId(
   return `el_${sha256Hex(`${structuralFingerprint}\0${collisionOrdinal}`).slice(0, 16)}`;
 }
 
-/** Deterministic browser-safe SHA-256 with byte-for-byte Node crypto parity. */
-export function sha256Hex(input: string | Uint8Array): string {
-  const bytes = typeof input === 'string' ? new TextEncoder().encode(input) : input;
-  const bitLength = bytes.length * 8;
-  const paddedLength = Math.ceil((bytes.length + 9) / 64) * 64;
-  const padded = new Uint8Array(paddedLength);
-  padded.set(bytes);
-  padded[bytes.length] = 0x80;
-  const view = new DataView(padded.buffer);
-  view.setUint32(paddedLength - 8, Math.floor(bitLength / 0x1_0000_0000));
-  view.setUint32(paddedLength - 4, bitLength >>> 0);
-  const h = new Uint32Array([
-    0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a,
-    0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19,
-  ]);
-  const k = SHA256_CONSTANTS;
-  const w = new Uint32Array(64);
-  for (let offset = 0; offset < paddedLength; offset += 64) {
-    for (let index = 0; index < 16; index += 1) w[index] = view.getUint32(offset + index * 4);
-    for (let index = 16; index < 64; index += 1) {
-      const x = w[index - 15]!;
-      const y = w[index - 2]!;
-      const s0 = rotateRight(x, 7) ^ rotateRight(x, 18) ^ (x >>> 3);
-      const s1 = rotateRight(y, 17) ^ rotateRight(y, 19) ^ (y >>> 10);
-      w[index] = (w[index - 16]! + s0 + w[index - 7]! + s1) >>> 0;
-    }
-    let [a, b, c, d, e, f, g, hh] = h;
-    for (let index = 0; index < 64; index += 1) {
-      const s1 = rotateRight(e!, 6) ^ rotateRight(e!, 11) ^ rotateRight(e!, 25);
-      const choice = (e! & f!) ^ (~e! & g!);
-      const t1 = (hh! + s1 + choice + k[index]! + w[index]!) >>> 0;
-      const s0 = rotateRight(a!, 2) ^ rotateRight(a!, 13) ^ rotateRight(a!, 22);
-      const majority = (a! & b!) ^ (a! & c!) ^ (b! & c!);
-      const t2 = (s0 + majority) >>> 0;
-      hh = g; g = f; f = e; e = (d! + t1) >>> 0;
-      d = c; c = b; b = a; a = (t1 + t2) >>> 0;
-    }
-    const values = [a!, b!, c!, d!, e!, f!, g!, hh!];
-    for (let index = 0; index < 8; index += 1) h[index] = (h[index]! + values[index]!) >>> 0;
-  }
-  return [...h].map((value) => value.toString(16).padStart(8, '0')).join('');
-}
-
-function rotateRight(value: number, count: number): number {
-  return (value >>> count) | (value << (32 - count));
-}
-
-const SHA256_CONSTANTS = new Uint32Array([
-  0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5, 0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
-  0xd807aa98, 0x12835b01, 0x243185be, 0x550c7dc3, 0x72be5d74, 0x80deb1fe, 0x9bdc06a7, 0xc19bf174,
-  0xe49b69c1, 0xefbe4786, 0x0fc19dc6, 0x240ca1cc, 0x2de92c6f, 0x4a7484aa, 0x5cb0a9dc, 0x76f988da,
-  0x983e5152, 0xa831c66d, 0xb00327c8, 0xbf597fc7, 0xc6e00bf3, 0xd5a79147, 0x06ca6351, 0x14292967,
-  0x27b70a85, 0x2e1b2138, 0x4d2c6dfc, 0x53380d13, 0x650a7354, 0x766a0abb, 0x81c2c92e, 0x92722c85,
-  0xa2bfe8a1, 0xa81a664b, 0xc24b8b70, 0xc76c51a3, 0xd192e819, 0xd6990624, 0xf40e3585, 0x106aa070,
-  0x19a4c116, 0x1e376c08, 0x2748774c, 0x34b0bcb5, 0x391c0cb3, 0x4ed8aa4a, 0x5b9cca4f, 0x682e6ff3,
-  0x748f82ee, 0x78a5636f, 0x84c87814, 0x8cc70208, 0x90befffa, 0xa4506ceb, 0xbef9a3f7, 0xc67178f2,
-]);
+export * from './css-motion-semantics.js';
+export { sha256Hex } from './sha256.js';

@@ -1,10 +1,19 @@
 import { describe, expect, test } from 'vitest';
-import { canonicalBytes, sha256Hex } from '../../domain/src/index.ts';
+import { canonicalBytes, sha256Hex, type TransformWaypointsTranslateOperation } from '../../domain/src/index.ts';
 import { createPhase3Seed } from '../../local-service/src/seed.ts';
-import { makeBranchCreateCommand, makeClaimAcquireCommand, makeTrackCreateCommand, parseCommand,
+import { makeBranchCreateCommand, makeClaimAcquireCommand, makeTrackCreateCommand, makeTrajectoryCommand, parseCommand,
   parseCommandResponse, parseCommitMetadata, parseImmutableRevision, MotionServiceClient } from './index.ts';
 
 describe('motion.protocol.v1', () => {
+  test('strictly carries the shared trajectory operation without widening its bundle', () => {
+    const operation: TransformWaypointsTranslateOperation = { schemaVersion: 'motion.operation.v1', kind: 'motion.transform-waypoints.translate', operationId: 'trajectory', documentId: 'doc', expectedRevision: 0,
+      payload: { targets: [{ elementId: 'a', trackId: 't', keyframeId: 'k', expectedTransform: 'translate(0px, 0px)' }], deltaXPpm: 1000, deltaYPpm: -1000,
+        stage: { stageDigest: 'a'.repeat(64), widthMicrounits: 1_000_000, heightMicrounits: 1_000_000 } } };
+    const command = makeTrajectoryCommand(operation);
+    expect(parseCommand(command)).toEqual({ ok: true, command });
+    expect(parseCommand({ ...command, command: { ...command.command, privatePath: '/tmp/no' } })).toEqual({ ok: false, code: 'VALIDATION' });
+    expect(() => makeTrajectoryCommand({ ...operation, payload: { ...operation.payload, deltaXPpm: 0.5 } })).toThrow();
+  });
   test('shares one strict canonical-ID command and rejects selector addressing or envelope drift', () => {
     const command = makeTrackCreateCommand({ operationId: 'op', documentId: 'doc', expectedRevision: 0,
       elementId: 'el_2dbee68b1ea318c8' });

@@ -14,7 +14,11 @@ import postcss, {
 import valueParser from 'postcss-value-parser';
 
 import {
+  classifyAnimatedProperty,
   deriveElementId,
+  parseCssTimingFunction,
+  projectTrackInterpolation,
+  serializeCssTimingFunction,
   validateMotionDocument,
   type Diagnostic,
   type MotionDocument,
@@ -31,6 +35,11 @@ export type ImportResult = {
   diagnostics: Diagnostic[];
   inventory: ImportInventory;
 };
+export type V3ImportIdentity = Readonly<{
+  captureNamespaceSha256: string;
+  admissionPackageSha256: string;
+  provenance: readonly Readonly<{ stableId: string; nodeProvenanceSha256: string; captureNamespaceSha256: string }>[];
+}>;
 
 type ParsedSlot = MotionDocument['applications'][number]['slots'][number];
 type MutableInventory = Omit<ImportInventory, 'diagnosticCodes'> & {
@@ -40,11 +49,23 @@ type MutableInventory = Omit<ImportInventory, 'diagnosticCodes'> & {
 const directionValues = new Set(['normal', 'reverse', 'alternate', 'alternate-reverse']);
 const fillValues = new Set(['none', 'forwards', 'backwards', 'both']);
 const playValues = new Set(['running', 'paused']);
-const timingKeywords = new Set(['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out']);
+const animationLonghandProperties = [
+  'animation-name',
+  'animation-duration',
+  'animation-timing-function',
+  'animation-delay',
+  'animation-iteration-count',
+  'animation-direction',
+  'animation-fill-mode',
+  'animation-play-state',
+] as const;
+type AnimationLonghandProperty = typeof animationLonghandProperties[number];
+const animationLonghandPropertySet = new Set<string>(animationLonghandProperties);
 
 export function importMotionHtml(
   source: string,
   materialization?: FontMaterializationProvenance,
+  v3Identity?: V3ImportIdentity,
 ): ImportResult {
   const sourceDigest = digest(source);
   const documentNode = parse(source, {
@@ -66,6 +87,14 @@ export function importMotionHtml(
   if (materialization && materialization.materializedSourceDigest !== sourceDigest) {
     addDiagnostic(diagnostics, inventory, 'IMPORT_MATERIALIZED_DIGEST_MISMATCH',
       'Materialized source bytes do not match their provenance.');
+    return failedResult(diagnostics, inventory);
+  }
+  if (v3Identity && (!/^[a-f0-9]{64}$/.test(v3Identity.captureNamespaceSha256)
+    || !/^[a-f0-9]{64}$/.test(v3Identity.admissionPackageSha256)
+    || v3Identity.provenance.length === 0
+    || v3Identity.provenance.some((item) => item.captureNamespaceSha256 !== v3Identity.captureNamespaceSha256)
+    || new Set(v3Identity.provenance.map((item) => item.stableId)).size !== v3Identity.provenance.length)) {
+    addDiagnostic(diagnostics, inventory, 'IMPORT_V3_PROVENANCE_INVALID', 'The active-v3 provenance envelope is invalid.');
     return failedResult(diagnostics, inventory);
   }
 
@@ -109,6 +138,8 @@ export function importMotionHtml(
     return failedResult(diagnostics, inventory);
   }
 
+  const reducedMotionRules = extractReducedMotionRules(cssRoot, diagnostics, inventory);
+
   detectUnsupportedCss(cssRoot, diagnostics, inventory);
   const customProperties = collectCustomProperties(cssRoot);
   const motionTimingCustomProperties = collectMotionTimingCustomProperties(cssRoot);
@@ -121,9 +152,92 @@ export function importMotionHtml(
   );
   const rules = parseKeyframeRules(cssRoot, diagnostics, inventory);
   const ruleByName = new Map(rules.map((rule) => [rule.sourceName, rule]));
+  const longhandApplications = collectLonghandApplications(
+    cssRoot, documentNode, diagnostics, inventory,
+  );
   const canonicalElements = new Map<Element, MotionDocument['elements'][number]>();
   const applications: MotionDocument['applications'] = [];
   const elementTracks: MotionDocument['tracks'] = [];
+  const shorthandElements = new Set<Element>();
+
+  const ensureCanonicalElement = (element: Element, selectorHint: string, sourceRule: Rule) => {
+    let canonicalElement = canonicalElements.get(element);
+    if (canonicalElement) return canonicalElement;
+    const structuralFingerprint = fingerprint(element);
+    const stableIdentity = element.attribs['data-motion-stable'];
+    const nodeProvenance = element.attribs['data-motion-provenance'];
+    const proven = v3Identity?.provenance.find((item) => item.stableId === stableIdentity);
+    if (v3Identity && (!stableIdentity || !nodeProvenance || !proven
+      || proven.nodeProvenanceSha256 !== nodeProvenance)) {
+      addCssDiagnostic(diagnostics, inventory, 'IMPORT_V3_PROVENANCE_UNBOUND',
+        'An animated target is not bound to authenticated v3 node provenance.', sourceRule);
+      return null;
+    }
+    canonicalElement = {
+      id: v3Identity ? deriveElementId(`${v3Identity.captureNamespaceSha256}\0${nodeProvenance}`, 0)
+        : deriveElementId(structuralFingerprint, 0),
+      selectorHint,
+      structuralFingerprint,
+    };
+    canonicalElements.set(element, canonicalElement);
+    element.attribs['data-motion-id'] = canonicalElement.id;
+    return canonicalElement;
+  };
+
+  const appendApplication = (
+    bound: Element[],
+    boundCanonicalElements: MotionDocument['elements'],
+    selectorHint: string,
+    slots: Omit<ParsedSlot, 'id'>[],
+    sourceNode: Declaration,
+  ) => {
+    const applicationId = stableId('app', JSON.stringify({
+      elements: boundCanonicalElements.map((element) => element.id).sort(),
+      slots: slots.map((slot) => ({
+        ...slot, timingFunction: serializeCssTimingFunction(slot.timingFunction),
+      })),
+    }));
+    const applicationSlots: ParsedSlot[] = [];
+    for (const parsedSlot of slots) {
+      const rule = ruleByName.get(parsedSlot.ruleId);
+      if (!rule) {
+        inventory.missingCount += 1;
+        addCssDiagnostic(diagnostics, inventory, 'IMPORT_RULE_MISSING',
+          'An animation application references an unknown keyframe rule.', sourceNode, false);
+        continue;
+      }
+      const slotId = stableId('slot', JSON.stringify({ applicationId, ruleId: rule.id,
+        slot: { ...parsedSlot,
+          timingFunction: serializeCssTimingFunction(parsedSlot.timingFunction) } }));
+      const slot = { ...parsedSlot, id: slotId, ruleId: rule.id };
+      applicationSlots.push(slot);
+      for (const canonicalElement of boundCanonicalElements) {
+        for (const ruleTrack of rule.tracks) {
+          elementTracks.push({
+            id: stableId('track', `${canonicalElement.id}\0${slotId}\0${ruleTrack.property}`),
+            elementId: canonicalElement.id,
+            ruleId: rule.id,
+            slotId,
+            property: ruleTrack.property,
+            interpolation: projectTrackInterpolation(ruleTrack.property, slot.timingFunction),
+            keyframeIds: ruleTrack.keyframes.map((keyframe) => keyframe.id),
+          });
+        }
+      }
+    }
+    if (applicationSlots.length > 0) {
+      applications.push({
+        id: applicationId,
+        bindings: boundCanonicalElements.map((element, index) => ({
+          elementId: element.id,
+          delayOverridesMs: bindingDelayOverrides.get(bound[index]!)
+            ?? applicationSlots.map((slot) => slot.delayMs),
+        })),
+        selectorHint,
+        slots: applicationSlots,
+      });
+    }
+  };
 
   cssRoot.walkRules((cssRule) => {
     if (isInsideKeyframes(cssRule)) return;
@@ -177,66 +291,30 @@ export function importMotionHtml(
       return;
     }
 
-    const applicationIndex = applications.length;
     const boundCanonicalElements: MotionDocument['elements'] = [];
     for (const element of bound) {
-      let canonicalElement = canonicalElements.get(element);
-      if (!canonicalElement) {
-        const structuralFingerprint = fingerprint(element);
-        canonicalElement = {
-          id: deriveElementId(structuralFingerprint, 0),
-          selectorHint: cssRule.selector,
-          structuralFingerprint,
-        };
-        canonicalElements.set(element, canonicalElement);
-        element.attribs['data-motion-id'] = canonicalElement.id;
-      }
-      boundCanonicalElements.push(canonicalElement);
+      shorthandElements.add(element);
+      const canonicalElement = ensureCanonicalElement(element, cssRule.selector, cssRule);
+      if (canonicalElement) boundCanonicalElements.push(canonicalElement);
     }
-    const applicationId = stableId('app', `${boundCanonicalElements
-      .map((element) => element.id)
-      .join('\0')}\0${applicationIndex}`);
-    const applicationSlots: ParsedSlot[] = [];
-    for (const [slotIndex, parsedSlot] of slots.entries()) {
-      const rule = ruleByName.get(parsedSlot.ruleId);
-      if (!rule) {
-        inventory.missingCount += 1;
-        addCssDiagnostic(diagnostics, inventory, 'IMPORT_RULE_MISSING',
-          'An animation application references an unknown keyframe rule.', animationDeclaration, false);
-        continue;
-      }
-      const slotId = stableId('slot', `${applicationId}\0${slotIndex}`);
-      const slot = { ...parsedSlot, id: slotId, ruleId: rule.id };
-      applicationSlots.push(slot);
-      for (const canonicalElement of boundCanonicalElements) {
-        for (const ruleTrack of rule.tracks) {
-          elementTracks.push({
-            id: stableId('track', `${canonicalElement.id}\0${slotId}\0${ruleTrack.property}`),
-            elementId: canonicalElement.id,
-            ruleId: rule.id,
-            slotId,
-            property: ruleTrack.property,
-            interpolation: slot.timingFunction.kind === 'steps'
-              ? 'step'
-              : ruleTrack.interpolation,
-            keyframeIds: ruleTrack.keyframes.map((keyframe) => keyframe.id),
-          });
-        }
-      }
-    }
-    if (applicationSlots.length > 0) {
-      applications.push({
-        id: applicationId,
-        bindings: boundCanonicalElements.map((element, index) => ({
-          elementId: element.id,
-          delayOverridesMs: bindingDelayOverrides.get(bound[index]!)
-            ?? applicationSlots.map((slot) => slot.delayMs),
-        })),
-        selectorHint: cssRule.selector,
-        slots: applicationSlots,
-      });
-    }
+    appendApplication(bound, boundCanonicalElements, cssRule.selector, slots, animationDeclaration);
   });
+
+  for (const longhand of longhandApplications) {
+    if (shorthandElements.has(longhand.element)) {
+      addCssDiagnostic(diagnostics, inventory, 'IMPORT_ANIMATION_LONGHAND_INVALID',
+        'Animation shorthand and complete longhands cannot target the same element.',
+        longhand.sourceRule);
+      continue;
+    }
+    const canonicalElement = ensureCanonicalElement(
+      longhand.element, longhand.selectorHint, longhand.sourceRule,
+    );
+    if (canonicalElement) appendApplication(
+      [longhand.element], [canonicalElement], longhand.selectorHint,
+      [longhand.slot], longhand.sourceDeclaration,
+    );
+  }
 
   inventory.ruleCount = rules.length;
   inventory.applicationCount = applications.length;
@@ -297,7 +375,7 @@ export function importMotionHtml(
     tracks: elementTracks,
     cues: [],
     inventory: { ...inventory },
-    provenance: materialization ? {
+    provenance: { ...(materialization ? {
       sourceKind: 'offline-font-materialized',
       ...materialization,
     } : {
@@ -308,8 +386,9 @@ export function importMotionHtml(
       stylesheetDigest: null,
       aggregateFontAssetDigest: null,
       fontAssetCount: 0,
-    },
-    reducedMotion: { mode: 'source-snapshot', css: '' },
+    }), ...(v3Identity ? { captureNamespaceSha256: v3Identity.captureNamespaceSha256,
+      admissionPackageSha256: v3Identity.admissionPackageSha256 } : {}) },
+    reducedMotion: { mode: 'source-snapshot', css: reducedMotionRules.join('\n') },
   };
   const validation = validateMotionDocument(motionDocument);
   if (!validation.ok) {
@@ -320,6 +399,163 @@ export function importMotionHtml(
   }
 
   return { document: motionDocument, diagnostics, inventory: { ...inventory } };
+}
+
+function extractReducedMotionRules(
+  root: postcss.Root,
+  diagnostics: Diagnostic[],
+  inventory: MutableInventory,
+): string[] {
+  const snapshots: string[] = [];
+  root.walkAtRules('media', (atRule) => {
+    if (!/^\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)$/i.test(atRule.params)) return;
+    let animationNoneCount = 0;
+    let invalid = false;
+    atRule.walkAtRules(() => { invalid = true; });
+    atRule.walkRules((rule) => {
+      if (rule.selector.includes('::')) invalid = true;
+    });
+    atRule.walkDecls((declaration) => {
+      const property = declaration.prop.toLowerCase();
+      if (!isMotionDeclaration(property)) return;
+      if (property === 'animation'
+        && declaration.value.trim().toLowerCase() === 'none'
+        && !declaration.important) {
+        animationNoneCount += 1;
+      } else {
+        invalid = true;
+      }
+    });
+    if (invalid || animationNoneCount === 0) {
+      addCssDiagnostic(diagnostics, inventory, 'IMPORT_RESPONSIVE_MOTION',
+        'Reduced-motion branches must contain only registered animation:none motion.', atRule);
+      return;
+    }
+    snapshots.push(atRule.toString());
+    atRule.remove();
+  });
+  return snapshots;
+}
+
+type LonghandApplication = {
+  element: Element;
+  selectorHint: string;
+  sourceRule: Rule;
+  sourceDeclaration: Declaration;
+  slot: Omit<ParsedSlot, 'id'>;
+};
+
+function collectLonghandApplications(
+  root: postcss.Root,
+  documentNode: ParentNode,
+  diagnostics: Diagnostic[],
+  inventory: MutableInventory,
+): LonghandApplication[] {
+  const declarationsByElement = new Map<Element, Map<AnimationLonghandProperty, Declaration>>();
+  const selectorsByElement = new Map<Element, { selector: string; rule: Rule }>();
+  root.walkRules((rule) => {
+    if (isInsideKeyframes(rule) || hasConditionalAtRuleAncestor(rule)) return;
+    const declarations = rule.nodes.filter((node): node is Declaration =>
+      node.type === 'decl' && animationLonghandPropertySet.has(node.prop.toLowerCase()));
+    if (declarations.length === 0) return;
+    if (rule.selector.includes('::')) {
+      addCssDiagnostic(diagnostics, inventory, 'IMPORT_PSEUDO_ELEMENT_MOTION',
+        'Pseudo-element animation applications are deferred.', rule);
+      return;
+    }
+    let bound: Element[];
+    try {
+      bound = selectAll(rule.selector, documentNode.children);
+    } catch {
+      addCssDiagnostic(diagnostics, inventory, 'IMPORT_SELECTOR_UNSUPPORTED',
+        'An animation binding selector is unsupported.', rule);
+      return;
+    }
+    if (bound.length === 0) {
+      inventory.missingCount += 1;
+      addCssDiagnostic(diagnostics, inventory, 'IMPORT_BINDING_MISSING',
+        'An animation longhand could not bind to an element.', rule, false);
+      return;
+    }
+    for (const declaration of declarations) {
+      const property = declaration.prop.toLowerCase() as AnimationLonghandProperty;
+      const value = declaration.value.trim();
+      for (const element of bound) {
+        const byProperty = declarationsByElement.get(element) ?? new Map();
+        const existing = byProperty.get(property);
+        if (existing && existing.value.trim() !== value) {
+          addCssDiagnostic(diagnostics, inventory, 'IMPORT_ANIMATION_LONGHAND_CONFLICT',
+            'Conflicting animation longhands target the same element.', declaration);
+          continue;
+        }
+        byProperty.set(property, declaration);
+        declarationsByElement.set(element, byProperty);
+        selectorsByElement.set(element, { selector: rule.selector, rule });
+      }
+    }
+  });
+
+  const applications: LonghandApplication[] = [];
+  for (const [element, declarations] of declarationsByElement) {
+    // A delay by itself is the existing element-bound override, not an application tuple.
+    if (declarations.size === 1 && declarations.has('animation-delay')) continue;
+    const source = selectorsByElement.get(element)!;
+    if (animationLonghandProperties.some((property) => !declarations.has(property))) {
+      addCssDiagnostic(diagnostics, inventory, 'IMPORT_ANIMATION_LONGHAND_INCOMPLETE',
+        'Animation longhand applications must provide one complete legacy tuple.', source.rule);
+      continue;
+    }
+    const invalidDeclaration = [...declarations.values()].find((declaration) => {
+      const value = declaration.value.trim();
+      return declaration.important || valueParser(value).nodes.some((node) =>
+        node.type === 'div' && node.value === ',')
+        || /\b(?:var|env)\s*\(/i.test(value)
+        || /^(?:inherit|initial|unset|revert|revert-layer)$/i.test(value);
+    });
+    if (invalidDeclaration) {
+      addCssDiagnostic(diagnostics, inventory, 'IMPORT_ANIMATION_LONGHAND_INVALID',
+        'Animation longhands must use one explicit non-cascading value.', invalidDeclaration);
+      continue;
+    }
+    try {
+      const value = (property: AnimationLonghandProperty) =>
+        declarations.get(property)!.value.trim();
+      const durationMs = parseTime(value('animation-duration'));
+      const delayMs = parseTime(value('animation-delay'));
+      const iterationRaw = value('animation-iteration-count').toLowerCase();
+      const iterationCount = iterationRaw === 'infinite' ? 'infinite'
+        : /^(?:\d+|\d*\.\d+)$/.test(iterationRaw) ? Number(iterationRaw) : NaN;
+      const direction = value('animation-direction').toLowerCase();
+      const fillMode = value('animation-fill-mode').toLowerCase();
+      const playState = value('animation-play-state').toLowerCase();
+      const name = value('animation-name');
+      if (durationMs < 0 || (iterationCount !== 'infinite'
+        && (!Number.isFinite(iterationCount) || iterationCount < 0))
+        || !directionValues.has(direction) || !fillValues.has(fillMode)
+        || !playValues.has(playState) || !/^-?[_a-zA-Z][_a-zA-Z0-9-]*$/.test(name)
+        || name.toLowerCase() === 'none') throw new Error('invalid longhand tuple');
+      applications.push({
+        element,
+        selectorHint: source.selector,
+        sourceRule: source.rule,
+        sourceDeclaration: declarations.get('animation-name')!,
+        slot: {
+          ruleId: name,
+          durationMs,
+          delayMs,
+          iterationCount,
+          direction: direction as ParsedSlot['direction'],
+          fillMode: fillMode as ParsedSlot['fillMode'],
+          playState: playState as ParsedSlot['playState'],
+          timingFunction: parseCssTimingFunction(value('animation-timing-function')),
+        },
+      });
+    } catch {
+      addCssDiagnostic(diagnostics, inventory, 'IMPORT_ANIMATION_LONGHAND_INVALID',
+        'An animation longhand tuple could not be parsed exactly.', source.rule);
+    }
+  }
+  return applications;
 }
 
 function parseKeyframeRules(
@@ -355,7 +591,7 @@ function parseKeyframeRules(
       let easing: TimingFunction | undefined;
       if (easingDeclaration) {
         try {
-          easing = parseTimingFunction(easingDeclaration.value);
+          easing = parseCssTimingFunction(easingDeclaration.value);
         } catch {
           addCssDiagnostic(diagnostics, inventory, 'IMPORT_TIMING_UNSUPPORTED',
             'A keyframe timing function is unsupported.', easingDeclaration);
@@ -377,19 +613,22 @@ function parseKeyframeRules(
         propertyFrames.set(property, frames);
       }
     });
-    const tracks: RuleTrack[] = [...propertyFrames.entries()].map(([property, frames]) => ({
-      id: stableId('rule_track', `${ruleId}\0${property}`),
-      property,
-      interpolation: discreteProperties.has(property) ? 'discrete' : 'continuous',
-      keyframes: frames
-        .sort((a, b) => a.offset - b.offset)
-        .map((frame) => ({
-          id: stableId('kf', `${ruleId}\0${property}\0${frame.offset}`),
-          offset: frame.offset,
-          value: frame.value,
-          ...(frame.easing ? { easing: frame.easing } : {}),
+    const tracks: RuleTrack[] = [];
+    for (const [property, frames] of propertyFrames.entries()) {
+      const interpolation = classifyAnimatedProperty(property);
+      if (!interpolation) {
+        addCssDiagnostic(diagnostics, inventory, 'IMPORT_ANIMATED_PROPERTY_UNSUPPORTED',
+          'An animated property is not registered by motion.css-motion-semantics.v1.', atRule);
+        continue;
+      }
+      tracks.push({
+        id: stableId('rule_track', `${ruleId}\0${property}`), property, interpolation,
+        keyframes: frames.sort((a, b) => a.offset - b.offset).map((frame) => ({
+          id: stableId('kf', `${ruleId}\0${property}\0${frame.offset}`), offset: frame.offset,
+          value: frame.value, ...(frame.easing ? { easing: frame.easing } : {}),
         })),
-    }));
+      });
+    }
     if (tracks.length === 0) {
       addCssDiagnostic(diagnostics, inventory, 'IMPORT_RULE_EMPTY',
         'A keyframe rule contains no supported property tracks.', atRule);
@@ -425,8 +664,8 @@ function parseAnimationShorthand(
       const resolvedTime = resolveTime(token, customProperties);
       if (resolvedTime !== null) {
         times.push(resolvedTime);
-      } else if (timingKeywords.has(token) || token.startsWith('steps(') || token.startsWith('cubic-bezier(')) {
-        timingFunction = parseTimingFunction(token);
+      } else if (/^(?:linear|ease(?:-in|-out|-in-out)?|steps\(|cubic-bezier\()/i.test(token)) {
+        timingFunction = parseCssTimingFunction(token);
       } else if (token === 'infinite') {
         iterationCount = 'infinite';
       } else if (/^(?:\d+|\d*\.\d+)$/.test(token)) {
@@ -455,23 +694,6 @@ function parseAnimationShorthand(
       timingFunction,
     };
   });
-}
-
-function parseTimingFunction(value: string): TimingFunction {
-  if (timingKeywords.has(value)) {
-    return { kind: 'keyword', value: value as Extract<TimingFunction, { kind: 'keyword' }>['value'] };
-  }
-  const steps = /^steps\(\s*(\d+)\s*(?:,\s*([\w-]+)\s*)?\)$/.exec(value);
-  if (steps) return { kind: 'steps', count: Number(steps[1]), position: steps[2] ?? 'end' };
-  const bezier = /^cubic-bezier\(\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*,\s*(-?[\d.]+)\s*\)$/.exec(value);
-  if (bezier) {
-    return {
-      kind: 'cubic-bezier',
-      x1: Number(bezier[1]), y1: Number(bezier[2]),
-      x2: Number(bezier[3]), y2: Number(bezier[4]),
-    };
-  }
-  throw new Error('unsupported timing function');
 }
 
 function parseOffsets(selector: string): number[] | null {
@@ -514,14 +736,11 @@ function detectUnsupportedCss(
     };
     const unsupported = mapping[property];
     if (unsupported) addCssDiagnostic(diagnostics, inventory, unsupported[0], unsupported[1], declaration);
-    else if (property === 'animation-timing-function'
-      && !(declaration.parent?.type === 'rule'
+    else if (property.startsWith('animation-')
+      && !animationLonghandPropertySet.has(property)
+      && !(property === 'animation-timing-function'
+        && declaration.parent?.type === 'rule'
         && isInsideKeyframes(declaration.parent))) {
-      addCssDiagnostic(diagnostics, inventory, 'IMPORT_ANIMATION_LONGHAND_UNSUPPORTED',
-        'Animation longhands are unsupported in this import version.', declaration);
-    } else if (property.startsWith('animation-')
-      && property !== 'animation-timing-function'
-      && property !== 'animation-delay') {
       addCssDiagnostic(diagnostics, inventory, 'IMPORT_ANIMATION_LONGHAND_UNSUPPORTED',
         'Animation longhands are unsupported in this import version.', declaration);
     }
@@ -872,8 +1091,6 @@ function stableId(prefix: string, input: string): string {
 function digest(input: string): string {
   return createHash('sha256').update(input).digest('hex');
 }
-
-const discreteProperties = new Set(['display', 'visibility', 'content']);
 
 export {
   materializeOfflineFontResources,

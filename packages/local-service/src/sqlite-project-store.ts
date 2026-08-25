@@ -2,7 +2,7 @@ import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node
 import { DatabaseSync } from 'node:sqlite';
 
 import { canonicalBytes, canonicalJson, createAuthoringState, dispatchAuthoringOperation, sha256Hex,
-  validateMotionDocument, type MotionDocument } from '../../domain/src/index.ts';
+  validateMotionDocument, type AuthoringOperation, type AuthoringState, type MotionDocument } from '../../domain/src/index.ts';
 import { MAIN_BRANCH_ID, PROTOCOL_VERSION, canonicalResponseBytes, type CommandSuccess, type ControlReceipt,
   type MotionCommand, type RevisionReceipt } from '../../motion-protocol/src/index.ts';
 import type { AuthContext, CommitResult, ProjectStore } from '../../project-store/src/index.ts';
@@ -64,7 +64,7 @@ export class SqliteProjectStore implements ProjectStore {
         ? { response: JSON.parse(prior.sanitized_receipt_json) as CommandSuccess,
           event: this.eventFor(command.documentId, command.operationId), replayed: true }
         : { response: { ok: false, code: 'OPERATION_ID_CONFLICT' } }; }
-      const result = command.command.kind === 'motion.track.create'
+      const result = isAuthoringKind(command.command.kind)
         ? this.author(command, auth, publicDigest, privateDigest)
         : this.control(command, auth, publicDigest, privateDigest);
       if (!('event' in result)) { this.database.exec('ROLLBACK'); return result; }
@@ -72,7 +72,7 @@ export class SqliteProjectStore implements ProjectStore {
     } catch (error) { if (this.database.isTransaction) this.database.exec('ROLLBACK'); throw error; }
   }
   private author(command: MotionCommand, auth: AuthContext, publicDigest: string, privateDigest: string): CommitResult {
-    if (command.command.kind !== 'motion.track.create') throw new Error('AUTHOR_KIND');
+    if (!isAuthoringKind(command.command.kind)) throw new Error('AUTHOR_KIND');
     const head = this.readHeadRow(command.documentId, command.branchId); if (!head) return { response: { ok: false, code: 'VALIDATION' } };
     if (head.revision !== command.expectedRevision) return { response: { ok: false, code: 'STALE_REVISION',
       currentRevision: head.revision, currentDigest: head.digest } };
@@ -80,7 +80,9 @@ export class SqliteProjectStore implements ProjectStore {
       return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
     const last = (this.database.prepare('SELECT last_revision FROM documents WHERE document_id=?').get(command.documentId) as { last_revision: number }).last_revision;
     if (last >= Number.MAX_SAFE_INTEGER) return { response: { ok: false, code: 'VALIDATION' } };
-    const nextRevision = last + 1; const reduced = dispatchAuthoringOperation(createAuthoringState(JSON.parse(head.json)), command.command, nextRevision);
+    const nextRevision = last + 1; const state = command.command.kind === 'motion.history.undo' || command.command.kind === 'motion.history.redo'
+      ? this.reconstructAuthoringState(command.documentId, head.revision) : createAuthoringState(JSON.parse(head.json));
+    const reduced = dispatchAuthoringOperation(state, command.command, nextRevision);
     if (!reduced.ok) return { response: { ok: false, code: 'VALIDATION' } };
     const next = reduced.state.document; const canonical = canonicalJson(next); const canonicalDigest = sha256Hex(canonicalBytes(next));
     const receipt: RevisionReceipt = { schemaVersion: 'motion.revision-receipt.v1', protocolVersion: PROTOCOL_VERSION,
@@ -101,8 +103,28 @@ export class SqliteProjectStore implements ProjectStore {
     if (branch.changes !== 1 || doc.changes !== 1) throw new Error('REVISION_COMPARE_AND_SWAP_FAILED');
     return { response, event: this.eventFor(command.documentId, command.operationId), replayed: false };
   }
+  private reconstructAuthoringState(documentId: string, headRevision: number): AuthoringState {
+    const chain: Array<{ revision: number; parent_revision: number | null; canonical_json: string; creating_event_id: string | null }> = [];
+    let cursor: number | null = headRevision;
+    while (cursor !== null) {
+      const row = this.database.prepare('SELECT revision,parent_revision,canonical_json,creating_event_id FROM revisions WHERE document_id=? AND revision=?')
+        .get(documentId, cursor) as { revision: number; parent_revision: number | null; canonical_json: string; creating_event_id: string | null } | undefined;
+      if (!row) throw new Error('AUTHORING_LINEAGE_MISSING'); chain.push(row); cursor = row.parent_revision;
+    }
+    chain.reverse(); let state = createAuthoringState(JSON.parse(chain[0]!.canonical_json));
+    for (const row of chain.slice(1)) {
+      if (!row.creating_event_id) throw new Error('AUTHORING_LINEAGE_EVENT_MISSING');
+      const event = this.database.prepare('SELECT private_payload_json FROM events WHERE event_id=?').get(row.creating_event_id) as { private_payload_json: string } | undefined;
+      if (!event) throw new Error('AUTHORING_LINEAGE_EVENT_MISSING');
+      const operation = JSON.parse(event.private_payload_json) as AuthoringOperation;
+      const replay = dispatchAuthoringOperation(state, operation, row.revision);
+      if (!replay.ok || canonicalJson(replay.state.document) !== row.canonical_json) throw new Error('AUTHORING_LINEAGE_CORRUPT');
+      state = replay.state;
+    }
+    return state;
+  }
   private control(command: MotionCommand, auth: AuthContext, publicDigest: string, privateDigest: string): CommitResult {
-    const operation = command.command; if (operation.kind === 'motion.track.create') throw new Error('CONTROL_KIND');
+    const operation = command.command; if (isAuthoringKind(operation.kind)) throw new Error('CONTROL_KIND');
     if (operation.kind === 'motion.branch.create' && auth.actor !== 'human') return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
     if ((operation.kind === 'motion.claim.acquire' || operation.kind === 'motion.claim.renew' || operation.kind === 'motion.claim.release')
       && auth.actor !== 'agent') return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
@@ -135,7 +157,7 @@ export class SqliteProjectStore implements ProjectStore {
       this.database.prepare('INSERT INTO claims(claim_id,document_id,branch_id,token_hash,holder_kind,lease_version,expires_at,active) VALUES(?,?,?,?,?,?,?,1)')
         .run(claimId, command.documentId, targetBranch, sha256Hex(auth.claimSecret), 'agent', leaseVersion, expiresAt);
     } else {
-      if (!claim || !claim.active || claim.expires_at <= auth.now || claim.lease_version !== operation.payload.leaseVersion)
+      if (!claim || !claim.active || claim.expires_at <= auth.now || claim.lease_version !== (operation as { payload: { leaseVersion: number } }).payload.leaseVersion)
         return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
       if (claim.branch_id !== null && claim.branch_id !== command.branchId) return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
       if (operation.kind !== 'motion.claim.revoke' && (!auth.claimSecret || sha256Hex(auth.claimSecret) !== claim.token_hash))
@@ -249,6 +271,12 @@ export class SqliteProjectStore implements ProjectStore {
     }
   }
   private verify(): void { this.verifyPreMigration(); }
+}
+
+function isAuthoringKind(kind: string): kind is AuthoringOperation['kind'] {
+  return ['motion.track.create', 'motion.transform-pose.set', 'motion.transform-waypoints.translate',
+    'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set',
+    'motion.history.undo', 'motion.history.redo'].includes(kind);
 }
 
 /** Synthetic migration fixture creation stays inside the sole SQLite adapter. */

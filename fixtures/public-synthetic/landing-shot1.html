@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Neutral trajectory workspace</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; }
+    .stage { position: relative; width: 800px; height: 450px; overflow: hidden; background: #eef2f5; }
+    .object { position: absolute; width: 48px; height: 48px; border-radius: 10px; }
+    .object-a { background: #4169e1; animation: neutral-a 7000ms ease both; }
+    .object-b { background: #d2691e; animation: neutral-b 7000ms ease both; }
+    @keyframes neutral-a {
+      0% { transform: translate(60px, 40px) scale(1) rotate(0deg); }
+      10% { transform: translate(220px, 170px) scale(1.05) rotate(8deg); animation-timing-function: ease-out; }
+      30% { transform: translate(250px, 180px) scale(1) rotate(0deg); }
+      40% { transform: translate(300px, 200px) scale(1) rotate(0deg); }
+      100% { transform: translate(340px, 210px) scale(1) rotate(0deg); }
+    }
+    @keyframes neutral-b {
+      0% { transform: translate(690px, 60px) scale(1) rotate(0deg); }
+      10% { transform: translate(520px, 190px) scale(0.95) rotate(-6deg); animation-timing-function: ease-out; }
+      30% { transform: translate(500px, 180px) scale(1) rotate(0deg); }
+      40% { transform: translate(460px, 210px) scale(1) rotate(0deg); }
+      100% { transform: translate(420px, 220px) scale(1) rotate(0deg); }
+    }
+    @media (prefers-reduced-motion: reduce) { .object { animation: none; } }
+  </style>
+</head>
+<body>
+  <main class="stage" aria-label="Neutral motion stage">
+    <div class="object object-a" aria-label="Object A"></div>
+    <div class="object object-b" aria-label="Object B"></div>
+  </main>
+</body>
+</html>

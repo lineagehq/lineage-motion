@@ -5,7 +5,10 @@ import { resolve } from 'node:path';
 import { chromium, type Browser, type Page } from '@playwright/test';
 import { PNG } from 'pngjs';
 
-import type { MotionDocument } from '../../domain/src/index.js';
+import {
+  applicationInstanceId, deriveMotionEvidenceBoundaries, normalizeAnimationInstance,
+  type MotionDocument,
+} from '../../domain/src/index.js';
 
 export type SamplePlan = {
   durationMs: number;
@@ -31,68 +34,25 @@ export function deriveSamplePlan(document: MotionDocument, stableTimesMs: number
         const delayMs = binding.delayOverridesMs[slotIndex];
         const rule = ruleById.get(slot.ruleId);
         if (delayMs === undefined || !rule) throw new Error('VISUAL_SAMPLE_RELATIONSHIP_INVALID');
-        const iterationCount = slot.iterationCount === 'infinite'
-          ? 1 : Math.ceil(slot.iterationCount);
-        for (let iteration = 0; iteration < iterationCount; iteration += 1) {
-          const iterationStart = delayMs + iteration * slot.durationMs;
-          if (slot.timingFunction.kind === 'steps') {
-            const offsets = [...new Set(rule.tracks.flatMap((track) =>
-              track.keyframes.map((keyframe) => keyframe.offset)))].sort((a, b) => a - b);
-            for (const offset of offsets) {
-              addBoundary(
-                boundaryReasons,
-                iterationStart + slot.durationMs * offset,
-                'slot-steps',
-                document.durationMs,
-              );
-            }
-            for (let offsetIndex = 0; offsetIndex < offsets.length - 1; offsetIndex += 1) {
-              const segmentStartOffset = offsets[offsetIndex]!;
-              const segmentEndOffset = offsets[offsetIndex + 1]!;
-              for (const fraction of stepsBoundaryFractions(
-                slot.timingFunction.count,
-                slot.timingFunction.position,
-              )) {
-                addBoundary(
-                  boundaryReasons,
-                  iterationStart + slot.durationMs * (segmentStartOffset
-                    + (segmentEndOffset - segmentStartOffset) * fraction),
-                  'slot-steps',
-                  document.durationMs,
-                );
-              }
-            }
-          }
-          for (const ruleTrack of rule.tracks) {
-            if (ruleTrack.interpolation === 'discrete') {
-              for (const keyframe of ruleTrack.keyframes) {
-                addBoundary(
-                  boundaryReasons,
-                  iterationStart + slot.durationMs * keyframe.offset,
-                  'discrete-keyframe',
-                  document.durationMs,
-                );
-              }
-            }
-            for (const [keyframeIndex, keyframe] of ruleTrack.keyframes.entries()) {
-              if (keyframe.easing?.kind !== 'steps') continue;
-              const next = ruleTrack.keyframes[keyframeIndex + 1];
-              if (!next) continue;
-              const segmentStart = iterationStart + slot.durationMs * keyframe.offset;
-              const segmentDuration = slot.durationMs * (next.offset - keyframe.offset);
-              for (const fraction of stepsBoundaryFractions(
-                keyframe.easing.count,
-                keyframe.easing.position,
-              )) {
-                addBoundary(
-                  boundaryReasons,
-                  segmentStart + segmentDuration * fraction,
-                  'keyframe-steps',
-                  document.durationMs,
-                );
-              }
-            }
-          }
+        const offsets = [...new Set(rule.tracks.flatMap((track) => track.keyframes.map((keyframe) => keyframe.offset)))].sort((a, b) => a - b);
+        const instance = normalizeAnimationInstance({
+          applicationId: applicationInstanceId(binding.elementId, slot.ruleId, slot.id),
+          targetId: binding.elementId, ruleId: slot.ruleId, timeline: 'document', composition: 'replace',
+          durationMs: slot.durationMs, delayMs, iterations: slot.iterationCount, direction: slot.direction,
+          fill: slot.fillMode, playState: slot.playState, easing: slot.timingFunction,
+          properties: rule.tracks.map((track) => track.property),
+          keyframes: offsets.map((offset) => ({
+            offset,
+            easing: rule.tracks.flatMap((track) => track.keyframes).find((frame) => frame.offset === offset)?.easing ?? slot.timingFunction,
+            properties: rule.tracks.filter((track) => track.keyframes.some((frame) => frame.offset === offset)).map((track) => track.property),
+            values: Object.fromEntries(rule.tracks.flatMap((track) => {
+              const keyframe = track.keyframes.find((frame) => frame.offset === offset);
+              return keyframe ? [[track.property, keyframe.value]] : [];
+            })),
+          })),
+        });
+        for (const boundary of deriveMotionEvidenceBoundaries([instance], document.durationMs)) {
+          boundary.reasons.forEach((reason) => addBoundary(boundaryReasons, boundary.timeMs, reason, document.durationMs));
         }
       }
     }
@@ -121,23 +81,6 @@ export function deriveSamplePlan(document: MotionDocument, stableTimesMs: number
     sampleTimesMs: [...sampleTimes].sort((a, b) => a - b),
     endpointHandling,
   };
-}
-
-function stepsBoundaryFractions(count: number, position: string): number[] {
-  const fractions = Array.from({ length: Math.max(0, count - 1) }, (_, index) =>
-    (index + 1) / count);
-  if (position === 'start' || position === 'jump-start' || position === 'jump-both') {
-    fractions.unshift(0);
-  }
-  if (position === 'end' || position === 'jump-end' || position === 'jump-both') {
-    fractions.push(1);
-  }
-  if (position !== 'start' && position !== 'jump-start'
-    && position !== 'end' && position !== 'jump-end'
-    && position !== 'jump-none' && position !== 'jump-both') {
-    throw new Error('VISUAL_STEPS_POSITION_UNSUPPORTED');
-  }
-  return fractions;
 }
 
 export function compareRgba(
@@ -436,6 +379,7 @@ async function captureReplay(input: {
     const page = await context.newPage();
     await page.setContent(input.html, { waitUntil: 'load' });
     const readiness = await preparePage(page);
+    await primeExactZeroCssAnimationCapture(page, input.sampleTimesMs);
     const frames: CaptureReplay['frames'] = [];
     for (const [sampleIndex, timeMs] of input.sampleTimesMs.entries()) {
       await setNativeAnimationTime(page, timeMs);
@@ -456,6 +400,29 @@ async function captureReplay(input: {
   } finally {
     await context.close();
   }
+}
+
+async function primeExactZeroCssAnimationCapture(
+  page: Page,
+  sampleTimesMs: number[],
+): Promise<void> {
+  const firstPositiveTimeMs = sampleTimesMs.find((timeMs) => timeMs > 0);
+  if (sampleTimesMs[0] !== 0 || firstPositiveTimeMs === undefined) return;
+  await page.evaluate(async (positiveTimeMs) => {
+    const animations = document.getAnimations().filter((animation): animation is CSSAnimation =>
+      animation instanceof CSSAnimation);
+    const seek = async (timeMs: number): Promise<void> => {
+      for (const animation of animations) {
+        animation.pause();
+        animation.currentTime = timeMs;
+      }
+      await Promise.all(animations.map((animation) => animation.ready.catch(() => animation)));
+      await new Promise<void>((resolveFrame) => requestAnimationFrame(() =>
+        requestAnimationFrame(() => resolveFrame())));
+    };
+    await seek(positiveTimeMs);
+    await seek(0);
+  }, firstPositiveTimeMs);
 }
 
 async function preparePage(page: Page): Promise<ControlledVisualProof['readiness'][number]> {
