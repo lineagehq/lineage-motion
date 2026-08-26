@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { importMotionHtml } from '../../css-import/src/index.js';
+import { compileMotionDocument } from '../../css-compiler/src/index.js';
 import { canonicalBytes, parseTransformPose, projectShotWorkspace, projectTransformTrajectory,
-  sha256Hex, type MotionDocument } from './index.js';
+  cssKeyframeTimeQuantizationHalfStep, sha256Hex, type MotionDocument } from './index.js';
 
 const source = readFileSync(resolve(import.meta.dirname,
   '../../../fixtures/public-synthetic/trajectory-representability.html'), 'utf8');
@@ -51,6 +52,19 @@ describe('strict trajectory representability projection', () => {
     expect(sha256Hex(canonicalBytes(base))).toBe(before);
   });
 
+  test('compiler six-decimal percentages reimport into the same eligible workspace', () => {
+    const compiled = compileMotionDocument(base);
+    expect(compiled.css).toContain('33.333333%');
+    const reimported = importMotionHtml(compiled.html);
+    expect(reimported.diagnostics).toEqual([]);
+    expect(reimported.document).not.toBeNull();
+    const ids = reimported.document!.elements.map((element) => element.id).sort();
+    expect(projectShotWorkspace(reimported.document!,
+      { startMs: 0, landedMs: 700, settledMs: 2100, targetElementIds: ids })).toMatchObject({
+      eligible: true,
+    });
+  });
+
   test('admits every probed unique source time strictly inside the open one-nanosecond interval', () => {
     for (const deltaNanoseconds of [0.999, 0.9995, 0.9999]) {
       const deltaMilliseconds = deltaNanoseconds / 1_000_000;
@@ -62,8 +76,9 @@ describe('strict trajectory representability projection', () => {
   });
 
   test('uses literal representable open boundaries on both sides without rounded buckets', () => {
-    const lowerBoundaryMs = 700 - 0.000001;
-    const upperBoundaryMs = 700 + 0.000001;
+    const halfStep = cssKeyframeTimeQuantizationHalfStep(2100);
+    const lowerBoundaryMs = 700 - halfStep;
+    const upperBoundaryMs = 700 + halfStep;
 
     for (const sourceTimeMs of [nextUp(lowerBoundaryMs), nextDown(upperBoundaryMs)]) {
       expect(projectionAtMiddleSourceTime(sourceTimeMs), `inside ${sourceTimeMs}`)
@@ -84,7 +99,7 @@ describe('strict trajectory representability projection', () => {
       track.keyframeIds.includes(collisionTrack.keyframes[0]!.id))!.elementId)).toMatchObject({ eligible: false,
       code: 'TRAJECTORY_TIME_UNREPRESENTABLE' });
 
-    for (const delta of [0.000002, 0.25]) {
+    for (const delta of [cssKeyframeTimeQuantizationHalfStep(2100) + 0.000001, 0.25]) {
       const hostile = structuredClone(base); firstTransformTrack(hostile).keyframes[1]!.offset = (700 + delta) / 2100;
       expect(projectShotWorkspace(hostile,
         { startMs: 0, landedMs: 700, settledMs: 2100, targetElementIds })).toMatchObject({ eligible: false });

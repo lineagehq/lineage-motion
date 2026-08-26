@@ -86,7 +86,7 @@ document.body.innerHTML = `
       <fieldset class="shot-moments" data-shot-moments><legend>Moment</legend></fieldset>
       <details class="shot-advanced" data-shot-advanced><summary>Advanced</summary><div class="advanced-content">
         <form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form>
-        <div class="shot-timing"><label>Landing (ms)<input data-shot-landing type="number" min="1" max="2099" value="700"></label><button type="button" data-shot-apply-time>Apply times</button><label>Incoming easing<select data-shot-easing><option>ease-out</option><option>ease-in</option><option>ease-in-out</option><option>linear</option></select></label><button type="button" data-shot-apply-easing>Apply easing</button><label>Settled (ms)<input data-shot-settled type="number" min="2" max="2100" value="2100"></label><button type="button" data-shot-hold>Create settled hold</button></div>
+        <div class="shot-timing"><label>Landing (ms)<input data-shot-landing type="number" min="1" max="2099" value="700"></label><button type="button" data-shot-apply-time>Apply times</button><label>Incoming easing<select data-shot-easing><option value="custom" disabled>Custom (source)</option><option>ease</option><option>ease-out</option><option>ease-in</option><option>ease-in-out</option><option>linear</option></select></label><button type="button" data-shot-apply-easing>Apply easing</button><label>Settled (ms)<input data-shot-settled type="number" min="2" max="2100" value="2100"></label><button type="button" data-shot-hold>Create settled hold</button></div>
       </div></details>
       <div class="shot-history-slot" data-shot-history-slot></div>
       <output data-shot-status role="status" aria-live="polite"></output>
@@ -828,7 +828,7 @@ function renderProjection(): void {
   const timeline = buildTimeline(authoring.document);
   const timelineElement = required<HTMLElement>('[data-timeline]');
   timelineElement.dataset.durationMs = String(timeline.durationMs);
-  scrubber.max = String(shotConfig ? Math.min(timeline.durationMs, 2101) : timeline.durationMs);
+  scrubber.max = String(shotConfig ? shotConfig.settledMs + 1 : timeline.durationMs);
   timelineElement.replaceChildren(...timeline.rows.map(renderTrack));
   required('[data-track-count]').textContent = `${timeline.rows.length} tracks`;
   const cues = required('[data-cues]');
@@ -1052,8 +1052,7 @@ function syncPlaybackFeedback(): void {
   const nativeTime = state.currentTimes.find((time): time is number => typeof time === 'number');
   if (nativeTime === undefined) return;
   const shotEndMs = shotConfig?.settledMs;
-  if (shotEndMs !== undefined && (nativeTime > shotEndMs
-    || (nativeTime === shotEndMs && state.playStates.some((playState) => playState === 'running')))) {
+  if (shotEndMs !== undefined && nativeTime >= shotEndMs) {
     controller.pause();
     controller.scrub(shotEndMs);
     scrubber.value = String(shotEndMs); playhead.value = `${shotEndMs} ms`;
@@ -1263,8 +1262,16 @@ function syncPreviewObjectTargets(): void {
       button.style.left = `${rect.left + rect.width / 2 - bodyWidth / 2}px`;
       button.style.top = `${rect.top + rect.height / 2 - bodyHeight / 2}px`;
       button.style.width = `${bodyWidth}px`; button.style.height = `${bodyHeight}px`;
-      for (const kind of ['scale', 'rotate'] as const) {
-        const key = `${elementId}:${kind}`; desired.add(key); let handle = existing.get(key);
+      const transformControls = [
+        { kind: 'scale' as const, corner: 'top-left', x: rect.left - targetSize / 2, y: rect.top - targetSize / 2 },
+        { kind: 'scale' as const, corner: 'top-right', x: rect.right + targetSize / 2, y: rect.top - targetSize / 2 },
+        { kind: 'scale' as const, corner: 'bottom-right', x: rect.right + targetSize / 2, y: rect.bottom + targetSize / 2 },
+        { kind: 'scale' as const, corner: 'bottom-left', x: rect.left - targetSize / 2, y: rect.bottom + targetSize / 2 },
+        { kind: 'rotate' as const, corner: null, x: rect.left + rect.width / 2, y: rect.top - targetSize * .82 },
+      ];
+      for (const control of transformControls) {
+        const { kind, corner } = control;
+        const key = `${elementId}:${kind}:${corner ?? 'top-center'}`; desired.add(key); let handle = existing.get(key);
         if (!handle) {
           handle = document.createElement('button'); handle.type = 'button';
           handle.className = `preview-transform-handle ${kind}-handle`; handle.dataset.previewControlKey = key;
@@ -1276,14 +1283,22 @@ function syncPreviewObjectTargets(): void {
           handle.addEventListener('keydown', (event) => void handleDirectPoseKeyboard(event, kind));
           previewObjectOverlay.append(handle);
         }
+        handle.dataset.transformRole = kind === 'scale' ? 'uniform-scale-corner' : 'rotation';
+        if (corner) handle.dataset.transformCorner = corner;
+        else delete handle.dataset.transformCorner;
         const selected = elementId === shotPrimaryElementId; handle.hidden = !selected;
         handle.style.width = `${targetSize}px`; handle.style.height = `${targetSize}px`;
-        handle.style.left = `${rect.right + targetSize * .1}px`;
-        handle.style.top = `${kind === 'scale' ? rect.bottom + targetSize * .1 : rect.top - targetSize * 1.1}px`;
+        handle.style.left = `${control.x - targetSize / 2}px`;
+        handle.style.top = `${control.y - targetSize / 2}px`;
         const trajectory = projectTransformTrajectory(authoring.document, elementId);
         const pose = trajectory.eligible ? trajectory.waypoints.find((point) => point.timeMs === shotMomentMs)?.pose : undefined;
         const value = kind === 'scale' ? (pose?.scalePpm ?? 1_000_000) / 1_000_000 : (pose?.rotateMicrodegrees ?? 0) / 1_000_000;
-        handle.setAttribute('aria-label', `${kind === 'scale' ? 'Uniform scale' : 'Rotation'} for Object ${index + 1}`);
+        const controlName = kind === 'scale'
+          ? `${corner!.replace('-', ' ')} uniform scale handle for Object ${index + 1}`
+          : `Rotation handle for Object ${index + 1}`;
+        handle.setAttribute('aria-label', controlName);
+        handle.title = kind === 'scale' ? `Drag the ${corner!.replace('-', ' ')} corner to scale Object ${index + 1}`
+          : `Drag to rotate Object ${index + 1}`;
         handle.setAttribute('aria-valuemin', kind === 'scale' ? '0.25' : '-180'); handle.setAttribute('aria-valuemax', kind === 'scale' ? '3' : '180');
         handle.setAttribute('aria-valuenow', String(value)); handle.setAttribute('aria-valuetext', kind === 'scale' ? `${value} uniform scale` : `${value} degrees`);
       }
@@ -1307,7 +1322,7 @@ function openShotWorkspace(config: { startMs: number; landedMs: number; settledM
   shotPrimaryElementId = shotConfig.targetElementIds[0]!;
   shotSelection = [shotPrimaryElementId]; shotMomentMs = config.landedMs; shotWorkspace.hidden = false;
   activateShotLayout(); configurePreviewCanvas();
-  scrubber.max = String(Math.min(authoring.document.durationMs, 2101));
+  scrubber.max = String(shotConfig.settledMs + 1);
   if (!alignShotPreviewToMoment(shotMomentMs)) return { ok: false, code: 'PREVIEW_MOMENT_ALIGNMENT_INVALID' };
   renderShotWorkspace(); configurePreviewCanvas(); renderShotWorkspace(); return { ok: true };
 }
@@ -1510,7 +1525,7 @@ function renderShotWorkspace(): void {
   shotWorkspace.dataset.mode = shotMode;
   syncPreviewShotToolbar(requestedTimes);
   previewSelectionLabel.textContent = `${primaryLabel} selected`;
-  shotGuidance.textContent = `Editing ${primaryLabel} at ${momentLabel}. Drag the object to move it, the square handle to scale, or the round handle to rotate.${moveTogether.checked ? ' Object movement translates both objects together.' : ''}${shotMode === 'path' ? ' Path waypoints are visible and draggable.' : ''}`;
+  shotGuidance.textContent = `Editing ${primaryLabel} at ${momentLabel}. Drag the object to move it, any corner to scale uniformly, or the rotation handle above it to rotate.${moveTogether.checked ? ' Object movement translates both objects together.' : ''}${shotMode === 'path' ? ' Path waypoints are visible and draggable.' : ''}`;
   const controls = shotPoseForm.elements as unknown as Record<string, HTMLInputElement>;
   for (const control of shotPoseForm.querySelectorAll<HTMLInputElement>('input')) control.disabled = !selected;
   if (selected) { controls.x!.value = String(selected.pose.translateXMicrounits / 1_000_000); controls.y!.value = String(selected.pose.translateYMicrounits / 1_000_000);
@@ -1545,7 +1560,8 @@ function syncShotTimingControls(inventories: NonNullable<ReturnType<typeof canon
   const timings = effectiveShotTimings(selected.targets);
   if (timings && timings.every((timing) => canonicalJson(timing) === canonicalJson(timings[0]))) {
     const timing = timings[0]!;
-    if (timing.kind === 'keyword') required<HTMLSelectElement>('[data-shot-easing]').value = timing.value;
+    required<HTMLSelectElement>('[data-shot-easing]').value = timing.kind === 'keyword'
+      ? timing.value : 'custom';
   }
 }
 
@@ -2052,7 +2068,9 @@ async function applyShotEasing(): Promise<void> {
   if (effectiveTimings.some((timing) => canonicalJson(timing) !== canonicalJson(expectedEasing))) {
     shotStatus.value = 'AUTHORING_TRAJECTORY_EASING_NON_UNIFORM · unchanged.'; return;
   }
-  const value = required<HTMLSelectElement>('[data-shot-easing]').value as 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out';
+  const draft = required<HTMLSelectElement>('[data-shot-easing]').value;
+  if (draft === 'custom') { shotStatus.value = 'Choose an easing preset to replace the source curve.'; return; }
+  const value = draft as 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out';
   const result = await dispatch({ ...operationEnvelope(), kind: 'motion.keyframe-group-easing.set', payload: { targets: selected.targets, expectedEasing, easing: { kind: 'keyword', value } } });
   shotStatus.value = result.ok ? `Easing applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`; renderShotWorkspace();
 }

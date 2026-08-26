@@ -17,6 +17,32 @@ if (process.argv[2] === '--materialize-public-asymmetric-seed') {
   await materializePublicAsymmetricSeed(resolve(import.meta.dirname, '../../..'), process.argv[3]);
   process.exit();
 }
+if (process.argv[2] === '--resolve-shot1-canonical-easing') {
+  const repositoryRoot = resolve(import.meta.dirname, '../../..');
+  const authority = process.argv[3];
+  const { projectTrajectorySelection } = await import('../../../packages/domain/src/index.ts');
+  const { buildTimeline } = await import('../../../packages/preview-runtime/src/index.ts');
+  const seed = authority === 'private'
+    ? JSON.parse(await readFile(process.argv[4], 'utf8'))
+    : (await import('../../../packages/local-service/src/seed.ts')).createLandingShot1EditorSeed(repositoryRoot);
+  const targetElementIds = seed.elements.map((element) => element.id).sort();
+  const selected = projectTrajectorySelection(seed, targetElementIds, 700);
+  if (!selected.eligible) throw new Error('SHOT1_CANONICAL_EASING_SELECTION_INELIGIBLE');
+  if (selected.targets.length !== 2) throw new Error('SHOT1_CANONICAL_EASING_TARGET_COUNT');
+  const timeline = buildTimeline(seed);
+  const effectiveEasings = selected.targets.map((target) => {
+    const rows = timeline.rows.filter((row) => row.elementId === target.elementId
+      && row.trackId === target.trackId && row.property === 'transform');
+    if (rows.length !== 1) throw new Error('SHOT1_CANONICAL_EASING_ROW_IDENTITY');
+    const frames = rows[0].keyframes.filter((keyframe) => keyframe.id === target.keyframeId
+      && keyframe.value === target.expectedTransform);
+    if (frames.length !== 1) throw new Error('SHOT1_CANONICAL_EASING_KEYFRAME_IDENTITY');
+    return frames[0].easing ?? rows[0].timing;
+  });
+  process.stdout.write(`${JSON.stringify({ eligible: true, targetCount: selected.targets.length,
+    resolvedCount: effectiveEasings.length, effectiveEasings })}\n`);
+  process.exit();
+}
 if (process.argv[2] === '--vite-listen-ready') {
   const { createServer } = await import('vite');
   const requestedPort = Number(process.argv[3]);
@@ -773,6 +799,19 @@ async function runRealCli(args) {
   if (code !== 0) throw new Error(`REAL_CLI_FAILED_${code}_${stderr.length}`); return JSON.parse(stdout);
 }
 
+async function resolveShot1CanonicalEasing(repositoryRoot, authority, privateDocumentPath) {
+  const args = ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/qa-chrome.mjs'),
+    '--resolve-shot1-canonical-easing', authority];
+  if (authority === 'private') args.push(privateDocumentPath);
+  const child = spawn('npm', args, { cwd: repositoryRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+  let stdout = ''; let stderrLength = 0;
+  child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
+  child.stderr.on('data', (chunk) => { stderrLength += chunk.length; });
+  const code = await new Promise((resolveExit) => child.once('exit', resolveExit));
+  if (code !== 0) throw new Error(`SHOT1_CANONICAL_EASING_RESOLVER_FAILED_${code}_${stderrLength}`);
+  return JSON.parse(stdout);
+}
+
 function resolveShot1ProofAuthority(authority, availability) {
   if (authority === 'public') {
     if (!availability.publicFixture) throw new Error('SHOT1_PUBLIC_FIXTURE_REQUIRED');
@@ -902,7 +941,7 @@ async function runAsymmetricAlternatePrimaryQa({ repositoryRoot, directory, brow
       value: document.querySelector('[data-shot-landing]').value, invalid: document.querySelector('[data-shot-landing]').getAttribute('aria-invalid'),
       focused: document.activeElement === document.querySelector('[data-shot-landing]'), status: document.querySelector('[data-shot-status]').value }));
     if (!polishBaseline.guidance.includes('Editing Object 1 at 700 ms.')
-      || !polishBaseline.guidance.includes('square handle to scale')
+      || !polishBaseline.guidance.includes('any corner to scale uniformly')
       || !polishBaseline.groupCopy.includes('Move together') || !polishBaseline.groupCopy.includes('Translation only')
       || polishRejected.value !== '2200' || polishRejected.invalid !== 'true' || !polishRejected.focused
       || polishRejected.status !== 'Landing must be a whole number from 1 to 2099 ms. Revision 0 unchanged.'
@@ -1078,6 +1117,10 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
   const seed = authority === 'private' ? JSON.parse(await readFile(privateDocumentPath, 'utf8')) : null;
   let targetElementIds = seed?.elements.map((element) => element.id).sort() ?? [];
   if (authority === 'private' && targetElementIds.length !== 2) throw new Error('LANDING_SHOT1_TARGET_COUNT');
+  const canonicalEasing = await resolveShot1CanonicalEasing(repositoryRoot, authority, privateDocumentPath);
+  if (!canonicalEasing.eligible || canonicalEasing.targetCount !== 2 || canonicalEasing.resolvedCount !== 2) {
+    throw new Error('LANDING_SHOT1_CANONICAL_EASING_RESOLUTION_INVALID');
+  }
   const directory = await mkdtemp(join(tmpdir(), 'lineage-motion-shot1-qa-'));
   const humanCapability = randomBytes(32).toString('base64url'); const agentCapability = randomBytes(32).toString('base64url');
   const port = 43500 + Math.floor(Math.random() * 300);
@@ -1118,6 +1161,67 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
       moment: authority === 'public' ? workspaceState.momentMs === 700 : workspaceState.moments.includes(workspaceState.momentMs),
       previewMatchesCompiler: workspaceState.previewMatchesCompiler };
     if (!Object.values(workspaceChecks).every(Boolean)) throw new Error(`LANDING_SHOT1_WORKSPACE_NOT_INITIALIZED_${Object.entries(workspaceChecks).filter(([, passed]) => !passed).map(([name]) => name).join('_')}`);
+    const baselinePrimaryControls = page.locator('[data-shot-targets] input[name="shot-primary"]');
+    const baselinePrimaryIndex = await baselinePrimaryControls.evaluateAll((controls) =>
+      controls.findIndex((control) => control.checked));
+    const primaryMomentInventories = [];
+    for (let index = 0; index < await baselinePrimaryControls.count(); index += 1) {
+      if (index !== baselinePrimaryIndex) {
+        const priorRequestId = await currentGeometryRequestId(page);
+        await baselinePrimaryControls.nth(index).check();
+        await observeGeometryCommit(page, { sampleCount: null, previousRequestId: priorRequestId });
+      }
+      primaryMomentInventories.push(await page.locator('input[name="shot-moment"]').evaluateAll((controls) =>
+        controls.map((control) => Number(control.value))));
+    }
+    if (baselinePrimaryIndex !== primaryMomentInventories.length - 1) {
+      const priorRequestId = await currentGeometryRequestId(page);
+      await baselinePrimaryControls.nth(baselinePrimaryIndex).check();
+      await observeGeometryCommit(page, { sampleCount: null, previousRequestId: priorRequestId });
+    }
+    const sharedMomentLabels = primaryMomentInventories[0]?.filter((timeMs) =>
+      primaryMomentInventories.every((moments) => moments.includes(timeMs))) ?? [];
+    const baselineTiming = await page.evaluate(({ sharedMoments, effectiveEasings }) => {
+      const moments = [...document.querySelectorAll('input[name="shot-moment"]')].map((input) => Number(input.value));
+      const landing = Number(document.querySelector('[data-shot-landing]').value);
+      const settled = Number(document.querySelector('[data-shot-settled]').value);
+      const easingControl = document.querySelector('[data-shot-easing]');
+      return { moments, sharedMoments, landing, settled, endpoint: sharedMoments.at(-1), easing: easingControl.value,
+        supportedOptions: [...easingControl.options].map((option) => option.value),
+        effectiveEasings, effectiveCount: effectiveEasings.length };
+    }, { sharedMoments: sharedMomentLabels, effectiveEasings: canonicalEasing.effectiveEasings });
+    const sortedBaselineMoments = [...new Set(baselineTiming.moments)].sort((left, right) => left - right);
+    if (JSON.stringify(sortedBaselineMoments) !== JSON.stringify(baselineTiming.moments)
+      || baselineTiming.landing !== 700 || baselineTiming.endpoint !== 2100) {
+      throw new Error('LANDING_SHOT1_CANONICAL_TIMING_BOUNDARY_MISMATCH');
+    }
+    const sortedSharedMoments = [...new Set(baselineTiming.sharedMoments)].sort((left, right) => left - right);
+    if (JSON.stringify(sortedSharedMoments) !== JSON.stringify(baselineTiming.sharedMoments)
+      || ![0, 700, 2100].every((timeMs) => sortedSharedMoments.includes(timeMs))) {
+      throw new Error('LANDING_SHOT1_CANONICAL_SHARED_MOMENTS_INVALID');
+    }
+    const penultimate = sortedSharedMoments.at(-2);
+    const expectedBaselineSettled = sortedSharedMoments.length > 3
+      && penultimate > baselineTiming.landing && penultimate < baselineTiming.endpoint
+      ? penultimate : 2100;
+    if (baselineTiming.settled !== expectedBaselineSettled) {
+      throw new Error('LANDING_SHOT1_CANONICAL_SETTLED_LABEL_MISMATCH');
+    }
+    const supportedEasingKeywords = ['linear', 'ease', 'ease-in', 'ease-out', 'ease-in-out'];
+    const effectiveEasing = baselineTiming.effectiveEasings[0];
+    if (baselineTiming.effectiveCount !== targetElementIds.length || !effectiveEasing
+      || baselineTiming.effectiveEasings.some((timing) => JSON.stringify(timing) !== JSON.stringify(effectiveEasing))) {
+      throw new Error('LANDING_SHOT1_CANONICAL_EASING_NON_UNIFORM');
+    }
+    const effectiveEasingControlValue = effectiveEasing.kind === 'keyword'
+      ? effectiveEasing.value : 'custom';
+    if ((effectiveEasing.kind === 'keyword' && !supportedEasingKeywords.includes(effectiveEasing.value))
+      || !baselineTiming.supportedOptions.includes(effectiveEasingControlValue)) {
+      throw new Error('LANDING_SHOT1_CANONICAL_EASING_UNSUPPORTED');
+    }
+    if (baselineTiming.easing !== effectiveEasingControlValue) {
+      throw new Error('LANDING_SHOT1_CANONICAL_EASING_LABEL_MISMATCH');
+    }
     if (workspaceSmokeOnly) {
       const nativePreview = await page.evaluate(() => { const frame = document.querySelector('[data-preview]'); const animations = frame.contentDocument.getAnimations();
         return frame.srcdoc === window.__motionEditor.compiledHtml && animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation'
@@ -1142,17 +1246,46 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
       await observeGeometryCommit(page, { sampleCount: null, previousRequestId: undoGeometryRequestId });
       const restored = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
       const reversibleEdit = restored.contentDigest === original.contentDigest && restored.exportDigest === original.exportDigest;
+      if (await page.getByRole('button', { name: 'Path' }).getAttribute('aria-pressed') !== 'true') {
+        await page.getByRole('button', { name: 'Path' }).click();
+      }
+      await observeGeometryCommit(page, { sampleCount: null });
+      const aggregateGeometry = await page.evaluate(() => {
+        const inspected = window.__motionEditor.inspectShotWorkspace();
+        const handle = document.querySelector('[data-trajectory-overlay] [aria-pressed="true"]');
+        const rect = handle?.getBoundingClientRect();
+        return {
+          sampleCount: inspected.geometry.length,
+          moments: [...document.querySelectorAll('input[name="shot-moment"]')].map((input) => Number(input.value)),
+          maximumDeltaDevicePixels: Math.max(0, ...inspected.geometry.flatMap((sample) => Object.values(sample.deltasDevicePixels))),
+          selectedHandleVisible: handle instanceof HTMLElement && rect !== undefined && rect.width > 0 && rect.height > 0,
+        };
+      });
       if (!nativePreview || !projectionSafe || !reversibleEdit || diagnostics.consoleErrors.length || diagnostics.pageErrors.length || diagnostics.failedRequests.length
         || diagnostics.unexpectedNetwork.length || diagnostics.httpErrors.length) throw new Error('LANDING_SHOT1_PRIVATE_WORKSPACE_SMOKE_FAILED');
-      process.stdout.write('{"schemaVersion":"motion.shot1-private-workspace-smoke.v1","passed":true,"uniformProjection":true,"reversibleEdit":true,"trackedPrivateDetails":false}\n');
+      process.stdout.write(`${JSON.stringify({ schemaVersion: 'motion.shot1-private-workspace-smoke.v1', passed: true,
+        uniformProjection: true, reversibleEdit: true, trackedPrivateDetails: false, aggregateGeometry })}\n`);
       return;
+    }
+    const initialMoments = baselineTiming.moments;
+    const retimedMoments = [...new Set(initialMoments.map((timeMs) => timeMs === 700 ? 840 : timeMs))].sort((left, right) => left - right);
+    const heldMoments = [...new Set([...retimedMoments, 1820])].sort((left, right) => left - right);
+    const groupedInitialMoments = sortedSharedMoments;
+    const groupedRetimedMoments = [...new Set(groupedInitialMoments.map((timeMs) => timeMs === 700 ? 840 : timeMs))]
+      .sort((left, right) => left - right);
+    const groupedHeldMoments = [...new Set([...groupedRetimedMoments, 1820])].sort((left, right) => left - right);
+    if (![0, 700, 2100].every((timeMs) => initialMoments.includes(timeMs))) {
+      throw new Error('LANDING_SHOT1_REQUIRED_MOMENTS_MISSING');
+    }
+    if (![0, 700, 2100].every((timeMs) => groupedInitialMoments.includes(timeMs))) {
+      throw new Error('LANDING_SHOT1_GROUPED_REQUIRED_MOMENTS_MISSING');
     }
     let pathAlignmentCommandCount = 0; page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) pathAlignmentCommandCount += 1; });
     const beforePathAlignment = await page.evaluate(() => ({ revision: window.__motionEditor.inspectAuthoring().revision,
       momentMs: window.__motionEditor.inspectShotWorkspace().momentMs, native: window.__motionEditor.readState(),
       slider: Number(document.querySelector('[data-scrub]').value), visibleTime: document.querySelector('[data-playhead]').value }));
     if (await page.getByRole('button', { name: 'Path' }).getAttribute('aria-pressed') !== 'true') await page.getByRole('button', { name: 'Path' }).click();
-    await observeGeometryCommit(page, { sampleCount: 3, moments: [0, 700, 2100] });
+    await observeGeometryCommit(page, { sampleCount: initialMoments.length, moments: initialMoments });
     const readMomentAlignment = () => page.evaluate(() => ({ revision: window.__motionEditor.inspectAuthoring().revision,
       momentMs: window.__motionEditor.inspectShotWorkspace().momentMs, native: window.__motionEditor.readState(),
       slider: Number(document.querySelector('[data-scrub]').value), visibleTime: document.querySelector('[data-playhead]').value }));
@@ -1279,10 +1412,11 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
       || !sustainedDraft.handleFeedback || JSON.stringify(sustainedDraft.native) !== JSON.stringify(draftBaseline.native)
       || JSON.stringify(sustainedDraft.bounds) === JSON.stringify(draftBaseline.bounds)) throw new Error('LANDING_SHOT1_SUSTAINED_DRAFT_INVALID');
     await page.keyboard.press('Escape');
-    await observeActionCommit(page, { revision: original.revision, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' });
+    await observeActionCommit(page, { revision: original.revision, moments: initialMoments, landing: 700,
+      settled: baselineTiming.settled, easing: baselineTiming.easing });
     await page.waitForFunction(() => window.__motionEditor.inspectShotWorkspace().activeDraft === null
       && !window.__motionEditor.inspectShotWorkspace().compilerDraft.active);
-    await observeGeometryCommit(page, { sampleCount: 3, moments: [0, 700, 2100] });
+    await observeGeometryCommit(page, { sampleCount: initialMoments.length, moments: initialMoments });
     const cancelRestoration = await page.evaluate((elementId) => { const frame = document.querySelector('[data-preview]');
       const target = [...frame.contentDocument.querySelectorAll('[data-motion-id]')].find((item) => item.dataset.motionId === elementId);
       const rect = target.getBoundingClientRect(); const inspected = window.__motionEditor.inspectShotWorkspace(); return {
@@ -1326,8 +1460,9 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
     if (!pointer.terminal.stableDocument || pointer.terminal.loadCount !== 0 || !pointer.terminal.handleFeedback
       || pointer.terminal.phase === 'idle' || pointer.terminal.oldLocation) throw new Error('LANDING_SHOT1_TERMINAL_HANDOFF_INVALID');
     await page.mouse.up();
-    await observeActionCommit(page, { revision: 1, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' });
-    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: releaseGeometryRequestId, moments: [0, 700, 2100] });
+    await observeActionCommit(page, { revision: 1, moments: initialMoments, landing: 700,
+      settled: baselineTiming.settled, easing: baselineTiming.easing });
+    await observeGeometryCommit(page, { sampleCount: initialMoments.length, previousRequestId: releaseGeometryRequestId, moments: initialMoments });
     const releaseState = await page.evaluate(() => { const frame = document.querySelector('[data-preview]'); const workspace = window.__motionEditor.inspectShotWorkspace(); return {
       activeDraft: workspace.activeDraft, loadCount: Number(frame.dataset.draftLoadCount), releasePhase: workspace.waypointReleasePhase,
       remountedDocument: frame.contentDocument !== window.__shotDraftDocument, compilerEqual: workspace.previewMatchesCompiler,
@@ -1353,31 +1488,44 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
         hitTestable: document.elementFromPoint(center.x, center.y) === node }; });
     if (!Object.values(runway).every(Boolean)) throw new Error('LANDING_SHOT1_OFF_FRAME_RUNWAY_INVALID');
     await page.locator('[data-move-together]').check();
-    await observeGeometryCommit(page, { sampleCount: 3, moments: [0, 700, 2100] });
+    await observeGeometryCommit(page, { sampleCount: groupedInitialMoments.length, moments: groupedInitialMoments });
     const groupedScope = await page.evaluate(() => ({ grouped: document.querySelector('[data-move-together]').checked,
       selectedCount: window.__motionEditor.inspectShotWorkspace().selectedElementIds.length }));
     if (!groupedScope.grouped || groupedScope.selectedCount !== 2) throw new Error('LANDING_SHOT1_GROUP_SCOPE_NOT_COMMITTED');
     await ensureAdvancedOpen(page);
-    const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 8));
+    const x = page.locator('[data-pose-form] input[name="x"]');
+    const scale = page.locator('[data-pose-form] input[name="scale"]');
+    const rotate = page.locator('[data-pose-form] input[name="rotate"]');
+    const poseBefore = { x: Number(await x.inputValue()), scale: Number(await scale.inputValue()), rotate: Number(await rotate.inputValue()) };
+    const poseAfter = { x: poseBefore.x + 8, scale: poseBefore.scale <= 2.99 ? poseBefore.scale + 0.01 : poseBefore.scale - 0.01,
+      rotate: poseBefore.rotate <= 179 ? poseBefore.rotate + 1 : poseBefore.rotate - 1 };
+    const poseCoverage = { translation: poseAfter.x !== poseBefore.x, scale: poseAfter.scale !== poseBefore.scale,
+      rotation: poseAfter.rotate !== poseBefore.rotate, withinBounds: poseAfter.scale >= 0.25 && poseAfter.scale <= 3
+        && poseAfter.rotate >= -180 && poseAfter.rotate <= 180 };
+    if (!Object.values(poseCoverage).every(Boolean)) throw new Error('LANDING_SHOT1_POSE_COVERAGE_INVALID');
+    await x.fill(String(poseAfter.x)); await scale.fill(String(poseAfter.scale)); await rotate.fill(String(poseAfter.rotate));
     let transitionRequestId = await currentGeometryRequestId(page);
     await page.getByRole('button', { name: 'Apply pose' }).click();
-    await observeActionCommit(page, { revision: 2, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' });
-    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: transitionRequestId, moments: [0, 700, 2100] });
+    await observeActionCommit(page, { revision: 2, moments: groupedInitialMoments, landing: 700,
+      settled: baselineTiming.settled, easing: baselineTiming.easing });
+    await observeGeometryCommit(page, { sampleCount: groupedInitialMoments.length, previousRequestId: transitionRequestId, moments: groupedInitialMoments });
     transitionRequestId = await currentGeometryRequestId(page);
     const retimeCommandCount = pathAlignmentCommandCount;
     await page.locator('[data-shot-landing]').fill('840'); await page.locator('[data-shot-apply-time]').click();
-    await observeActionCommit(page, { revision: 3, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-out' });
-    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: transitionRequestId, moments: [0, 840, 2100] });
+    await observeActionCommit(page, { revision: 3, moments: groupedRetimedMoments, landing: 840,
+      settled: baselineTiming.settled, easing: baselineTiming.easing });
+    await observeGeometryCommit(page, { sampleCount: groupedRetimedMoments.length, previousRequestId: transitionRequestId, moments: groupedRetimedMoments });
     if (!exactlyAligned(await readMomentAlignment(), 840, 3) || pathAlignmentCommandCount !== retimeCommandCount + 1
       || (await currentGeometryRequestId(page)) !== transitionRequestId + 1) throw new Error('LANDING_SHOT1_RETIME_RECONCILIATION_INVALID');
     transitionRequestId = await currentGeometryRequestId(page);
     await page.locator('[data-shot-easing]').selectOption('ease-in-out'); await page.locator('[data-shot-apply-easing]').click();
-    await observeActionCommit(page, { revision: 4, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-in-out' });
-    await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: transitionRequestId, moments: [0, 840, 2100] });
+    await observeActionCommit(page, { revision: 4, moments: groupedRetimedMoments, landing: 840,
+      settled: baselineTiming.settled, easing: 'ease-in-out' });
+    await observeGeometryCommit(page, { sampleCount: groupedRetimedMoments.length, previousRequestId: transitionRequestId, moments: groupedRetimedMoments });
     transitionRequestId = await currentGeometryRequestId(page);
     await page.locator('[data-shot-settled]').fill('1820'); await page.locator('[data-shot-hold]').click();
-    await observeActionCommit(page, { revision: 5, moments: [0, 840, 1820, 2100], landing: 840, settled: 1820, easing: 'ease-in-out' });
-    await observeGeometryCommit(page, { sampleCount: 4, previousRequestId: transitionRequestId, moments: [0, 840, 1820, 2100] });
+    await observeActionCommit(page, { revision: 5, moments: groupedHeldMoments, landing: 840, settled: 1820, easing: 'ease-in-out' });
+    await observeGeometryCommit(page, { sampleCount: groupedHeldMoments.length, previousRequestId: transitionRequestId, moments: groupedHeldMoments });
     const edited = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
     const readInteractiveInventory = () => page.evaluate(() => ({
       controls: [...document.querySelectorAll('input[name="shot-moment"]')].map((input) => Number(input.value)),
@@ -1441,7 +1589,9 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
       }).every((bounds, index) => JSON.stringify(bounds) === JSON.stringify(expected[index]));
     }, { elementIds: targetElementIds, expected: settledPlaybackBounds });
     if (!playbackEndpointHold) throw new Error('LANDING_SHOT1_PLAYBACK_ENDPOINT_HOLD_INVALID');
-    const uiSampleTimesMs = [839, 840, 841, 1819, 1820, 1821, 2099, 2101, 2100];
+    const uiSampleTimesMs = [...new Set([0, 700, ...heldMoments, 839, 840, 841, 1819, 1820, 1821, 2099, 2101])]
+      .filter((timeMs) => timeMs !== 2100);
+    uiSampleTimesMs.push(2100);
     await scrubber.fill('837'); await scrubber.fill('838');
     const readRaceState = () => page.evaluate(() => { const frame = document.querySelector('[data-preview]'); const inspected = window.__motionEditor.inspectShotWorkspace();
       const state = window.__motionEditor.readState(); const animations = frame.contentDocument.getAnimations();
@@ -1458,11 +1608,11 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
           geometryDeltas: inspected.geometry.map((sample) => sample.deltasDevicePixels), geometryPump: inspected.geometryPump }; }, { once: true });
       input.value = '839'; input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText', data: '839' }));
       if (!immediate) throw new Error('LANDING_SHOT1_IMMEDIATE_SAME_DISPATCH_CAPTURE_MISSING'); return immediate; });
-    await observeGeometryCommit(page, { sampleCount: 4, moments: [0, 840, 1820, 2100] });
+    await observeGeometryCommit(page, { sampleCount: groupedHeldMoments.length, moments: groupedHeldMoments });
     const settledRaceState = await readRaceState();
     const exactRace = [immediateRaceState, settledRaceState].every((state) => state.sliderValueMs === 839 && state.playheadMs === 839
       && state.controllerCurrentTimesMs.every((time) => time === 839) && state.nativeCurrentTimesMs.every((time) => time === 839)
-      && state.playStates.every((playState) => playState === 'paused')) && settledRaceState.geometryCount === 4
+      && state.playStates.every((playState) => playState === 'paused')) && settledRaceState.geometryCount === groupedHeldMoments.length
       && settledRaceState.geometryDeltas.every((deltas) => Object.values(deltas).every((delta) => delta <= 1))
       && settledRaceState.geometryPump.maximumActiveSamplers === 1 && settledRaceState.geometryPump.activeSamplers === 0
       && settledRaceState.geometryPump.pendingRequestId === null
@@ -1479,23 +1629,43 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
     }
     const momentOnlyGeometryIdentity = JSON.stringify((await readRaceState()).geometryPump) === committedGeometryIdentity;
     if (!momentOnlyGeometryIdentity) throw new Error('LANDING_SHOT1_MOMENT_RESAMPLED');
-    const uiSamples = []; for (const sample of uiSampleTimesMs) { await scrubber.fill(String(sample));
-      const evidence = await page.evaluate((timeMs) => { const iframe = document.querySelector('[data-preview]'); const input = document.querySelector('[data-scrub]');
-        const animations = iframe.contentDocument.getAnimations(); const state = window.__motionEditor.readState();
-        return { category: 'uiScrub', timeMs, rangeMaxMs: Number(input.max), sliderValueMs: Number(input.value),
-          playheadMs: state.playheadMs, controllerCurrentTimesMs: state.currentTimes,
+    const uiSamples = []; for (const sample of uiSampleTimesMs) {
+      const immediateEvidence = await scrubber.evaluate((input, timeMs) => { let immediate;
+        const capture = () => { const iframe = document.querySelector('[data-preview]'); const animations = iframe.contentDocument.getAnimations();
+          const state = window.__motionEditor.readState(); return { category: 'uiScrub', timeMs, rangeMaxMs: Number(input.max),
+            sliderValueMs: Number(input.value), playheadMs: state.playheadMs, controllerCurrentTimesMs: state.currentTimes,
+            nativeCurrentTimesMs: animations.map((animation) => animation.currentTime),
+            nativeTypes: animations.map((animation) => ({ animation: animation.constructor.name,
+              effect: animation.effect?.constructor.name, timeline: animation.timeline?.constructor.name })),
+            playStates: animations.map((animation) => animation.playState), previewMatchesCompiler: iframe.srcdoc === window.__motionEditor.compiledHtml }; };
+        input.addEventListener('input', () => { immediate = capture(); }, { once: true });
+        input.value = String(timeMs);
+        input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText', data: String(timeMs) }));
+        if (!immediate) throw new Error('LANDING_SHOT1_UI_SAMPLE_IMMEDIATE_CAPTURE_MISSING');
+        return immediate;
+      }, sample);
+      const stableEvidence = await page.evaluate(async (timeMs) => { const iframe = document.querySelector('[data-preview]');
+        await new Promise((resolveRender) => iframe.contentWindow.requestAnimationFrame(() => iframe.contentWindow.requestAnimationFrame(resolveRender)));
+        const input = document.querySelector('[data-scrub]'); const animations = iframe.contentDocument.getAnimations();
+        const state = window.__motionEditor.readState(); return { category: 'uiScrub', timeMs, rangeMaxMs: Number(input.max),
+          sliderValueMs: Number(input.value), playheadMs: state.playheadMs, controllerCurrentTimesMs: state.currentTimes,
           nativeCurrentTimesMs: animations.map((animation) => animation.currentTime),
           nativeTypes: animations.map((animation) => ({ animation: animation.constructor.name,
             effect: animation.effect?.constructor.name, timeline: animation.timeline?.constructor.name })),
-          playStates: animations.map((animation) => animation.playState), previewMatchesCompiler: iframe.srcdoc === window.__motionEditor.compiledHtml }; }, sample);
-      if (evidence.rangeMaxMs !== 2101 || evidence.sliderValueMs !== sample || evidence.playheadMs !== sample
-        || evidence.controllerCurrentTimesMs.length === 0 || !evidence.controllerCurrentTimesMs.every((time) => time === sample)
-        || !evidence.nativeCurrentTimesMs.every((time) => time === sample)
-        || !evidence.nativeTypes.every((types) => types.animation === 'CSSAnimation' && types.effect === 'KeyframeEffect'
+          playStates: animations.map((animation) => animation.playState), previewMatchesCompiler: iframe.srcdoc === window.__motionEditor.compiledHtml };
+      }, sample);
+      const exactSample = (evidence) => evidence.rangeMaxMs === 2101 && evidence.sliderValueMs === sample && evidence.playheadMs === sample
+        && evidence.controllerCurrentTimesMs.length > 0 && evidence.controllerCurrentTimesMs.every((time) => time === sample)
+        && evidence.nativeCurrentTimesMs.every((time) => time === sample)
+        && evidence.nativeTypes.every((types) => types.animation === 'CSSAnimation' && types.effect === 'KeyframeEffect'
           && types.timeline === 'DocumentTimeline')
-        || !evidence.playStates.every((state) => state === 'paused') || !evidence.previewMatchesCompiler) throw new Error(`LANDING_SHOT1_UI_SAMPLE_${sample}`);
+        && evidence.playStates.every((state) => state === 'paused') && evidence.previewMatchesCompiler;
+      if (!exactSample(immediateEvidence)) throw new Error(`LANDING_SHOT1_UI_SAMPLE_IMMEDIATE_${sample}`);
+      if (!exactSample(stableEvidence) || JSON.stringify(stableEvidence) !== JSON.stringify(immediateEvidence)) {
+        throw new Error(`LANDING_SHOT1_UI_SAMPLE_STABILITY_${sample}`);
+      }
       if (JSON.stringify((await readRaceState()).geometryPump) !== committedGeometryIdentity) throw new Error(`LANDING_SHOT1_IDLE_RESAMPLED_${sample}`);
-      uiSamples.push(evidence); }
+      uiSamples.push({ ...stableEvidence, immediateExact: true, twoFrameStable: true }); }
     const nativePostRange = await page.evaluate(async () => { const iframe = document.querySelector('[data-preview]'); const input = document.querySelector('[data-scrub]');
       const animations = iframe.contentDocument.getAnimations(); animations.forEach((animation) => { animation.pause(); animation.currentTime = 2101; });
       await Promise.all(animations.map((animation) => animation.ready));
@@ -1523,20 +1693,22 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
       && restoration.nativeCurrentTimesMs.every((time) => time === 2100)
       && restoration.playStates.every((state) => state === 'paused') && restoration.previewMatchesCompiler;
     if (!exactRestoration) throw new Error('LANDING_SHOT1_UI_RESTORATION_2100');
-    const nativeBoundaryProof = uiSamples.length === 9 && nativePostRange.category === 'nativePostRange' && exactRestoration;
+    const nativeBoundaryProof = uiSamples.length === uiSampleTimesMs.length
+      && [0, 700, 2100].every((timeMs) => uiSamples.some((sample) => sample.timeMs === timeMs))
+      && nativePostRange.category === 'nativePostRange' && exactRestoration;
     await page.locator('input[name="shot-moment"][value="840"]').check();
     if (!exactlyAligned(await readMomentAlignment(), 840, 5)
       || JSON.stringify((await readRaceState()).geometryPump) !== committedGeometryIdentity) throw new Error('LANDING_SHOT1_HISTORY_ALIGNMENT_SETUP_INVALID');
     const undoContracts = [
-      { revision: 6, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-in-out' },
-      { revision: 7, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-out' },
-      { revision: 8, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
-      { revision: 9, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
-      { revision: 10, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
+      { revision: 6, moments: groupedRetimedMoments, geometryCount: groupedRetimedMoments.length, landing: 840, settled: baselineTiming.settled, easing: 'ease-in-out' },
+      { revision: 7, moments: groupedRetimedMoments, geometryCount: groupedRetimedMoments.length, landing: 840, settled: baselineTiming.settled, easing: baselineTiming.easing },
+      { revision: 8, moments: groupedInitialMoments, geometryCount: groupedInitialMoments.length, landing: 700, settled: baselineTiming.settled, easing: baselineTiming.easing },
+      { revision: 9, moments: groupedInitialMoments, geometryCount: groupedInitialMoments.length, landing: 700, settled: baselineTiming.settled, easing: baselineTiming.easing },
+      { revision: 10, moments: groupedInitialMoments, geometryCount: groupedInitialMoments.length, landing: 700, settled: baselineTiming.settled, easing: baselineTiming.easing },
     ];
     for (const contract of undoContracts) { const priorRequestId = await currentGeometryRequestId(page); const priorCommandCount = pathAlignmentCommandCount;
       await page.locator('[data-undo]').click(); await observeActionCommit(page, contract);
-      await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: contract.moments });
+      await observeGeometryCommit(page, { sampleCount: contract.geometryCount, previousRequestId: priorRequestId, moments: contract.moments });
       const expectedMoment = contract.moments.includes(840) ? 840 : 700;
       if (!exactlyAligned(await readMomentAlignment(), expectedMoment, contract.revision)
         || pathAlignmentCommandCount !== priorCommandCount + 1 || (await currentGeometryRequestId(page)) !== priorRequestId + 1) {
@@ -1545,15 +1717,15 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
     const undone = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
     const undoneInventory = await readInteractiveInventory();
     const redoContracts = [
-      { revision: 11, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
-      { revision: 12, moments: [0, 700, 2100], landing: 700, settled: 2100, easing: 'ease-out' },
-      { revision: 13, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-out' },
-      { revision: 14, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-in-out' },
-      { revision: 15, moments: [0, 840, 1820, 2100], landing: 840, settled: 1820, easing: 'ease-in-out' },
+      { revision: 11, moments: groupedInitialMoments, geometryCount: groupedInitialMoments.length, landing: 700, settled: baselineTiming.settled, easing: baselineTiming.easing },
+      { revision: 12, moments: groupedInitialMoments, geometryCount: groupedInitialMoments.length, landing: 700, settled: baselineTiming.settled, easing: baselineTiming.easing },
+      { revision: 13, moments: groupedRetimedMoments, geometryCount: groupedRetimedMoments.length, landing: 840, settled: baselineTiming.settled, easing: baselineTiming.easing },
+      { revision: 14, moments: groupedRetimedMoments, geometryCount: groupedRetimedMoments.length, landing: 840, settled: baselineTiming.settled, easing: 'ease-in-out' },
+      { revision: 15, moments: groupedHeldMoments, geometryCount: groupedHeldMoments.length, landing: 840, settled: 1820, easing: 'ease-in-out' },
     ];
     for (const contract of redoContracts) { const priorRequestId = await currentGeometryRequestId(page); const priorCommandCount = pathAlignmentCommandCount;
       await page.locator('[data-redo]').click(); await observeActionCommit(page, contract);
-      await observeGeometryCommit(page, { sampleCount: contract.moments.length, previousRequestId: priorRequestId, moments: contract.moments });
+      await observeGeometryCommit(page, { sampleCount: contract.geometryCount, previousRequestId: priorRequestId, moments: contract.moments });
       const expectedMoment = contract.moments.includes(840) ? 840 : 700;
       if (!exactlyAligned(await readMomentAlignment(), expectedMoment, contract.revision)
         || pathAlignmentCommandCount !== priorCommandCount + 1 || (await currentGeometryRequestId(page)) !== priorRequestId + 1) {
@@ -1567,19 +1739,21 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
       ? await runHitOwnershipQa({ repositoryRoot, directory, browser: shotBrowser }) : null;
     const checks = { workspaceOpened: workspaceState.open, fiveOperations: edited.revision === 5, exactUndo: undone.contentDigest === original.contentDigest,
       exactRedo: redone.contentDigest === edited.contentDigest && redone.exportDigest === edited.exportDigest,
-      historyInventories: JSON.stringify(undoneInventory.controls) === JSON.stringify([0, 700, 2100])
-        && JSON.stringify(undoneInventory.handles.map((handle) => handle.timeMs)) === JSON.stringify([0, 700, 2100])
-        && JSON.stringify(redoneInventory.controls) === JSON.stringify([0, 840, 1820, 2100])
-        && JSON.stringify(redoneInventory.handles.map((handle) => handle.timeMs)) === JSON.stringify([0, 840, 1820, 2100]),
+      historyInventories: JSON.stringify(undoneInventory.controls) === JSON.stringify(groupedInitialMoments)
+        && JSON.stringify(undoneInventory.handles.map((handle) => handle.timeMs)) === JSON.stringify(groupedInitialMoments)
+        && JSON.stringify(redoneInventory.controls) === JSON.stringify(groupedHeldMoments)
+        && JSON.stringify(redoneInventory.handles.map((handle) => handle.timeMs)) === JSON.stringify(groupedHeldMoments),
       tripleExportEqual: exports.every((value) => value === exports[0]), nativeBoundaryProof, playbackEndpointHold, spatialParity, editedSpatialParity, exactRace,
       momentOnlyGeometryIdentity, smoothDrag: true, asymmetricAlternatePrimary: authority !== 'public' || asymmetricAlternatePrimary?.passed === true,
       hitOwnership: authority !== 'public' || hitOwnership?.passed === true,
+      poseTranslation: poseCoverage.translation, poseScale: poseCoverage.scale, poseRotation: poseCoverage.rotation,
       previewMatchesCompiler: (await page.evaluate(() => window.__motionEditor.inspectShotWorkspace())).previewMatchesCompiler,
       zeroConsoleErrors: diagnostics.consoleErrors.length === 0, zeroPageErrors: diagnostics.pageErrors.length === 0,
       zeroFailedRequests: diagnostics.failedRequests.length === 0, zeroUnexpectedNetwork: diagnostics.unexpectedNetwork.length === 0, zeroHttpErrors: diagnostics.httpErrors.length === 0 };
     const receipt = { schemaVersion: 'motion.landing-shot1-chrome-qa.v2', passed: Object.values(checks).every(Boolean),
       browser: { name: 'Google Chrome', version: shotBrowser.version() }, privateReference: authority === 'private',
       targetCount: targetElementIds.length, operationCount: 5,
+      coverage: { translation: poseCoverage.translation, scale: poseCoverage.scale, rotation: poseCoverage.rotation },
       revisions: { original: original.revision, edited: edited.revision, undone: undone.revision, redone: redone.revision },
       history: { edited: { undoCount: edited.undoCount, redoCount: edited.redoCount }, undone: { undoCount: undone.undoCount, redoCount: undone.redoCount },
         redone: { undoCount: redone.undoCount, redoCount: redone.redoCount } },

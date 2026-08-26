@@ -3,10 +3,14 @@ import { createHash } from 'node:crypto';
 import { describe, expect, test } from 'vitest';
 
 import {
-  CSS_MOTION_SEMANTICS_VERSION, applicationInstanceId, classifyAnimatedProperty,
+  CSS_KEYFRAME_PERCENTAGE_DECIMALS, CSS_MOTION_SEMANTICS_VERSION, applicationInstanceId,
+  classifyAnimatedProperty, classifyReducedMotionDeclaration,
+  cssKeyframeTimeQuantizationHalfStep,
   deriveMotionEvidenceBoundaries, expandBoundarySamples, normalizeAnimationInstance,
   discreteTransitionFraction, evaluateCssTimingProgress, parseCssTimingFunction,
-  discretePropertyTransitionFraction, serializeCssTimingFunction, splitCssTimingFunction, stepTransitionFractions,
+  discretePropertyTransitionFraction, formatCssKeyframePercentage,
+  registeredAnimatedProperties, serializeCssTimingFunction,
+  splitCssTimingFunction, stepTransitionFractions,
 } from './css-motion-semantics.js';
 import { sha256Hex } from './sha256.js';
 
@@ -19,6 +23,33 @@ describe('motion.css-motion-semantics.v1', () => {
     expect(() => parseCssTimingFunction('steps(1, jump-none)')).toThrow('CSS_MOTION_TIMING_UNSUPPORTED');
     expect(() => parseCssTimingFunction('cubic-bezier(-.1, 0, 1, 1)')).toThrow('CSS_MOTION_TIMING_UNSUPPORTED');
     expect(splitCssTimingFunction({ kind: 'keyword', value: 'linear' }, 0.25).progress).toBe(0.25);
+  });
+
+  test('shares one closed reduced-motion declaration and keyframe quantization contract', () => {
+    expect(classifyReducedMotionDeclaration('animation', 'none', false)).toBe('animation-none');
+    expect(classifyReducedMotionDeclaration('animation-duration', '.001ms', false)).toBe('animation-duration');
+    expect(classifyReducedMotionDeclaration('animation-timing-function', 'steps(2, end)', false))
+      .toBe('animation-timing-function');
+    expect(classifyReducedMotionDeclaration('opacity', '1', false)).toBe('static');
+    for (const [property, value, important] of [
+      ['transition', 'none', false],
+      ['animation-delay', '0ms', false],
+      ['animation-duration', '1ms, 2ms', false],
+      ['animation-duration', 'var(--duration)', false],
+      ['animation-timing-function', 'linear, ease', false],
+      ['animation-timing-function', 'frames(2)', false],
+      ['animation', 'none', true],
+      ['--motion', '1', false],
+      ['color', 'url(live.invalid)', false],
+    ] as const) {
+      expect(classifyReducedMotionDeclaration(property, value, important), `${property}:${value}`)
+        .toBeNull();
+    }
+    expect(CSS_KEYFRAME_PERCENTAGE_DECIMALS).toBe(6);
+    expect(formatCssKeyframePercentage(1 / 3)).toBe('33.333333%');
+    expect(formatCssKeyframePercentage(0)).toBe('0%');
+    expect(formatCssKeyframePercentage(1)).toBe('100%');
+    expect(cssKeyframeTimeQuantizationHalfStep(2100)).toBe(0.0000105);
   });
 
   test('is the exact authority for every supported step position and discrete switch', () => {
@@ -40,6 +71,8 @@ describe('motion.css-motion-semantics.v1', () => {
     expect(classifyAnimatedProperty('visibility')).toBe('discrete');
     expect(classifyAnimatedProperty('display')).toBeNull();
     expect(classifyAnimatedProperty('content')).toBeNull();
+    expect(classifyAnimatedProperty('offset-distance')).toBeNull();
+    expect(registeredAnimatedProperties()).not.toContain('offset-distance');
     expect(discretePropertyTransitionFraction('visibility', 'hidden', 'visible', 'linear')).toBe(0);
     expect(discretePropertyTransitionFraction('visibility', 'visible', 'hidden', 'linear')).toBe(1);
     expect(discretePropertyTransitionFraction('visibility', 'hidden', 'collapse', 'linear')).toBe(0.5);

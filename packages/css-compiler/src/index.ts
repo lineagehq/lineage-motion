@@ -4,6 +4,8 @@ import { parse } from 'parse5';
 
 import {
   canonicalBytes,
+  classifyReducedMotionDeclaration,
+  formatCssKeyframePercentage,
   serializeCssTimingFunction,
   splitCssTimingFunction,
   sha256Hex,
@@ -297,7 +299,7 @@ function assertReducedMotionSnapshot(css: string): void {
     throw new Error('COMPILER_REDUCED_MOTION_INVALID');
   }
   let mediaCount = 0;
-  let animationNoneCount = 0;
+  let registeredMotionCount = 0;
   let invalid = false;
   for (const node of root.nodes) {
     if (node.type === 'comment') continue;
@@ -312,13 +314,14 @@ function assertReducedMotionSnapshot(css: string): void {
       if (rule.selector.includes('::')) invalid = true;
     });
     node.walkDecls((declaration) => {
-      const property = declaration.prop.toLowerCase();
-      if (isMotionProperty(property)) {
-        if (property === 'animation'
-          && declaration.value.trim().toLowerCase() === 'none'
-          && !declaration.important) animationNoneCount += 1;
-        else invalid = true;
-      }
+      const kind = classifyReducedMotionDeclaration(
+        declaration.prop,
+        declaration.value,
+        declaration.important,
+      );
+      if (kind === 'animation-none' || kind === 'animation-duration'
+        || kind === 'animation-timing-function') registeredMotionCount += 1;
+      else if (kind === null) invalid = true;
       valueParser(declaration.value).walk((valueNode) => {
         if (valueNode.type !== 'function') return;
         const name = valueNode.value.toLowerCase();
@@ -331,7 +334,7 @@ function assertReducedMotionSnapshot(css: string): void {
       });
     });
   }
-  if (invalid || mediaCount === 0 || animationNoneCount === 0) {
+  if (invalid || mediaCount === 0 || registeredMotionCount === 0) {
     throw new Error('COMPILER_REDUCED_MOTION_INVALID');
   }
 }
@@ -472,7 +475,7 @@ function formatTime(milliseconds: number): string {
 }
 
 function formatOffset(offset: number): string {
-  return `${formatNumber(offset * 100)}%`;
+  return formatCssKeyframePercentage(offset);
 }
 
 function formatNumber(value: number): string {

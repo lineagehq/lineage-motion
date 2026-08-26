@@ -1,10 +1,17 @@
 import { z } from 'zod';
 
 import {
+  cssKeyframeTimeQuantizationHalfStep,
   classifyAnimatedProperty,
   normalizeCssTimingFunction,
   projectTrackInterpolation,
   type CssTimingFunction,
+} from './css-motion-semantics.js';
+export {
+  CSS_KEYFRAME_PERCENTAGE_DECIMALS,
+  classifyReducedMotionDeclaration,
+  cssKeyframeTimeQuantizationHalfStep,
+  formatCssKeyframePercentage,
 } from './css-motion-semantics.js';
 import { sha256Hex } from './sha256.js';
 
@@ -1443,7 +1450,7 @@ function completeTrajectoryMomentBundle(document: MotionDocument, entries: NonNu
 }
 function projectTrajectoryKeyframeTimes(ruleTrack: RuleTrack, delayMs: number, durationMs: number,
   maximumTimeMs: number): Map<string, number> | null {
-  const maximumDeltaMilliseconds = 0.000001;
+  const maximumDeltaMilliseconds = cssKeyframeTimeQuantizationHalfStep(durationMs);
   if (![delayMs, durationMs, maximumTimeMs].every(Number.isSafeInteger)
     || delayMs < 0 || durationMs <= 0 || maximumTimeMs < 0
     || new Set(ruleTrack.keyframes.map((keyframe) => keyframe.id)).size !== ruleTrack.keyframes.length) return null;

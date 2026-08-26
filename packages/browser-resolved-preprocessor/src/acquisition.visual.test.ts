@@ -4,6 +4,40 @@ import { expect, test } from 'vitest';
 import { CLOSED_PROFILE_CATEGORIES, OWNER_INPUT_SCHEMA_VERSION, PREPROCESSOR_VERSION, acquireAndPreprocessLockedOwnerInput, lockOwnerInput, sha256, type OwnerInput } from './index.js';
 import { deriveMotionEvidenceBoundaries, evaluateCssTimingProgress, normalizeAnimationInstance } from '../../domain/src/css-motion-semantics.js';
 
+test('commits rounded combined transforms before deterministic computed-state and pixel capture', async () => {
+  const browser = await chromium.launch({ headless: true }); const version = browser.version(); await browser.close();
+  const css = [
+    'html,body{margin:0;width:100%;height:100%;overflow:hidden}',
+    '.probe{position:absolute;left:47px;top:31px;width:97px;height:97px;border-radius:50%;background:rgb(24,91,173);transform-origin:50% 50%;animation:rounded-motion 2100ms cubic-bezier(.2,.7,.3,1) both}',
+    '@keyframes rounded-motion{0%{transform:translate(0px,0px) rotate(0deg) scale(1)}33.333333333333333%{transform:translate(237.375px,109.625px) rotate(23.75deg) scale(.8375)}100%{transform:translate(411.625px,251.375px) rotate(71.25deg) scale(1.1375)}}',
+    '@media (prefers-reduced-motion:reduce){.probe{animation:none}}',
+  ].join('');
+  const html = `<!doctype html><html><head><style>${css}</style></head><body><div class="probe"></div></body></html>`;
+  const input: OwnerInput = {
+    schemaVersion: OWNER_INPUT_SCHEMA_VERSION, protocolVersion: PREPROCESSOR_VERSION,
+    sourceLock: { entryRequest: 'https://locked.test/index.html', originalSha256: sha256(html), redirects: [], responses: [
+      { requestUrl: 'https://locked.test/index.html', status: 200, headers: {}, mimeType: 'text/html', body: html, bodySha256: sha256(html) },
+    ] },
+    environment: { browserName: 'chromium', browserVersion: version, viewport: { width: 640, height: 480 }, deviceScaleFactor: 1, locale: 'en-US', timezoneId: 'UTC', colorScheme: 'light', contrast: 'no-preference', profiles: ['normal', 'reduced'] },
+    bindings: [{ bindingId: 'binding_focal', role: 'focal', locator: '.probe', expectedMatches: 1 }],
+    procedure: { readiness: 'dom-fonts-two-animation-frames', start: [{ kind: 'click', bindingId: 'binding_focal' }], actions: [], loopDurationMs: 2100, settledTimeMs: 2100, epsilonMs: 1, reset: 'reload-reapply-and-compare-initial' },
+    expectedInventory: { dom: 5, cssRules: 5, keyframes: 1, applications: 1, scripts: 0, resources: 0, pseudos: 0, conditionals: 1, transitions: 0, animatedBindingIds: ['binding_focal'] },
+    closedProfile: { categories: [...CLOSED_PROFILE_CATEGORIES], counts: { structural: 5, css: 5, application: 1, resource: 1, 'binding-action': 2, event: 2, reset: 1 } },
+  };
+  const candidate = await import('./index.js').then(({ precommitLockedOwnerInputCandidate }) => precommitLockedOwnerInputCandidate(lockOwnerInput(input)));
+  expect(candidate.receipt.diagnosticCodes).toEqual([]);
+  expect(candidate.receipt).toMatchObject({ threeCleanRuns: true, replayEquivalent: true, resetEquivalent: true, deterministicExecution: true });
+
+  const evidence = candidate.candidatePackage!.detailedEvidence;
+  for (const profile of ['normal', 'reduced'] as const) {
+    const source = evidence.sourceRuns.filter((run) => run.profile === profile).map((run) => run.observation.samples);
+    const replay = evidence.replayRuns.filter((run) => run.profile === profile).map((run) => run.observation.samples);
+    expect(new Set(source.map((samples) => JSON.stringify(samples))).size, `${profile}:source computed state and pixels`).toBe(1);
+    expect(new Set(replay.map((samples) => JSON.stringify(samples))).size, `${profile}:replay computed state and pixels`).toBe(1);
+    expect(source[0], `${profile}:source/replay computed state and pixels`).toEqual(replay[0]);
+  }
+}, 120_000);
+
 test('losslessly replays high-precision keyframes and preserves inline/external cascade order', async () => {
   const browser = await chromium.launch({ headless: true }); const version = browser.version(); await browser.close();
   const externalCss = '.probe{width:16px;height:16px;background:rgb(10,20,30);animation:precise 2100ms linear both}@keyframes precise{0%{transform:translateX(0)}33.333333333333333%{transform:translateX(7px)}100%{transform:translateX(14px)}}';

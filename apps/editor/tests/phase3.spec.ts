@@ -51,7 +51,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     const application = track && seed.applications.find((item) => item.slots.some((slot) => slot.id === track.slotId));
     const slot = application?.slots.find((item) => item.id === track?.slotId);
     if (!keyframe || !slot) throw new Error('TRAJECTORY_INHERITED_TIMING_SEED_INVALID');
-    delete keyframe.easing; slot.timingFunction = { kind: 'keyword', value: 'ease-in' };
+    delete keyframe.easing; slot.timingFunction = { kind: 'cubic-bezier', x1: 0.2, y1: 0.8, x2: 0.3, y2: 1 };
   }
   const runtimeSeedPath = join(directory, 'trajectory-inherited-timing.json');
   await writeFile(runtimeSeedPath, `${JSON.stringify(seed)}\n`);
@@ -105,7 +105,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     slider: 700, visibleTime: '700 ms' });
   await expect(page.getByRole('button', { name: 'Path' })).toHaveAttribute('aria-pressed', 'true');
   await expect(workspace.locator('[data-shot-guidance]')).toContainText('Editing Object 1 at 700 ms.');
-  await expect(workspace.locator('[data-shot-guidance]')).toContainText('square handle to scale');
+  await expect(workspace.locator('[data-shot-guidance]')).toContainText('any corner to scale uniformly');
   await expect(page.locator('[data-trajectory-segment]')).toHaveCount(2);
   expect(await page.locator('[data-trajectory-segment]').evaluateAll((segments) => segments.every((segment) => {
     const style = getComputedStyle(segment); return style.display !== 'none' && Number.parseFloat(style.width) > 20;
@@ -211,6 +211,44 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   }, targetElementIds)).toEqual(settledObjectBounds);
   await expect(previewToolbar.locator('[data-preview-shot-state]')).toHaveText('Paused 2100 ms · Settled');
   expect((await page.evaluate(() => window.__motionEditor.inspectAuthoring())).revision).toBe(0);
+  expect(commandBytes).toHaveLength(0);
+  const finishedEndpointBaseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  await page.locator('[data-scrub]').fill('2088');
+  const finishedEndpointArrival = await page.evaluate(() => {
+    document.querySelector<HTMLButtonElement>('[data-play]')!.click();
+    const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    const animations = frame.contentDocument!.getAnimations();
+    const originalTimings = animations.map((animation) => {
+      const { delay, duration, endDelay, iterations } = animation.effect!.getTiming();
+      if ((typeof duration !== 'string' && typeof duration !== 'number')
+        || typeof delay !== 'number' || typeof endDelay !== 'number' || typeof iterations !== 'number') {
+        throw new Error('FINISHED_ENDPOINT_TIMING_UNSUPPORTED');
+      }
+      return { delay, duration, endDelay, iterations };
+    });
+    for (const animation of animations) {
+      animation.effect?.updateTiming({ delay: 0, duration: 2100, endDelay: 0, iterations: 1 });
+      animation.currentTime = 2100; animation.finish();
+    }
+    return { count: animations.length, native: animations.every((animation) => animation.constructor.name === 'CSSAnimation'),
+      times: animations.map((animation) => animation.currentTime), states: animations.map((animation) => animation.playState), originalTimings };
+  });
+  expect({ ...finishedEndpointArrival, originalTimings: undefined }).toEqual({ count: 2, native: true,
+    times: [2100, 2100], states: ['finished', 'finished'], originalTimings: undefined });
+  await expect.poll(() => page.evaluate(() => { const state = window.__motionEditor.readState(); const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    const animations = frame.contentDocument!.getAnimations(); return { playheadMs: state.playheadMs, currentTimes: state.currentTimes,
+      controllerStates: state.playStates, nativeTimes: animations.map((animation) => animation.currentTime),
+      nativeStates: animations.map((animation) => animation.playState), slider: Number(document.querySelector<HTMLInputElement>('[data-scrub]')!.value),
+      visibleTime: document.querySelector<HTMLOutputElement>('[data-playhead]')!.value };
+  })).toEqual({ playheadMs: 2100, currentTimes: [2100, 2100], controllerStates: ['paused', 'paused'],
+    nativeTimes: [2100, 2100], nativeStates: ['paused', 'paused'], slider: 2100, visibleTime: '2100 ms' });
+  await page.evaluate((timings) => {
+    const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    frame.contentDocument!.getAnimations().forEach((animation, index) => animation.effect?.updateTiming(timings[index]));
+  }, finishedEndpointArrival.originalTimings);
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({ revision: finishedEndpointBaseline.revision,
+    contentDigest: finishedEndpointBaseline.contentDigest, exportDigest: finishedEndpointBaseline.exportDigest,
+    undoCount: finishedEndpointBaseline.undoCount, redoCount: finishedEndpointBaseline.redoCount });
   expect(commandBytes).toHaveLength(0);
   await previewToolbar.getByRole('button', { name: 'Edit 700 ms waypoint from preview' }).click();
   expect(commandBytes).toHaveLength(0);
@@ -562,7 +600,9 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     ['motion.keyframe-group-time.set', 2, 2],
     ['motion.keyframe-group-easing.set', 3, 3],
   ]);
-  expect(timingCommands[1]?.command.payload.expectedEasing).toEqual({ kind: 'keyword', value: 'ease-in' });
+  expect(timingCommands[1]?.command.payload.expectedEasing).toEqual({
+    kind: 'cubic-bezier', x1: 0.2, y1: 0.8, x2: 0.3, y2: 1,
+  });
   await page.locator('[data-shot-settled]').fill('1820'); await page.locator('[data-shot-hold]').click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(5);
   expect(commandBytes.slice(2, 5).map((bytes) => { const wire = JSON.parse(bytes) as { expectedRevision: number;
@@ -722,8 +762,8 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
       settled: Number((document.querySelector('[data-shot-settled]') as HTMLInputElement).value),
       easing: (document.querySelector('[data-shot-easing]') as HTMLSelectElement).value,
       moments: [...document.querySelectorAll<HTMLInputElement>('input[name="shot-moment"]')].map((input) => Number(input.value)) }));
-    if (restoredRevision <= 2) expect(controls).toMatchObject({ landing: 700, settled: 2100, easing: 'ease-in', moments: [0, 700, 2100] });
-    if (restoredRevision === 3) expect(controls).toMatchObject({ landing: 840, settled: 2100, easing: 'ease-in', moments: [0, 840, 2100] });
+    if (restoredRevision <= 2) expect(controls).toMatchObject({ landing: 700, settled: 2100, easing: 'custom', moments: [0, 700, 2100] });
+    if (restoredRevision === 3) expect(controls).toMatchObject({ landing: 840, settled: 2100, easing: 'custom', moments: [0, 840, 2100] });
     if (restoredRevision === 4) expect(controls).toMatchObject({ landing: 840, settled: 2100, easing: 'ease-in-out', moments: [0, 840, 2100] });
     if (restoredRevision === 5) expect(controls).toMatchObject({ landing: 840, settled: 1820, easing: 'ease-in-out', moments: [0, 840, 1820, 2100] });
     const expectedMoment = restoredRevision <= 2 ? 700 : 840;
@@ -787,10 +827,86 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   const directTargets = await page.locator('[data-preview-object-id]:visible, [data-transform-handle]:visible').evaluateAll((items) => items.map((item) => {
     const rect = item.getBoundingClientRect(); return { width: rect.width, height: rect.height, kind: (item as HTMLElement).dataset.transformHandle ?? 'body' };
   }));
-  expect(directTargets).toHaveLength(4);
+  expect(directTargets).toHaveLength(7);
   expect(directTargets.every(({ width, height }) => width >= 43.5 && height >= 43.5)).toBe(true);
+  const selectionFrame = async () => page.evaluate(() => {
+    const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    const selectedBody = document.querySelector<HTMLElement>('[data-preview-object-id][aria-pressed="true"]')!;
+    const target = frame.contentDocument!.querySelector<HTMLElement>(`[data-motion-id="${selectedBody.dataset.previewObjectId}"]`)!;
+    const targetRect = target.getBoundingClientRect(); const selection = document.querySelector<HTMLElement>('[data-preview-selection]')!;
+    const corners = [...document.querySelectorAll<HTMLElement>('[data-transform-handle="scale"]:not([hidden])')].map((handle) => ({
+      corner: handle.dataset.transformCorner, key: handle.dataset.previewControlKey, label: handle.getAttribute('aria-label'),
+      title: handle.title, role: handle.getAttribute('role'), value: handle.getAttribute('aria-valuenow'),
+      min: handle.getAttribute('aria-valuemin'), max: handle.getAttribute('aria-valuemax'),
+      anchor: { x: handle.dataset.transformCorner?.endsWith('left')
+        ? Number.parseFloat(handle.style.left) + Number.parseFloat(handle.style.width) : Number.parseFloat(handle.style.left),
+      y: handle.dataset.transformCorner?.startsWith('top')
+        ? Number.parseFloat(handle.style.top) + Number.parseFloat(handle.style.height) : Number.parseFloat(handle.style.top) },
+    }));
+    const rotation = document.querySelector<HTMLElement>('[data-transform-handle="rotate"]:not([hidden])')!;
+    const aligned = (left: number, right: number) => Math.abs(left - right) < .001;
+    return { selectedLabel: selection.querySelector('span')!.textContent!, exactBounds: { left: aligned(Number.parseFloat(selection.style.left), targetRect.left),
+      top: aligned(Number.parseFloat(selection.style.top), targetRect.top), width: aligned(Number.parseFloat(selection.style.width), targetRect.width),
+      height: aligned(Number.parseFloat(selection.style.height), targetRect.height) }, selectionValues: { left: Number.parseFloat(selection.style.left),
+      top: Number.parseFloat(selection.style.top), width: Number.parseFloat(selection.style.width), height: Number.parseFloat(selection.style.height) },
+      corners, target: { left: targetRect.left, top: targetRect.top,
+      right: targetRect.right, bottom: targetRect.bottom }, rotation: { key: rotation.dataset.previewControlKey,
+      role: rotation.dataset.transformRole, label: rotation.getAttribute('aria-label'), title: rotation.title,
+      value: rotation.getAttribute('aria-valuenow'), text: rotation.getAttribute('aria-valuetext'),
+      centerX: Number.parseFloat(rotation.style.left) + Number.parseFloat(rotation.style.width) / 2,
+      centerY: Number.parseFloat(rotation.style.top) + Number.parseFloat(rotation.style.height) / 2,
+      symbol: getComputedStyle(rotation, '::before').content, connectorHeight: Number.parseFloat(getComputedStyle(rotation, '::after').height) } };
+  });
+  const frameAt768 = await selectionFrame();
+  expect(frameAt768.exactBounds).toEqual({ left: true, top: true, width: true, height: true });
+  expect(frameAt768.corners.map(({ corner }) => corner).sort()).toEqual(['bottom-left', 'bottom-right', 'top-left', 'top-right']);
+  const expectedCorners = [{ x: frameAt768.target.left, y: frameAt768.target.top }, { x: frameAt768.target.right, y: frameAt768.target.top },
+    { x: frameAt768.target.right, y: frameAt768.target.bottom }, { x: frameAt768.target.left, y: frameAt768.target.bottom }];
+  expect(frameAt768.corners.every(({ anchor }) => expectedCorners.some((expected) =>
+    Math.abs(anchor.x - expected.x) < .001 && Math.abs(anchor.y - expected.y) < .001))).toBe(true);
+  expect(frameAt768.corners.every(({ key, label, title, role, value, min, max }) => Boolean(key)
+    && label?.endsWith(`uniform scale handle for ${frameAt768.selectedLabel}`) && title.endsWith(`scale ${frameAt768.selectedLabel}`) && role === 'slider'
+    && value !== null && min === '0.25' && max === '3')).toBe(true);
+  expect(frameAt768.rotation).toMatchObject({ role: 'rotation', label: `Rotation handle for ${frameAt768.selectedLabel}`,
+    title: `Drag to rotate ${frameAt768.selectedLabel}` });
+  expect(frameAt768.rotation.key).toBeTruthy(); expect(frameAt768.rotation.value).not.toBeNull();
+  expect(frameAt768.rotation.text).toContain('degrees');
+  expect(Math.abs(frameAt768.rotation.centerX - (frameAt768.target.left + frameAt768.target.right) / 2)).toBeLessThan(.001);
+  expect(frameAt768.rotation.centerY).toBeLessThan(frameAt768.target.top); expect(frameAt768.rotation.symbol).not.toBe('none');
+  expect(frameAt768.rotation.connectorHeight).toBeGreaterThan(0);
+  const controlNodesBeforeResize = await page.locator('[data-preview-control-key]').evaluateAll((nodes) => {
+    (window as unknown as { __directControlNodes: Map<string, Element> }).__directControlNodes = new Map(
+      nodes.map((node) => [(node as HTMLElement).dataset.previewControlKey!, node]));
+    return nodes.map((node) => (node as HTMLElement).dataset.previewControlKey);
+  });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect.poll(async () => (await selectionFrame()).exactBounds).toEqual({ left: true, top: true, width: true, height: true });
+  const frameAt1440 = await selectionFrame();
+  expect(frameAt1440.exactBounds).toEqual({ left: true, top: true, width: true, height: true });
+  expect(await page.locator('[data-preview-control-key]').evaluateAll((nodes) => nodes.every((node) =>
+    (window as unknown as { __directControlNodes: Map<string, Element> }).__directControlNodes.get((node as HTMLElement).dataset.previewControlKey!) === node
+      && node.isConnected))).toBe(true);
+  expect(await page.locator('[data-preview-control-key]').evaluateAll((nodes) => nodes.map((node) =>
+    (node as HTMLElement).dataset.previewControlKey))).toEqual(controlNodesBeforeResize);
+  await page.setViewportSize({ width: 768, height: 900 });
   const directBaseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest);
-  for (const [selector, key] of [['[data-transform-handle="scale"]:visible', 'ArrowUp'], ['[data-transform-handle="rotate"]:visible', 'ArrowRight'], ['[data-preview-object-id][aria-pressed="true"]', 'Shift+ArrowRight']] as const) {
+  const directSelectionBaseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  for (const [index, elementId] of targetElementIds.entries()) {
+    await workspace.getByRole('radio', { name: `Primary Object ${index + 1}` }).check();
+    await expect(page.locator('[data-preview-selection] span')).toHaveText(`Object ${index + 1}`);
+    expect(await page.locator('[data-transform-handle]:visible').evaluateAll((handles, selectedId) => ({ count: handles.length,
+      selectedOnly: handles.every((handle) => (handle as HTMLElement).dataset.transformElementId === selectedId) }), elementId))
+      .toEqual({ count: 5, selectedOnly: true });
+  }
+  await workspace.getByRole('radio', { name: 'Primary Object 1' }).check();
+  const transformModeToggle = workspace.getByRole('button', { name: 'Path', exact: true });
+  await transformModeToggle.click(); await expect(transformModeToggle).toHaveAttribute('aria-pressed', 'false');
+  await expect(page.locator('[data-transform-handle]:visible')).toHaveCount(5);
+  await transformModeToggle.click(); await expect(transformModeToggle).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({
+    revision: directSelectionBaseline.revision, contentDigest: directSelectionBaseline.contentDigest,
+    exportDigest: directSelectionBaseline.exportDigest, undoCount: directSelectionBaseline.undoCount, redoCount: directSelectionBaseline.redoCount });
+  for (const [selector, key] of [['[data-transform-corner="top-left"]:visible', 'ArrowUp'], ['[data-transform-handle="rotate"]:visible', 'ArrowRight'], ['[data-preview-object-id][aria-pressed="true"]', 'Shift+ArrowRight']] as const) {
     const beforeRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
     await page.locator(selector).focus(); await page.keyboard.press(key);
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(beforeRevision + 1);
@@ -798,6 +914,106 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(beforeRevision + 2);
     expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest)).toBe(directBaseline);
   }
+  const cancelTransform = async (method: 'escape' | 'pointercancel') => {
+    const control = page.locator('[data-transform-corner="bottom-left"]:visible'); const box = await control.boundingBox(); expect(box).not.toBeNull();
+    const baseline = await page.evaluate(() => { const authoring = window.__motionEditor.inspectAuthoring();
+      const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+      const selected = document.querySelector<HTMLElement>('[data-preview-object-id][aria-pressed="true"]')!;
+      const rect = frame.contentDocument!.querySelector<HTMLElement>(`[data-motion-id="${selected.dataset.previewObjectId}"]`)!.getBoundingClientRect();
+      (window as unknown as { __cancelBaselineDocument: Document }).__cancelBaselineDocument = frame.contentDocument!;
+      return { authoring, bounds: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } }; });
+    const commandCount = commandBytes.length;
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2); await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width / 2 - 12, box!.y + box!.height / 2 + 10, { steps: 4 });
+    await expect.poll(() => page.evaluate((bounds) => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+      const selected = document.querySelector<HTMLElement>('[data-preview-object-id][aria-pressed="true"]')!;
+      const rect = frame.contentDocument!.querySelector<HTMLElement>(`[data-motion-id="${selected.dataset.previewObjectId}"]`)!.getBoundingClientRect();
+      return rect.left !== bounds.left || rect.top !== bounds.top || rect.width !== bounds.width || rect.height !== bounds.height;
+    }, baseline.bounds)).toBe(true);
+    if (method === 'escape') { await page.keyboard.press('Escape'); await page.mouse.up(); }
+    else { await page.evaluate(() => window.dispatchEvent(new PointerEvent('pointercancel', { pointerId: 1 }))); await page.mouse.up(); }
+    await expect.poll(() => page.evaluate((bounds) => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+      const selected = document.querySelector<HTMLElement>('[data-preview-object-id][aria-pressed="true"]')!;
+      const rect = frame.contentDocument!.querySelector<HTMLElement>(`[data-motion-id="${selected.dataset.previewObjectId}"]`)!.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height };
+    }, baseline.bounds)).toEqual(baseline.bounds);
+    expect(commandBytes).toHaveLength(commandCount);
+    expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({ revision: baseline.authoring.revision,
+      contentDigest: baseline.authoring.contentDigest, exportDigest: baseline.authoring.exportDigest,
+      undoCount: baseline.authoring.undoCount, redoCount: baseline.authoring.redoCount });
+    expect(await page.evaluate(() => document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument
+      === (window as unknown as { __cancelBaselineDocument: Document }).__cancelBaselineDocument)).toBe(true);
+  };
+  await cancelTransform('escape'); await cancelTransform('pointercancel');
+  const dragTransform = async (selector: string, delta: { x: number; y: number }) => {
+    const control = page.locator(selector); const box = await control.boundingBox(); expect(box).not.toBeNull();
+    const baseline = await page.evaluate(() => { const authoring = window.__motionEditor.inspectAuthoring();
+      const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+      const selected = document.querySelector<HTMLElement>('[data-preview-object-id][aria-pressed="true"]')!;
+      const target = frame.contentDocument!.querySelector<HTMLElement>(`[data-motion-id="${selected.dataset.previewObjectId}"]`)!;
+      const rect = target.getBoundingClientRect(); frame.dataset.directTransformLoads = '0';
+      frame.addEventListener('load', () => { frame.dataset.directTransformLoads = String(Number(frame.dataset.directTransformLoads) + 1); }, { once: true });
+      const controls = [...document.querySelectorAll<HTMLElement>('[data-preview-control-key]')];
+      const nodes = new Map(controls.map((node) => [node.dataset.previewControlKey!, node]));
+      const paint = { frames: 0, releaseFrames: 0, hiddenGaps: 0, identityGaps: 0, oldPoseReleaseFrames: 0, release: false, stop: false };
+      (window as unknown as { __directTransformDocument: Document }).__directTransformDocument = frame.contentDocument!;
+      (window as unknown as { __directTransformNodes: Map<string, Element> }).__directTransformNodes = nodes;
+      (window as unknown as { __directTransformPaint: typeof paint }).__directTransformPaint = paint;
+      window.addEventListener('pointerup', () => { paint.release = true; }, { once: true });
+      const tick = () => { if (paint.stop) return; paint.frames += 1;
+        const current = [...document.querySelectorAll<HTMLElement>('[data-preview-control-key]')];
+        if (document.querySelector<HTMLElement>('[data-preview-selection]')!.hidden
+          || current.filter((node) => !node.hidden && node.dataset.transformElementId === selected.dataset.previewObjectId).length !== 5) paint.hiddenGaps += 1;
+        if (current.some((node) => nodes.get(node.dataset.previewControlKey!) !== node || !node.isConnected)) paint.identityGaps += 1;
+        if (paint.release) { paint.releaseFrames += 1; const currentRect = target.getBoundingClientRect();
+          if (currentRect.left === rect.left && currentRect.top === rect.top && currentRect.width === rect.width && currentRect.height === rect.height)
+            paint.oldPoseReleaseFrames += 1; }
+        requestAnimationFrame(tick); };
+      requestAnimationFrame(tick);
+      return { revision: authoring.revision, contentDigest: authoring.contentDigest, exportDigest: authoring.exportDigest,
+        bounds: { left: rect.left, top: rect.top, width: rect.width, height: rect.height } };
+    });
+    await page.mouse.move(box!.x + box!.width / 2, box!.y + box!.height / 2); await page.mouse.down();
+    await page.mouse.move(box!.x + box!.width / 2 + delta.x, box!.y + box!.height / 2 + delta.y, { steps: 6 });
+    await expect.poll(() => page.evaluate((bounds) => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+      const selected = document.querySelector<HTMLElement>('[data-preview-object-id][aria-pressed="true"]')!;
+      const rect = frame.contentDocument!.querySelector<HTMLElement>(`[data-motion-id="${selected.dataset.previewObjectId}"]`)!.getBoundingClientRect();
+      return rect.left !== bounds.left || rect.top !== bounds.top || rect.width !== bounds.width || rect.height !== bounds.height;
+    }, baseline.bounds)).toBe(true);
+    const draftLanding = await page.evaluate(() => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+      const selected = document.querySelector<HTMLElement>('[data-preview-object-id][aria-pressed="true"]')!;
+      const rect = frame.contentDocument!.querySelector<HTMLElement>(`[data-motion-id="${selected.dataset.previewObjectId}"]`)!.getBoundingClientRect();
+      return { left: rect.left, top: rect.top, width: rect.width, height: rect.height }; });
+    const commandCount = commandBytes.length; await page.mouse.up();
+    await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(baseline.revision + 1);
+    await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
+    const committed = await page.evaluate(() => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+      const selected = document.querySelector<HTMLElement>('[data-preview-object-id][aria-pressed="true"]')!;
+      const rect = frame.contentDocument!.querySelector<HTMLElement>(`[data-motion-id="${selected.dataset.previewObjectId}"]`)!.getBoundingClientRect();
+      const paint = (window as unknown as { __directTransformPaint: { stop: boolean; frames: number; releaseFrames: number;
+        hiddenGaps: number; identityGaps: number; oldPoseReleaseFrames: number } }).__directTransformPaint; paint.stop = true;
+      const controls = [...document.querySelectorAll<HTMLElement>('[data-preview-control-key]')];
+      const nodes = (window as unknown as { __directTransformNodes: Map<string, Element> }).__directTransformNodes;
+      return { bounds: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        stableDocument: frame.contentDocument === (window as unknown as { __directTransformDocument: Document }).__directTransformDocument,
+        loads: Number(frame.dataset.directTransformLoads), controlsStable: controls.every((node) => nodes.get(node.dataset.previewControlKey!) === node && node.isConnected),
+        previewMatchesCompiler: window.__motionEditor.inspectShotWorkspace().previewMatchesCompiler,
+        paint: { frames: paint.frames, releaseFrames: paint.releaseFrames, hiddenGaps: paint.hiddenGaps,
+          identityGaps: paint.identityGaps, oldPoseReleaseFrames: paint.oldPoseReleaseFrames } };
+    });
+    expect(commandBytes).toHaveLength(commandCount + 1);
+    expect((JSON.parse(commandBytes.at(-1)!) as { command: { kind: string } }).command.kind).toBe('motion.transform-pose.set');
+    expect(committed).toMatchObject({ bounds: draftLanding, stableDocument: true, loads: 0, controlsStable: true,
+      previewMatchesCompiler: true, paint: { hiddenGaps: 0, identityGaps: 0, oldPoseReleaseFrames: 0 } });
+    expect(committed.paint.frames).toBeGreaterThan(1); expect(committed.paint.releaseFrames).toBeGreaterThan(0);
+    await page.locator('[data-undo]').click();
+    await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(baseline.revision + 2);
+    expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest)).toBe(baseline.contentDigest);
+    expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().exportDigest)).toBe(baseline.exportDigest);
+  };
+  await dragTransform('[data-transform-corner="top-left"]:visible', { x: -14, y: -10 });
+  await dragTransform('[data-transform-corner="bottom-right"]:visible', { x: 14, y: 10 });
+  await dragTransform('[data-transform-handle="rotate"]:visible', { x: 16, y: 7 });
   await page.locator('[data-move-together]').uncheck();
   const pathToggle = workspace.getByRole('button', { name: 'Path', exact: true });
   if (await pathToggle.getAttribute('aria-pressed') === 'true') await pathToggle.click();
@@ -842,6 +1058,73 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   await page.locator('[data-undo]').click(); await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(selectionRevision + 2);
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest)).toBe(directBaseline);
   expect(consoleErrors).toEqual([]);
+});
+
+test('exact-duration Shot workspace retains a post-endpoint native inspection position without mutation', async ({ page }) => {
+  processHandle?.kill('SIGTERM');
+  if (processHandle?.exitCode === null) await new Promise((resolveExit) => processHandle!.once('exit', resolveExit));
+  const root = resolve(import.meta.dirname, '../../..'); const port = 43500 + Math.floor(Math.random() * 250);
+  const seed = createTrajectorySeed(root); seed.durationMs = 2100; seed.cues = seed.cues.filter((cue) => cue.timeMs <= seed.durationMs);
+  for (const rule of seed.rules) {
+    for (const track of rule.tracks.filter((candidate) => candidate.property === 'transform')) {
+      track.keyframes = track.keyframes.filter((keyframe) => keyframe.offset <= 0.3);
+      for (const expanded of seed.tracks.filter((candidate) => candidate.ruleId === rule.id && candidate.property === 'transform')) {
+        expanded.keyframeIds = track.keyframes.map((keyframe) => keyframe.id);
+      }
+    }
+  }
+  const runtimeSeedPath = join(directory, 'trajectory-exact-duration.json');
+  await writeFile(runtimeSeedPath, `${JSON.stringify(seed)}\n`);
+  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'trajectory-exact-duration.sqlite'),
+      PHASE3_EDITOR_PORT: String(port), PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability,
+      LANDING_SHOT1_WORKSPACE: '1', LANDING_SHOT1_DOCUMENT_PATH: runtimeSeedPath },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const address = await new Promise<string>((resolveAddress, reject) => {
+    let output = ''; const timer = setTimeout(() => reject(new Error('EXACT_DURATION_SERVER_TIMEOUT')), 10000);
+    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
+      if (line) { clearTimeout(timer); resolveAddress((JSON.parse(line) as { editorUrl: string }).editorUrl); } });
+    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`EXACT_DURATION_SERVER_EXIT_${code}`)); });
+  });
+  await expect.poll(async () => { try { return (await fetch(address)).ok; } catch { return false; } }).toBe(true);
+  const commands: string[] = []; page.on('request', (request) => {
+    if (request.url().endsWith('/api/v1/commands')) commands.push(request.postData() ?? '');
+  });
+  await page.goto(address); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  const baseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  await expect(page.locator('[data-scrub]')).toHaveAttribute('max', '2101');
+  for (const timeMs of [0, 2100, 2101]) {
+    const immediate = await page.locator('[data-scrub]').evaluate((input: HTMLInputElement, requestedTimeMs) => { let captured;
+      const capture = () => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+        const animations = frame.contentDocument!.getAnimations(); const state = window.__motionEditor.readState();
+        return { maximum: Number(input.max), slider: Number(input.value), playheadMs: state.playheadMs,
+          controllerTimes: state.currentTimes, nativeTimes: animations.map((animation) => animation.currentTime),
+          nativeStates: animations.map((animation) => animation.playState), nativeIdentity: animations.map((animation) => ({
+            animation: animation.constructor.name, effect: animation.effect?.constructor.name, timeline: animation.timeline?.constructor.name })),
+          compilerEqual: frame.srcdoc === window.__motionEditor.compiledHtml };
+      };
+      input.addEventListener('input', () => { captured = capture(); }, { once: true }); input.value = String(requestedTimeMs);
+      input.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertReplacementText', data: String(requestedTimeMs) }));
+      return captured;
+    }, timeMs);
+    const stable = await page.evaluate(async () => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+      await new Promise((resolveFrame) => frame.contentWindow!.requestAnimationFrame(() => frame.contentWindow!.requestAnimationFrame(resolveFrame)));
+      const input = document.querySelector<HTMLInputElement>('[data-scrub]')!; const animations = frame.contentDocument!.getAnimations();
+      const state = window.__motionEditor.readState(); return { maximum: Number(input.max), slider: Number(input.value), playheadMs: state.playheadMs,
+        controllerTimes: state.currentTimes, nativeTimes: animations.map((animation) => animation.currentTime),
+        nativeStates: animations.map((animation) => animation.playState), nativeIdentity: animations.map((animation) => ({
+          animation: animation.constructor.name, effect: animation.effect?.constructor.name, timeline: animation.timeline?.constructor.name })),
+        compilerEqual: frame.srcdoc === window.__motionEditor.compiledHtml };
+    });
+    const expected = { maximum: 2101, slider: timeMs, playheadMs: timeMs, controllerTimes: [timeMs, timeMs], nativeTimes: [timeMs, timeMs],
+      nativeStates: ['paused', 'paused'], nativeIdentity: Array.from({ length: 2 }, () => ({ animation: 'CSSAnimation', effect: 'KeyframeEffect',
+        timeline: 'DocumentTimeline' })), compilerEqual: true };
+    expect(immediate).toEqual(expected); expect(stable).toEqual(expected);
+  }
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({ revision: baseline.revision,
+    contentDigest: baseline.contentDigest, exportDigest: baseline.exportDigest, undoCount: baseline.undoCount, redoCount: baseline.redoCount });
+  expect(commands).toEqual([]);
 });
 
 test('an incompatible Shot revision stays fail-closed and offers non-destructive recovery', async ({ page }) => {
