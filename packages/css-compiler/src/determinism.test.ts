@@ -122,6 +122,27 @@ describe('deterministic pure HTML/CSS compiler', () => {
     );
   });
 
+  test('revalidates registered reduced-motion duration and timing overrides', async () => {
+    const imported = importMotionHtml(await readFile(longhandFixturePath, 'utf8'));
+    expect(imported.document).not.toBeNull();
+    imported.document!.reducedMotion.css = `@media (prefers-reduced-motion: reduce) {
+      .target { animation: none; animation-duration: .001ms; animation-timing-function: linear; opacity: 1; }
+    }`;
+    expect(() => compileMotionDocument(imported.document!)).not.toThrow();
+    imported.document!.reducedMotion.css = `@media (prefers-reduced-motion: reduce) {
+      .target { animation-duration: 0ms; animation-timing-function: steps(1, end); opacity: 1; }
+    }`;
+    expect(() => compileMotionDocument(imported.document!)).not.toThrow();
+    for (const declaration of ['animation-duration: 1ms, 2ms',
+      'animation-timing-function: linear, ease', 'animation-delay: 0ms', '--motion: 1']) {
+      const hostile = structuredClone(imported.document!);
+      hostile.reducedMotion.css = `@media (prefers-reduced-motion: reduce) {
+        .target { animation: none; ${declaration}; }
+      }`;
+      expect(() => compileMotionDocument(hostile), declaration).toThrow('COMPILER_REDUCED_MOTION_INVALID');
+    }
+  });
+
   test('compiles parameterized Cursor and Orb opacity bundles deterministically with distinct identities', async () => {
     const imported = importMotionHtml(await readFile(
       new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8'));

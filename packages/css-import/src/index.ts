@@ -14,6 +14,7 @@ import postcss, {
 import valueParser from 'postcss-value-parser';
 
 import {
+  classifyReducedMotionDeclaration,
   classifyAnimatedProperty,
   deriveElementId,
   parseCssTimingFunction,
@@ -409,26 +410,28 @@ function extractReducedMotionRules(
   const snapshots: string[] = [];
   root.walkAtRules('media', (atRule) => {
     if (!/^\(\s*prefers-reduced-motion\s*:\s*reduce\s*\)$/i.test(atRule.params)) return;
-    let animationNoneCount = 0;
+    let registeredMotionCount = 0;
     let invalid = false;
     atRule.walkAtRules(() => { invalid = true; });
     atRule.walkRules((rule) => {
       if (rule.selector.includes('::')) invalid = true;
     });
     atRule.walkDecls((declaration) => {
-      const property = declaration.prop.toLowerCase();
-      if (!isMotionDeclaration(property)) return;
-      if (property === 'animation'
-        && declaration.value.trim().toLowerCase() === 'none'
-        && !declaration.important) {
-        animationNoneCount += 1;
-      } else {
+      const kind = classifyReducedMotionDeclaration(
+        declaration.prop,
+        declaration.value,
+        declaration.important,
+      );
+      if (kind === 'animation-none' || kind === 'animation-duration'
+        || kind === 'animation-timing-function') {
+        registeredMotionCount += 1;
+      } else if (kind === null) {
         invalid = true;
       }
     });
-    if (invalid || animationNoneCount === 0) {
+    if (invalid || registeredMotionCount === 0) {
       addCssDiagnostic(diagnostics, inventory, 'IMPORT_RESPONSIVE_MOTION',
-        'Reduced-motion branches must contain only registered animation:none motion.', atRule);
+        'Reduced-motion branches must contain only registered animation overrides.', atRule);
       return;
     }
     snapshots.push(atRule.toString());

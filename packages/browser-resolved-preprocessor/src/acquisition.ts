@@ -9,11 +9,12 @@ import {
 } from '../../domain/src/css-motion-semantics.js';
 
 import {
-  ADMISSION_SCHEMA_VERSION, CANDIDATE_SCHEMA_VERSION, CLOSED_PROFILE_CATEGORIES, PREPROCESSOR_VERSION, RECEIPT_SCHEMA_VERSION,
+  ADMISSION_SCHEMA_VERSION, CANDIDATE_SCHEMA_VERSION, CLOSED_PROFILE_CATEGORIES, IDENTITY_BIND_FAILURE_STEPS, IDENTITY_DERIVATION_OPERATIONS, PREPROCESSOR_VERSION, RECEIPT_SCHEMA_VERSION, RUNTIME_OBSERVATION_DIAGNOSTIC_SCHEMA_VERSION, RUNTIME_OBSERVATION_SUBSTAGES, RUNTIME_PREPARATION_SUBSTAGES,
   buildClosedProfileReport, decodeLockedOwnerInput, inspectAdmissionPackage, inspectCandidatePackage, rejectedResult, sha256, stableJson,
   type AdmissionPackage, type CandidatePackage, type ClosedProfileReport, type ConstructRecord, type DiagnosticCode, type DetailedEvidence,
   type ExternallyAuthenticatedExpectedRoot, type IntegratedPreprocessorResult, type LockedOwnerInput, type OwnerAction, type OwnerBinding,
   type OwnerInput, type PreprocessorCandidateResult, type PreprocessorReceipt, type ReplayPackage, type SamplePoint,
+  type IdentityBindFailureStep, type IdentityBindProgress, type IdentityDerivationOperation, type RuntimeObservationSubstage, type RuntimeObservationSummary, type RuntimePreparationSubstage,
 } from './index.js';
 
 type Inventory = OwnerInput['expectedInventory'];
@@ -46,6 +47,80 @@ type LockedStylesheet = Readonly<{
 export function snapshotRuntimeActivity<T>(values: readonly T[]): readonly T[] {
   return [...values];
 }
+
+export function summarizeRuntimeObservations(
+  sourceRuns: readonly Readonly<{ profile: 'normal' | 'reduced'; observation: Readonly<{ errors: readonly unknown[]; mutations: number }> }>[],
+  replayRuns: readonly Readonly<{ profile: 'normal' | 'reduced'; observation: Readonly<{ errors: readonly unknown[]; mutations: number }> }>[],
+): RuntimeObservationSummary {
+  const cell = (profile: 'normal' | 'reduced', side: 'source' | 'replay') => {
+    const runs = (side === 'source' ? sourceRuns : replayRuns).filter((run) => run.profile === profile);
+    return { profile, side, runCount: runs.length, browserErrorCount: runs.reduce((count, run) => count + run.observation.errors.length, 0), mutatedRunCount: runs.filter((run) => run.observation.mutations > 0).length, mutationCount: runs.reduce((count, run) => count + run.observation.mutations, 0) } as const;
+  };
+  return { schemaVersion: RUNTIME_OBSERVATION_DIAGNOSTIC_SCHEMA_VERSION, variant: 'complete-counts', completeness: 'complete', stage: 'observation-cleanliness', cells: [cell('normal', 'source'), cell('normal', 'replay'), cell('reduced', 'source'), cell('reduced', 'replay')] };
+}
+
+type ObservationCoordinate = Readonly<{ profile: 'normal' | 'reduced'; side: 'source' | 'replay'; runOrdinal: 1 | 2 | 3; substage: RuntimeObservationSubstage }>;
+export class RuntimeObservationTracker {
+  readonly #base: Omit<ObservationCoordinate, 'substage'>;
+  #coordinate: ObservationCoordinate;
+  constructor(profile: ObservationCoordinate['profile'], side: ObservationCoordinate['side'], runOrdinal: ObservationCoordinate['runOrdinal']) {
+    if (!['normal', 'reduced'].includes(profile) || !['source', 'replay'].includes(side) || ![1, 2, 3].includes(runOrdinal)) throw new Error('PREPROCESSOR_ARTIFACT_INVALID');
+    this.#base = { profile, side, runOrdinal };
+    this.#coordinate = { ...this.#base, substage: side === 'source' ? 'source-open' : 'replay-context' };
+  }
+  async close<T>(operation: () => Promise<T>): Promise<T> { const previous = this.#coordinate; this.enter('close'); const value = await operation(); this.#coordinate = previous; return value; }
+  enter(substage: RuntimeObservationSubstage): void {
+    if (!RUNTIME_OBSERVATION_SUBSTAGES.includes(substage) || (substage.startsWith('replay-') && this.#base.side !== 'replay')) throw new Error('PREPROCESSOR_ARTIFACT_INVALID');
+    this.#coordinate = { ...this.#base, substage };
+  }
+  earlyFailure(): RuntimeObservationSummary {
+    return { schemaVersion: RUNTIME_OBSERVATION_DIAGNOSTIC_SCHEMA_VERSION, variant: 'early-failure', completeness: 'incomplete', stage: 'observation-execution', failure: { ...this.#coordinate } };
+  }
+}
+export async function trackRuntimeObservationOperation<T>(tracker: RuntimeObservationTracker, substage: RuntimeObservationSubstage, operation: () => Promise<T>): Promise<T> { tracker.enter(substage); return operation(); }
+
+export class RuntimePreparationTracker {
+  readonly #runOrdinal: 1 | 2 | 3;
+  #substage: RuntimePreparationSubstage = 'source-open';
+  #identityBindTracker: IdentityBindFailureTracker | null = null;
+  constructor(runOrdinal: 1 | 2 | 3) { if (![1, 2, 3].includes(runOrdinal)) throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); this.#runOrdinal = runOrdinal; }
+  enter(substage: RuntimePreparationSubstage): void { if (!RUNTIME_PREPARATION_SUBSTAGES.includes(substage)) throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); this.#substage = substage; }
+  beginIdentityBind(bindingCount: number): IdentityBindFailureTracker { this.enter('identity-bind'); this.#identityBindTracker = new IdentityBindFailureTracker(this.#runOrdinal, bindingCount); return this.#identityBindTracker; }
+  async close<T>(operation: () => Promise<T>): Promise<T> { const previous = this.#substage; this.enter('close'); const value = await operation(); this.#substage = previous; return value; }
+  failure(): RuntimeObservationSummary { return { schemaVersion: RUNTIME_OBSERVATION_DIAGNOSTIC_SCHEMA_VERSION, variant: 'preparation-failure', completeness: 'incomplete', stage: 'preparation-execution', failure: { runOrdinal: this.#runOrdinal, substage: this.#substage } }; }
+  rejectedFailure(): RuntimeObservationSummary { return this.#substage === 'identity-bind' && this.#identityBindTracker ? this.#identityBindTracker.failure() : this.failure(); }
+}
+export function trackRuntimePreparationOperation<T>(tracker: RuntimePreparationTracker, substage: RuntimePreparationSubstage, operation: () => T): T { tracker.enter(substage); return operation(); }
+
+export class IdentityBindFailureTracker {
+  readonly #runOrdinal: 1 | 2 | 3;
+  readonly #bindingCount: number;
+  #step: IdentityBindFailureStep = 'derive-node-identities';
+  #identityDerivationComplete = false;
+  #locatorChecksCompleted = 0;
+  #identityReadsCompleted = 0;
+  #markerWritesCompleted = 0;
+  #derivationFailure: { operation: IdentityDerivationOperation; evaluationEntered: boolean; enumerationComplete: boolean } | null = null;
+  constructor(runOrdinal: 1 | 2 | 3, bindingCount: number) { if (![1, 2, 3].includes(runOrdinal) || !Number.isSafeInteger(bindingCount) || bindingCount <= 0) throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); this.#runOrdinal = runOrdinal; this.#bindingCount = bindingCount; }
+  enter(step: IdentityBindFailureStep): void {
+    if (!IDENTITY_BIND_FAILURE_STEPS.includes(step)) throw new Error('PREPROCESSOR_ARTIFACT_INVALID');
+    const valid = step === 'derive-node-identities' ? !this.#identityDerivationComplete && this.#locatorChecksCompleted === 0
+      : step === 'locator-count' ? this.#identityDerivationComplete && this.#locatorChecksCompleted < this.#bindingCount
+      : step === 'identity-read' ? this.#identityDerivationComplete && this.#locatorChecksCompleted > this.#identityReadsCompleted
+      : step === 'binding-marker-write' ? this.#identityDerivationComplete && this.#identityReadsCompleted > this.#markerWritesCompleted
+      : this.#identityDerivationComplete && this.#locatorChecksCompleted === this.#bindingCount && this.#identityReadsCompleted === this.#bindingCount && this.#markerWritesCompleted === this.#bindingCount;
+    if (!valid) throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); this.#step = step;
+  }
+  completeDerivation(): void { if (this.#step !== 'derive-node-identities') throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); this.#identityDerivationComplete = true; }
+  completeLocatorCheck(): void { if (this.#step !== 'locator-count') throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); this.#locatorChecksCompleted += 1; }
+  completeIdentityRead(): void { if (this.#step !== 'identity-read') throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); this.#identityReadsCompleted += 1; }
+  completeMarkerWrite(): void { if (this.#step !== 'binding-marker-write') throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); this.#markerWritesCompleted += 1; }
+  completeFinalization(): void { if (this.#step !== 'finalize-records') throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); }
+  recordDerivationFailure(operation: IdentityDerivationOperation, evaluationEntered: boolean, enumerationComplete: boolean): void { if (!IDENTITY_DERIVATION_OPERATIONS.includes(operation) || (operation === 'evaluation-dispatch' ? evaluationEntered || enumerationComplete : !evaluationEntered) || (['evaluation-dispatch', 'encoder-initialize', 'element-enumeration'].includes(operation) ? enumerationComplete : !enumerationComplete)) throw new Error('PREPROCESSOR_ARTIFACT_INVALID'); this.#derivationFailure = { operation, evaluationEntered, enumerationComplete }; }
+  progress(): IdentityBindProgress { return { bindingCount: this.#bindingCount, identityDerivationComplete: this.#identityDerivationComplete, locatorChecksCompleted: this.#locatorChecksCompleted, identityReadsCompleted: this.#identityReadsCompleted, markerWritesCompleted: this.#markerWritesCompleted, finalizationComplete: false }; }
+  failure(): RuntimeObservationSummary { return this.#derivationFailure ? { schemaVersion: RUNTIME_OBSERVATION_DIAGNOSTIC_SCHEMA_VERSION, variant: 'identity-derivation-failure', completeness: 'incomplete', stage: 'preparation-execution', failure: { runOrdinal: this.#runOrdinal, substage: 'identity-bind', step: 'derive-node-identities', ...this.#derivationFailure } } : { schemaVersion: RUNTIME_OBSERVATION_DIAGNOSTIC_SCHEMA_VERSION, variant: 'identity-bind-failure', completeness: 'incomplete', stage: 'preparation-execution', failure: { runOrdinal: this.#runOrdinal, substage: 'identity-bind', step: this.#step, progress: this.progress() } }; }
+}
+export function trackIdentityBindOperation<T>(tracker: IdentityBindFailureTracker, step: IdentityBindFailureStep, operation: () => T): T { tracker.enter(step); return operation(); }
 
 const HTML_NAMESPACE = 'http://www.w3.org/1999/xhtml';
 const REGISTERED_HTML_ELEMENTS = new Set([
@@ -106,13 +181,16 @@ async function generateCandidate(locked: LockedOwnerInput | unknown): Promise<Ge
     }
     let prepared: Prepared;
     let preparedRuns: readonly Prepared[];
+    let preparationTracker: RuntimePreparationTracker | null = null;
     try {
-      const runs = [await prepare(browser, input, captureNamespaceSha256), await prepare(browser, input, captureNamespaceSha256), await prepare(browser, input, captureNamespaceSha256)];
-      if (new Set(runs.map((run) => stableJson(run))).size !== 1) throw coded('PREPROCESSOR_CAPTURE_UNSTABLE');
+      const runs: Prepared[] = [];
+      for (const runOrdinal of [1, 2, 3] as const) { preparationTracker = new RuntimePreparationTracker(runOrdinal); runs.push(await prepare(browser, input, captureNamespaceSha256, preparationTracker)); }
+      trackRuntimePreparationOperation(preparationTracker!, 'cross-run-stability', () => { if (new Set(runs.map((run) => stableJson(run))).size !== 1) throw coded('PREPROCESSOR_CAPTURE_UNSTABLE'); });
       preparedRuns = runs;
       prepared = runs[0]!;
     } catch (error) {
-      return reject([diagnosticFromError(error)], { ownerInputLockVerified: true, browserPinned: true });
+      const diagnostic = diagnosticFromError(error);
+      return reject([diagnostic], { ownerInputLockVerified: true, browserPinned: true, ...(diagnostic === 'PREPROCESSOR_RUNTIME_ERROR' && preparationTracker ? { runtimeObservationSummary: preparationTracker.rejectedFailure() } : {}) });
     }
     if (stableJson(prepared.inventory) !== stableJson(input.expectedInventory)) {
       return reject(['PREPROCESSOR_INVENTORY_MISMATCH'], {
@@ -131,15 +209,20 @@ async function generateCandidate(locked: LockedOwnerInput | unknown): Promise<Ge
 
     const sourceRuns: Array<{ profile: 'normal' | 'reduced'; observation: Observation }> = [];
     const replayRuns: Array<{ profile: 'normal' | 'reduced'; observation: Observation }> = [];
+    let activeTracker: RuntimeObservationTracker | null = null;
     try {
       for (const profile of input.environment.profiles) {
         for (let run = 0; run < 3; run += 1) {
-          sourceRuns.push({ profile, observation: await observeSource(browser, input, profile, prepared.schedule, prepared.provenance, captureNamespaceSha256) });
-          replayRuns.push({ profile, observation: await observeReplay(browser, input, prepared.replayHtml, prepared.replayCss, profile, prepared.schedule, prepared.provenance) });
+          const runOrdinal = (run + 1) as 1 | 2 | 3;
+          activeTracker = new RuntimeObservationTracker(profile, 'source', runOrdinal);
+          sourceRuns.push({ profile, observation: await observeSource(browser, input, profile, prepared.schedule, prepared.provenance, captureNamespaceSha256, activeTracker) });
+          activeTracker = new RuntimeObservationTracker(profile, 'replay', runOrdinal);
+          replayRuns.push({ profile, observation: await observeReplay(browser, input, prepared.replayHtml, prepared.replayCss, profile, prepared.schedule, prepared.provenance, activeTracker) });
         }
       }
     } catch (error) {
-      return reject([diagnosticFromError(error)], { ownerInputLockVerified: true, browserPinned: true, lockedRoutingComplete: true, closedProfileCovered: true, boundariesComplete: true });
+      const diagnostic = diagnosticFromError(error);
+      return reject([diagnostic], { ownerInputLockVerified: true, browserPinned: true, lockedRoutingComplete: true, closedProfileCovered: true, boundariesComplete: true, ...(diagnostic === 'PREPROCESSOR_RUNTIME_ERROR' && activeTracker ? { runtimeObservationSummary: activeTracker.earlyFailure() } : {}) });
     }
 
     const profilesComplete = sourceRuns.length === 6 && replayRuns.length === 6;
@@ -163,6 +246,7 @@ async function generateCandidate(locked: LockedOwnerInput | unknown): Promise<Ge
       ownerInputLockVerified: true, browserPinned: true, lockedRoutingComplete: true, closedProfileCovered: true,
       boundariesComplete: true, profilesComplete, threeCleanRuns, stableIdentityProven, replayEquivalent,
       resetEquivalent, zeroReplayRequests, zeroErrors,
+      ...(diagnostics.includes('PREPROCESSOR_RUNTIME_ERROR') ? { runtimeObservationSummary: summarizeRuntimeObservations(sourceRuns, replayRuns) } : {}),
     });
 
     const receiptCore: PreprocessorReceipt = {
@@ -302,48 +386,44 @@ function expandAnimationShorthand(value: string): string {
 function normalizeSelector(value: string): string { return value.trim().replace(/\s*([>+~])\s*/g, '$1').replace(/\s+/g, ' '); }
 function normalizeCssTokenText(value: string): string { return value.trim().replace(/\s*([():,>+~])\s*/g, '$1').replace(/\s+/g, ' ').toLowerCase(); }
 
-async function prepare(browser: Browser, input: OwnerInput, captureNamespaceSha256: string): Promise<Prepared> {
-  const runtime = await openLockedPage(browser, input, 'normal');
+async function prepare(browser: Browser, input: OwnerInput, captureNamespaceSha256: string, tracker: RuntimePreparationTracker): Promise<Prepared> {
+  const runtime = await trackRuntimePreparationOperation(tracker, 'source-open', () => openLockedPage(browser, input, 'normal'));
   try {
-    await ready(runtime.page);
-    const provenance = await bindSource(runtime.page, input.bindings, captureNamespaceSha256);
-    const inventory = await inventoryPage(runtime.page, input.bindings);
-    const replay = await buildReplay(runtime.page, lockedStylesheets(input));
-    const bootstrap = await readBootstrapInstrumentation(runtime.page);
-    if (Object.values(bootstrap).some((value) => value !== 0)) throw coded('PREPROCESSOR_CONSTRUCT_UNSUPPORTED');
-    await installInstrumentation(runtime.page);
-    await executeActions(runtime.page, input.procedure.start, input.bindings, false);
-    await executeActions(runtime.page, input.procedure.actions, input.bindings, false);
-    await runtime.page.waitForTimeout(0);
-    if (inventory.pseudos > 0 || inventory.transitions > 0) throw coded('PREPROCESSOR_CONSTRUCT_UNSUPPORTED');
-    const browserAnimationCount = await runtime.page.evaluate(() => document.getAnimations().length);
+    await trackRuntimePreparationOperation(tracker, 'readiness', () => ready(runtime.page));
+    const provenance = await bindSource(runtime.page, input.bindings, captureNamespaceSha256, tracker.beginIdentityBind(input.bindings.length));
+    const inventory = await trackRuntimePreparationOperation(tracker, 'inventory', () => inventoryPage(runtime.page, input.bindings));
+    const replay = await trackRuntimePreparationOperation(tracker, 'replay-build', () => buildReplay(runtime.page, lockedStylesheets(input)));
+    const bootstrap = await trackRuntimePreparationOperation(tracker, 'bootstrap-read', () => readBootstrapInstrumentation(runtime.page));
+    trackRuntimePreparationOperation(tracker, 'bootstrap-validate', () => { if (Object.values(bootstrap).some((value) => value !== 0)) throw coded('PREPROCESSOR_CONSTRUCT_UNSUPPORTED'); });
+    await trackRuntimePreparationOperation(tracker, 'instrumentation-install', () => installInstrumentation(runtime.page));
+    await trackRuntimePreparationOperation(tracker, 'start-actions', () => executeActions(runtime.page, input.procedure.start, input.bindings, false));
+    await trackRuntimePreparationOperation(tracker, 'actions', () => executeActions(runtime.page, input.procedure.actions, input.bindings, false));
+    await trackRuntimePreparationOperation(tracker, 'settle-turn', () => runtime.page.waitForTimeout(0));
+    trackRuntimePreparationOperation(tracker, 'static-runtime-validate', () => { if (inventory.pseudos > 0 || inventory.transitions > 0) throw coded('PREPROCESSOR_CONSTRUCT_UNSUPPORTED'); });
+    const browserAnimationCount = await trackRuntimePreparationOperation(tracker, 'animation-count', () => runtime.page.evaluate(() => document.getAnimations().length));
     if (browserAnimationCount !== inventory.applications) throw coded('PREPROCESSOR_INVENTORY_MISMATCH');
-    const animations = await animationRecords(runtime.page);
-    const expectedAnimatedStableIds = provenance
-      .filter((item) => input.expectedInventory.animatedBindingIds.includes(item.bindingId))
-      .map((item) => item.stableId).sort();
-    const actualAnimatedStableIds = [...new Set(animations.map((item) => item.targetId))].sort();
-    if (stableJson(expectedAnimatedStableIds) !== stableJson(actualAnimatedStableIds)) throw coded('PREPROCESSOR_INVENTORY_MISMATCH');
-    const schedule = deriveSchedule(animations, input);
-    const runtimeEffects = await readInstrumentation(runtime.page);
-    assertLockedRequestClosure(input, runtime.requests, runtime.errors);
-    const ledger = await deriveLedger(runtime.page, input, inventory, runtime.requests, runtimeEffects, animations);
-    assertLedgerBijection(ledger, input, inventory, replay.html);
-    assertReplayStructurallySafe(replay.html, replay.css);
-    return {
+    const animations = await trackRuntimePreparationOperation(tracker, 'animation-records', () => animationRecords(runtime.page));
+    trackRuntimePreparationOperation(tracker, 'animated-identity-validate', () => { const expected = provenance.filter((item) => input.expectedInventory.animatedBindingIds.includes(item.bindingId)).map((item) => item.stableId).sort(); const actual = [...new Set(animations.map((item) => item.targetId))].sort(); if (stableJson(expected) !== stableJson(actual)) throw coded('PREPROCESSOR_INVENTORY_MISMATCH'); });
+    const schedule = trackRuntimePreparationOperation(tracker, 'schedule-derive', () => deriveSchedule(animations, input));
+    const runtimeEffects = await trackRuntimePreparationOperation(tracker, 'instrumentation-read', () => readInstrumentation(runtime.page));
+    trackRuntimePreparationOperation(tracker, 'route-closure', () => assertLockedRequestClosure(input, runtime.requests, runtime.errors));
+    const ledger = await trackRuntimePreparationOperation(tracker, 'ledger-derive', () => deriveLedger(runtime.page, input, inventory, runtime.requests, runtimeEffects, animations));
+    trackRuntimePreparationOperation(tracker, 'ledger-bijection', () => assertLedgerBijection(ledger, input, inventory, replay.html));
+    trackRuntimePreparationOperation(tracker, 'replay-safety', () => assertReplayStructurallySafe(replay.html, replay.css));
+    return trackRuntimePreparationOperation(tracker, 'result-assemble', () => ({
       replayHtml: replay.html, replayCss: replay.css, inventory, ledger, schedule, provenance,
       requestLedger: snapshotRuntimeActivity(runtime.requests), errors: snapshotRuntimeActivity(runtime.errors), mutations: runtimeEffects.mutations,
-    };
-  } finally { await runtime.context.close(); }
+    }));
+  } finally { await tracker.close(() => runtime.context.close()); }
 }
 
-async function observeSource(browser: Browser, input: OwnerInput, profile: 'normal' | 'reduced', schedule: readonly SamplePoint[], provenance: Prepared['provenance'], captureNamespaceSha256: string): Promise<Observation> {
-  const runtime = await openLockedPage(browser, input, profile);
-  try { return await observe(runtime, input, schedule, provenance, false, captureNamespaceSha256); } finally { await runtime.context.close(); }
+async function observeSource(browser: Browser, input: OwnerInput, profile: 'normal' | 'reduced', schedule: readonly SamplePoint[], provenance: Prepared['provenance'], captureNamespaceSha256: string, tracker: RuntimeObservationTracker): Promise<Observation> {
+  const runtime = await trackRuntimeObservationOperation(tracker, 'source-open', () => openLockedPage(browser, input, profile));
+  try { return await observe(runtime, input, schedule, provenance, false, captureNamespaceSha256, tracker); } finally { await tracker.close(() => runtime.context.close()); }
 }
-async function observeReplay(browser: Browser, input: OwnerInput, replayHtml: string, replayCss: string, profile: 'normal' | 'reduced', schedule: readonly SamplePoint[], provenance: Prepared['provenance']): Promise<Observation> {
-  const context = await newContext(browser, input, profile);
-  const page = await context.newPage();
+async function observeReplay(browser: Browser, input: OwnerInput, replayHtml: string, replayCss: string, profile: 'normal' | 'reduced', schedule: readonly SamplePoint[], provenance: Prepared['provenance'], tracker: RuntimeObservationTracker): Promise<Observation> {
+  const context = await trackRuntimeObservationOperation(tracker, 'replay-context', () => newContext(browser, input, profile));
+  const page = await trackRuntimeObservationOperation(tracker, 'replay-page', () => context.newPage());
   const requests: string[] = [];
   const errors: string[] = [];
   page.on('request', (request) => { if (request.url() !== 'https://replay.invalid/index.html') requests.push(request.url()); });
@@ -354,28 +434,28 @@ async function observeReplay(browser: Browser, input: OwnerInput, replayHtml: st
     else await route.abort('blockedbyclient');
   });
   try {
-    await page.goto('https://replay.invalid/index.html', { waitUntil: 'load' });
-    await page.addStyleTag({ content: replayCss });
-    return await observe({ context, page, requests, errors }, input, schedule, provenance, true, '', replayCss);
-  } finally { await context.close(); }
+    await trackRuntimeObservationOperation(tracker, 'lifecycle', () => page.goto('https://replay.invalid/index.html', { waitUntil: 'load' }));
+    await trackRuntimeObservationOperation(tracker, 'replay-style', () => page.addStyleTag({ content: replayCss }));
+    return await observe({ context, page, requests, errors }, input, schedule, provenance, true, '', tracker, replayCss);
+  } finally { await tracker.close(() => context.close()); }
 }
 
-async function observe(runtime: Runtime, input: OwnerInput, schedule: readonly SamplePoint[], provenance: Prepared['provenance'], replay: boolean, captureNamespaceSha256: string, replayCss = ''): Promise<Observation> {
-  await establishObservationLifecycle(runtime.page, input, provenance, replay, captureNamespaceSha256);
-  const initialDigest = sha256(stableJson(await captureState(runtime.page, provenance.map((item) => item.stableId))));
-  await installInstrumentation(runtime.page);
-  await executeActions(runtime.page, input.procedure.start, input.bindings, replay);
-  const afterStart = sha256(stableJson(await captureState(runtime.page, provenance.map((item) => item.stableId))));
-  await executeActions(runtime.page, input.procedure.actions, input.bindings, replay);
-  const animations = await animationRecords(runtime.page);
-  const effects = await readInstrumentation(runtime.page);
-  const samples = await captureSamples(runtime.page, schedule, provenance.map((item) => item.stableId));
-  const postLoop = sha256(stableJson(await captureState(runtime.page, provenance.map((item) => item.stableId), input.procedure.loopDurationMs)));
-  await runtime.page.reload({ waitUntil: 'load' });
-  if (replay) await runtime.page.addStyleTag({ content: replayCss });
-  await establishObservationLifecycle(runtime.page, input, provenance, replay, captureNamespaceSha256);
-  await executeActions(runtime.page, input.procedure.start, input.bindings, replay);
-  const resetDigest = sha256(stableJson(await captureState(runtime.page, provenance.map((item) => item.stableId))));
+async function observe(runtime: Runtime, input: OwnerInput, schedule: readonly SamplePoint[], provenance: Prepared['provenance'], replay: boolean, captureNamespaceSha256: string, tracker: RuntimeObservationTracker, replayCss = ''): Promise<Observation> {
+  await trackRuntimeObservationOperation(tracker, 'lifecycle', () => establishObservationLifecycle(runtime.page, input, provenance, replay, captureNamespaceSha256));
+  const initialDigest = sha256(stableJson(await trackRuntimeObservationOperation(tracker, 'initial-state', () => captureState(runtime.page, provenance.map((item) => item.stableId)))));
+  await trackRuntimeObservationOperation(tracker, 'instrumentation-install', () => installInstrumentation(runtime.page));
+  await trackRuntimeObservationOperation(tracker, 'start-actions', () => executeActions(runtime.page, input.procedure.start, input.bindings, replay));
+  const afterStart = sha256(stableJson(await trackRuntimeObservationOperation(tracker, 'after-start-state', () => captureState(runtime.page, provenance.map((item) => item.stableId)))));
+  await trackRuntimeObservationOperation(tracker, 'actions', () => executeActions(runtime.page, input.procedure.actions, input.bindings, replay));
+  const animations = await trackRuntimeObservationOperation(tracker, 'animation-inventory', () => animationRecords(runtime.page));
+  const effects = await trackRuntimeObservationOperation(tracker, 'instrumentation-read', () => readInstrumentation(runtime.page));
+  const samples = await trackRuntimeObservationOperation(tracker, 'samples', () => captureSamples(runtime.page, schedule, provenance.map((item) => item.stableId)));
+  const postLoop = sha256(stableJson(await trackRuntimeObservationOperation(tracker, 'post-loop-state', () => captureState(runtime.page, provenance.map((item) => item.stableId), input.procedure.loopDurationMs))));
+  await trackRuntimeObservationOperation(tracker, 'reload', () => runtime.page.reload({ waitUntil: 'load' }));
+  if (replay) await trackRuntimeObservationOperation(tracker, 'replay-style-reset', () => runtime.page.addStyleTag({ content: replayCss }));
+  await trackRuntimeObservationOperation(tracker, 'reset-lifecycle', () => establishObservationLifecycle(runtime.page, input, provenance, replay, captureNamespaceSha256));
+  await trackRuntimeObservationOperation(tracker, 'reset-start-actions', () => executeActions(runtime.page, input.procedure.start, input.bindings, replay));
+  const resetDigest = sha256(stableJson(await trackRuntimeObservationOperation(tracker, 'reset-state', () => captureState(runtime.page, provenance.map((item) => item.stableId)))));
   const resetCheckpoints = { beforeStart: initialDigest, afterStart, postLoop, afterReset: resetDigest };
   return {
     provenance, animations, samples, initialDigest, resetDigest, resetCheckpoints,
@@ -432,20 +512,19 @@ async function newContext(browser: Browser, input: OwnerInput, profile: 'normal'
   await context.addInitScript(() => {
     const counts = { timeouts: 0, intervals: 0, observers: 0, workers: 0, storage: 0, fetches: 0, xhrs: 0, animations: 0, listeners: 0 };
     (window as unknown as { __motionBootstrap: typeof counts }).__motionBootstrap = counts;
-    const sourceCall = (): boolean => document.currentScript !== null;
-    const originalTimeout = window.setTimeout.bind(window); window.setTimeout = ((...args: Parameters<typeof window.setTimeout>) => { if (sourceCall()) counts.timeouts += 1; return originalTimeout(...args); }) as typeof window.setTimeout;
-    const originalInterval = window.setInterval.bind(window); window.setInterval = ((...args: Parameters<typeof window.setInterval>) => { if (sourceCall()) counts.intervals += 1; return originalInterval(...args); }) as typeof window.setInterval;
-    const OriginalObserver = window.MutationObserver; window.MutationObserver = class extends OriginalObserver { constructor(callback: MutationCallback) { if (sourceCall()) counts.observers += 1; super(callback); } };
-    const originalFetch = window.fetch.bind(window); window.fetch = ((...args: Parameters<typeof window.fetch>) => { if (sourceCall()) counts.fetches += 1; return originalFetch(...args); }) as typeof window.fetch;
-    const originalOpen = XMLHttpRequest.prototype.open; XMLHttpRequest.prototype.open = function(method: string, url: string | URL, asyncFlag: boolean = true, username?: string | null, password?: string | null) { if (sourceCall()) counts.xhrs += 1; return originalOpen.call(this, method, url, asyncFlag, username, password); };
-    const originalAnimate = Element.prototype.animate; Element.prototype.animate = function(...args: Parameters<Element['animate']>) { if (sourceCall()) counts.animations += 1; return originalAnimate.apply(this, args); };
-    const originalAdd = EventTarget.prototype.addEventListener; EventTarget.prototype.addEventListener = function(...args: Parameters<EventTarget['addEventListener']>) { if (sourceCall()) counts.listeners += 1; return originalAdd.apply(this, args); };
-    const OriginalWorker = window.Worker; window.Worker = class extends OriginalWorker { constructor(...args: ConstructorParameters<typeof Worker>) { if (sourceCall()) counts.workers += 1; super(...args); } };
+    const originalTimeout = window.setTimeout.bind(window); window.setTimeout = ((...args: Parameters<typeof window.setTimeout>) => { if (document.currentScript !== null) counts.timeouts += 1; return originalTimeout(...args); }) as typeof window.setTimeout;
+    const originalInterval = window.setInterval.bind(window); window.setInterval = ((...args: Parameters<typeof window.setInterval>) => { if (document.currentScript !== null) counts.intervals += 1; return originalInterval(...args); }) as typeof window.setInterval;
+    const OriginalObserver = window.MutationObserver; window.MutationObserver = class extends OriginalObserver { constructor(callback: MutationCallback) { if (document.currentScript !== null) counts.observers += 1; super(callback); } };
+    const originalFetch = window.fetch.bind(window); window.fetch = ((...args: Parameters<typeof window.fetch>) => { if (document.currentScript !== null) counts.fetches += 1; return originalFetch(...args); }) as typeof window.fetch;
+    const originalOpen = XMLHttpRequest.prototype.open; XMLHttpRequest.prototype.open = function(method: string, url: string | URL, asyncFlag: boolean = true, username?: string | null, password?: string | null) { if (document.currentScript !== null) counts.xhrs += 1; return originalOpen.call(this, method, url, asyncFlag, username, password); };
+    const originalAnimate = Element.prototype.animate; Element.prototype.animate = function(...args: Parameters<Element['animate']>) { if (document.currentScript !== null) counts.animations += 1; return originalAnimate.apply(this, args); };
+    const originalAdd = EventTarget.prototype.addEventListener; EventTarget.prototype.addEventListener = function(...args: Parameters<EventTarget['addEventListener']>) { if (document.currentScript !== null) counts.listeners += 1; return originalAdd.apply(this, args); };
+    const OriginalWorker = window.Worker; window.Worker = class extends OriginalWorker { constructor(...args: ConstructorParameters<typeof Worker>) { if (document.currentScript !== null) counts.workers += 1; super(...args); } };
     for (const storage of [window.localStorage, window.sessionStorage]) {
-      const getItem = storage.getItem.bind(storage); storage.getItem = (key: string) => { if (sourceCall()) counts.storage += 1; return getItem(key); };
-      const setItem = storage.setItem.bind(storage); storage.setItem = (key: string, value: string) => { if (sourceCall()) counts.storage += 1; setItem(key, value); };
-      const removeItem = storage.removeItem.bind(storage); storage.removeItem = (key: string) => { if (sourceCall()) counts.storage += 1; removeItem(key); };
-      const clear = storage.clear.bind(storage); storage.clear = () => { if (sourceCall()) counts.storage += 1; clear(); };
+      const getItem = storage.getItem.bind(storage); storage.getItem = (key: string) => { if (document.currentScript !== null) counts.storage += 1; return getItem(key); };
+      const setItem = storage.setItem.bind(storage); storage.setItem = (key: string, value: string) => { if (document.currentScript !== null) counts.storage += 1; setItem(key, value); };
+      const removeItem = storage.removeItem.bind(storage); storage.removeItem = (key: string) => { if (document.currentScript !== null) counts.storage += 1; removeItem(key); };
+      const clear = storage.clear.bind(storage); storage.clear = () => { if (document.currentScript !== null) counts.storage += 1; clear(); };
     }
   });
   return context;
@@ -551,39 +630,76 @@ function isRegisteredCss(css: string): boolean {
 async function ready(page: Page): Promise<void> {
   await page.evaluate(async () => { await document.fonts.ready; await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))); });
 }
-async function bindSource(page: Page, bindings: readonly OwnerBinding[], captureNamespaceSha256: string): Promise<Prepared['provenance']> {
-  await page.evaluate(async (captureNamespace) => {
+async function bindSource(page: Page, bindings: readonly OwnerBinding[], captureNamespaceSha256: string, tracker?: IdentityBindFailureTracker): Promise<Prepared['provenance']> {
+  const identityTracker = tracker ?? new IdentityBindFailureTracker(1, bindings.length);
+  try { await trackIdentityBindOperation(identityTracker, 'derive-node-identities', () => page.evaluate(async (captureNamespace) => {
+    const scope = globalThis as typeof globalThis & { __motionIdentityDerivation?: { operation: IdentityDerivationOperation; evaluationEntered: boolean; enumerationComplete: boolean } };
+    const progress = { operation: 'encoder-initialize' as IdentityDerivationOperation, evaluationEntered: true, enumerationComplete: false };
+    scope.__motionIdentityDerivation = progress;
     const encode = new TextEncoder();
-    const digest = async (value: string): Promise<string> => [...new Uint8Array(await crypto.subtle.digest('SHA-256', encode.encode(value)))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    progress.operation = 'element-enumeration';
     const elements = [...document.querySelectorAll('*')];
+    progress.enumerationComplete = true;
     for (const element of elements) {
       const path: Array<{ namespace: string | null; tag: string; sameTagOrdinal: number; childSignature: string[] }> = [];
       let current: Element | null = element;
       while (current) {
+        progress.operation = 'sibling-selection';
         const siblings = current.parentElement ? [...current.parentElement.children].filter((candidate) => candidate.namespaceURI === current!.namespaceURI && candidate.tagName === current!.tagName) : [current];
-        path.unshift({ namespace: current.namespaceURI, tag: current.tagName.toLowerCase(), sameTagOrdinal: siblings.indexOf(current), childSignature: [...current.children].map((child) => `${child.namespaceURI}:${child.tagName.toLowerCase()}`).sort() });
+        progress.operation = 'child-signature';
+        const childSignature = [...current.children].map((child) => `${child.namespaceURI}:${child.tagName.toLowerCase()}`).sort();
+        progress.operation = 'ancestor-record';
+        path.unshift({ namespace: current.namespaceURI, tag: current.tagName.toLowerCase(), sameTagOrdinal: siblings.indexOf(current), childSignature });
         current = current.parentElement;
       }
-      const nodeProvenanceSha256 = await digest(JSON.stringify(path));
+      progress.operation = 'path-serialization';
+      const serializedPath = JSON.stringify(path);
+      progress.operation = 'provenance-digest';
+      const nodeProvenanceSha256 = [...new Uint8Array(await crypto.subtle.digest('SHA-256', encode.encode(serializedPath)))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      progress.operation = 'provenance-attribute-write';
       element.setAttribute('data-motion-provenance', nodeProvenanceSha256);
-      element.setAttribute('data-motion-stable', `node_${(await digest(JSON.stringify({ captureNamespace, nodeProvenanceSha256 }))).slice(0, 24)}`);
+      progress.operation = 'stable-input-serialization';
+      const stableInput = JSON.stringify({ captureNamespace, nodeProvenanceSha256 });
+      progress.operation = 'stable-digest';
+      const stableDigest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', encode.encode(stableInput)))].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+      progress.operation = 'stable-attribute-write';
+      element.setAttribute('data-motion-stable', `node_${stableDigest.slice(0, 24)}`);
     }
-  }, captureNamespaceSha256);
+    delete scope.__motionIdentityDerivation;
+  }, captureNamespaceSha256)); } catch {
+    let failure: { operation: IdentityDerivationOperation; evaluationEntered: boolean; enumerationComplete: boolean } = { operation: 'evaluation-dispatch', evaluationEntered: false, enumerationComplete: false };
+    try {
+      const observed = await page.evaluate(() => {
+        const scope = globalThis as typeof globalThis & { __motionIdentityDerivation?: { operation?: unknown; evaluationEntered?: unknown; enumerationComplete?: unknown } };
+        const value = scope.__motionIdentityDerivation;
+        return value && typeof value.operation === 'string' && typeof value.evaluationEntered === 'boolean' && typeof value.enumerationComplete === 'boolean'
+          ? { operation: value.operation, evaluationEntered: value.evaluationEntered, enumerationComplete: value.enumerationComplete }
+          : null;
+      });
+      if (observed && IDENTITY_DERIVATION_OPERATIONS.includes(observed.operation as IdentityDerivationOperation)) failure = { operation: observed.operation as IdentityDerivationOperation, evaluationEntered: observed.evaluationEntered, enumerationComplete: observed.enumerationComplete };
+    } catch {}
+    identityTracker.recordDerivationFailure(failure.operation, failure.evaluationEntered, failure.enumerationComplete);
+    throw coded('PREPROCESSOR_RUNTIME_ERROR');
+  }
+  identityTracker.completeDerivation();
   const records: Array<{ bindingId: string; stableId: string; nodeProvenanceSha256: string; captureNamespaceSha256: string }> = [];
   for (const binding of bindings) {
     let count: number;
-    try { count = await page.locator(binding.locator).count(); } catch { throw coded('PREPROCESSOR_BINDING_INVALID'); }
+    try { count = await trackIdentityBindOperation(identityTracker, 'locator-count', () => page.locator(binding.locator).count()); } catch { throw coded('PREPROCESSOR_BINDING_INVALID'); }
     if (count !== 1) throw coded('PREPROCESSOR_BINDING_INVALID');
-    const stableId = await page.locator(binding.locator).getAttribute('data-motion-stable');
-    const nodeProvenanceSha256 = await page.locator(binding.locator).getAttribute('data-motion-provenance');
+    identityTracker.completeLocatorCheck();
+    const [stableId, nodeProvenanceSha256] = await trackIdentityBindOperation(identityTracker, 'identity-read', () => Promise.all([page.locator(binding.locator).getAttribute('data-motion-stable'), page.locator(binding.locator).getAttribute('data-motion-provenance')]));
     if (!stableId || !nodeProvenanceSha256) throw coded('PREPROCESSOR_BINDING_INVALID');
-    await page.locator(binding.locator).evaluate((element, value) => {
+    identityTracker.completeIdentityRead();
+    await trackIdentityBindOperation(identityTracker, 'binding-marker-write', () => page.locator(binding.locator).evaluate((element, value) => {
       element.setAttribute('data-owner-binding', value.bindingId);
-    }, { bindingId: binding.bindingId });
+    }, { bindingId: binding.bindingId }));
+    identityTracker.completeMarkerWrite();
     records.push({ bindingId: binding.bindingId, stableId, nodeProvenanceSha256, captureNamespaceSha256 });
   }
-  if (new Set(records.map((item) => item.stableId)).size !== records.length) throw coded('PREPROCESSOR_BINDING_INVALID');
-  return records.sort((a, b) => a.bindingId.localeCompare(b.bindingId));
+  const finalized = trackIdentityBindOperation(identityTracker, 'finalize-records', () => { if (new Set(records.map((item) => item.stableId)).size !== records.length) throw coded('PREPROCESSOR_BINDING_INVALID'); return records.sort((a, b) => a.bindingId.localeCompare(b.bindingId)); });
+  identityTracker.completeFinalization();
+  return finalized;
 }
 async function verifyReplayBindings(page: Page, provenance: Prepared['provenance']): Promise<void> {
   for (const item of provenance) {
@@ -687,8 +803,10 @@ async function inventoryPage(page: Page, bindings: readonly OwnerBinding[]): Pro
   const animatedIds = new Set(bindings.filter((item) => item.role !== 'trigger').map((item) => item.bindingId));
   return page.evaluate((expectedAnimated) => {
     let cssRules = 0; let keyframes = 0; let applications = 0; let pseudos = 0; let conditionals = 0; let transitions = 0;
-    const visit = (rules: CSSRuleList): void => {
-      for (const rule of [...rules]) {
+    for (const sheet of [...document.styleSheets]) {
+      const pending = [...sheet.cssRules].reverse();
+      while (pending.length > 0) {
+        const rule = pending.pop()!;
         cssRules += 1;
         if (rule instanceof CSSKeyframesRule) keyframes += 1;
         if (rule instanceof CSSMediaRule || rule instanceof CSSSupportsRule) conditionals += 1;
@@ -699,10 +817,9 @@ async function inventoryPage(page: Page, bindings: readonly OwnerBinding[]): Pro
           applications += animationNames.length * matches;
           if (rule.style.transition && rule.style.transition !== 'none' && rule.style.transitionDuration !== '0s') transitions += matches;
         }
-        if ('cssRules' in rule && !(rule instanceof CSSKeyframesRule)) visit((rule as CSSGroupingRule).cssRules);
+        if ('cssRules' in rule && !(rule instanceof CSSKeyframesRule)) pending.push(...[...(rule as CSSGroupingRule).cssRules].reverse());
       }
-    };
-    for (const sheet of [...document.styleSheets]) visit(sheet.cssRules);
+    }
     return {
       dom: document.querySelectorAll('*').length, cssRules, keyframes, applications,
       scripts: document.scripts.length, resources: [...document.styleSheets].filter((sheet) => Boolean(sheet.href)).length,
@@ -724,8 +841,10 @@ async function deriveLedger(page: Page, input: OwnerInput, inventory: Inventory,
       rows.push({ kind: 'dom', basis, outputBasis: `${inlined ? 'removed-after-inline' : 'preserved'}:${basis}`, disposition: inlined ? 'inlined-locked' : 'preserved-declarative' });
     });
     let rootRuleIndex = 0;
-    const visit = (rules: CSSRuleList, parentPath: number[] = []): void => {
-      for (const [localIndex, rule] of [...rules].entries()) {
+    for (const sheet of [...document.styleSheets]) {
+      const pending = [...sheet.cssRules].map((rule, localIndex) => ({ rule, parentPath: [] as number[], localIndex })).reverse();
+      while (pending.length > 0) {
+        const { rule, parentPath, localIndex } = pending.pop()!;
         const cssPath = parentPath.length === 0 ? [rootRuleIndex++] : [...parentPath, localIndex];
         const cssDigestBasis = rule.cssText;
         if (rule instanceof CSSKeyframesRule) rows.push({ kind: 'keyframe', basis: cssDigestBasis, outputBasis: `preserved:${cssDigestBasis}`, disposition: 'preserved-declarative', cssPath });
@@ -737,10 +856,9 @@ async function deriveLedger(page: Page, input: OwnerInput, inventory: Inventory,
           if (rule.selectorText.includes('::')) rows.push({ kind: 'pseudo', basis: cssDigestBasis, outputBasis: `preserved:${cssDigestBasis}`, disposition: /animation/i.test(rule.style.cssText) ? 'unsupported' : 'preserved-declarative' });
           if (rule.style.transition && rule.style.transition !== 'none' && rule.style.transitionDuration !== '0s') rows.push({ kind: 'transition', basis: cssDigestBasis, outputBasis: `unsupported:${cssDigestBasis}`, disposition: 'unsupported' });
         }
-        if ('cssRules' in rule && !(rule instanceof CSSKeyframesRule)) visit((rule as CSSGroupingRule).cssRules, cssPath);
+        if ('cssRules' in rule && !(rule instanceof CSSKeyframesRule)) pending.push(...[...(rule as CSSGroupingRule).cssRules].map((child, childIndex) => ({ rule: child, parentPath: cssPath, localIndex: childIndex })).reverse());
       }
-    };
-    for (const sheet of [...document.styleSheets]) visit(sheet.cssRules);
+    }
     // Defensive only: preflight rejects scripts before this browser path is reachable.
     document.querySelectorAll('script').forEach((script) => { const basis = script.textContent ?? ''; rows.push({ kind: 'script', basis, outputBasis: `unsupported:${basis}`, disposition: 'unsupported' }); });
     return rows;
@@ -920,7 +1038,10 @@ async function captureSamples(page: Page, schedule: readonly SamplePoint[], stab
   return output;
 }
 async function pauseAt(page: Page, timeMs: number): Promise<void> {
-  await page.evaluate((time) => { for (const animation of document.getAnimations()) { animation.pause(); animation.currentTime = time; } }, timeMs);
+  await page.evaluate(async (time) => {
+    for (const animation of document.getAnimations()) { animation.pause(); animation.currentTime = time; }
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+  }, timeMs);
 }
 
 function runsStable(runs: Array<{ profile: 'normal' | 'reduced'; observation: Observation }>): boolean {

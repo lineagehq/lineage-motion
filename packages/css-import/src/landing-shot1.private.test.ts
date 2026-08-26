@@ -7,25 +7,20 @@ import { authenticateExpectedAdmissionRoot, inspectAdmissionPackage, sha256, sta
   type AdmissionPackage, type ExpectedAdmissionRoot } from '../../browser-resolved-preprocessor/src/index.js';
 import { importMotionHtml } from './index.js';
 
-const APPROVED_COMBINED_SHA256 = 'f27d11ad74cae22356497d61024aa534c4aeee9974a545640480b4d76c74ef59';
 const root = resolve(import.meta.dirname, '../../..');
-const manifestPath = resolve(root, '.private-corpus/landing-shot1-approved-reference-v3-r2-manifest.json');
-const fixedDirectory = resolve(root, '.motion/private/landing-shot1-approved-reference-v3-r2');
+const fixedDirectory = resolve(root, '.motion/private/shot1-purpose-built-v1');
 const outputDirectory = resolve(root, '.motion/private/landing-shot1-canonical-editing');
 const receiptPath = resolve(root, '.motion/receipts/t002-private.json');
 const RECEIPT_SCHEMA_VERSION = 'motion.private-import-receipt.v2';
 
-test('active-v3 authenticated approved reference imports completely into the exact Shot 1 workspace', async () => {
+test('owner-approved purpose-built authority imports completely into the exact Shot 1 workspace', async () => {
   await unlink(receiptPath).catch(() => undefined);
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as { combinedSourceSha256: string; ownerInputLockSha256: string; boundaryContract: { startMs: number; focalLandingMs: number; settledMs: number } };
-  expect(manifest.combinedSourceSha256).toBe(APPROVED_COMBINED_SHA256);
-  expect(manifest.boundaryContract).toEqual({ startMs: 0, focalLandingMs: 700, settledMs: 2100 });
-  const expectedRoot = JSON.parse(await readFile(resolve(fixedDirectory, 'candidate-root.json'), 'utf8')) as ExpectedAdmissionRoot;
+  const expectedRoot = JSON.parse(await readFile(resolve(fixedDirectory, 'approved-expected-root.json'), 'utf8')) as ExpectedAdmissionRoot;
   const authenticated = authenticateExpectedAdmissionRoot(expectedRoot, sha256(stableJson(expectedRoot)));
   expect(authenticated).not.toBeNull();
   const admission = JSON.parse(await readFile(resolve(fixedDirectory, 'admission-package.json'), 'utf8')) as AdmissionPackage;
   expect(inspectAdmissionPackage(admission, authenticated!).integrity).toBe('valid');
-  expect(admission.expectedRoot.ownerInputLockSha256).toBe(manifest.ownerInputLockSha256);
+  expect(admission.expectedRoot.ownerInputLockSha256).toBe(expectedRoot.ownerInputLockSha256);
   expect(admission.receipt).toMatchObject({ admitted: true, stableIdentityProven: true, replayEquivalent: true, resetEquivalent: true, zeroErrors: true, zeroReplayRequests: true });
   expect(admission.receipt.diagnosticCodes).toEqual([]);
   const replay = admission.candidatePackage.replayPackage;
@@ -35,7 +30,7 @@ test('active-v3 authenticated approved reference imports completely into the exa
     admissionPackageSha256: admission.sha256, provenance: evidence.provenance });
   expect(imported.diagnostics).toEqual([]); expect(imported.document).not.toBeNull();
   expect(imported.inventory).toMatchObject({ ruleCount: 2, applicationCount: 2, slotCount: 2,
-    trackCount: 4, unsupportedCount: 0, missingCount: 0, diagnosticCodes: [] });
+    trackCount: 3, unsupportedCount: 0, missingCount: 0, diagnosticCodes: [] });
   const document = imported.document!; const targetElementIds = document.elements.map((element) => element.id).sort();
   expect(targetElementIds).toHaveLength(2);
   const workspace = projectShotWorkspace(document, { startMs: 0, landedMs: 700, settledMs: 2100, targetElementIds });

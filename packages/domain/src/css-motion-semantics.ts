@@ -1,6 +1,13 @@
 import { sha256Hex } from './sha256.js';
 
 export const CSS_MOTION_SEMANTICS_VERSION = 'motion.css-motion-semantics.v1' as const;
+export const CSS_KEYFRAME_PERCENTAGE_DECIMALS = 6 as const;
+
+export type ReducedMotionDeclarationKind =
+  | 'animation-none'
+  | 'animation-duration'
+  | 'animation-timing-function'
+  | 'static';
 
 export type CssTimingFunction =
   | { kind: 'keyword'; value: 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out' }
@@ -31,6 +38,59 @@ export function classifyAnimatedProperty(property: string): MotionPropertyClassi
 
 export function registeredAnimatedProperties(): readonly string[] {
   return [...PROPERTY_REGISTRY.keys()].sort();
+}
+
+/**
+ * Closed declaration grammar for a source-snapshot reduced-motion branch.
+ * Structural concerns (the exact media query, ordinary selectors, and no
+ * nested at-rules) remain the caller's responsibility because they require a
+ * CSS AST. This function is deliberately usable by both import and compiler.
+ */
+export function classifyReducedMotionDeclaration(
+  propertyInput: string,
+  valueInput: string,
+  important: boolean,
+): ReducedMotionDeclarationKind | null {
+  if (important) return null;
+  const property = propertyInput.trim().toLowerCase();
+  const value = valueInput.trim();
+  const lowerValue = value.toLowerCase();
+  if (!property || property.startsWith('--') || !value
+    || /(?:var|env|url|local)\s*\(/i.test(value)) return null;
+  if (property === 'animation') return lowerValue === 'none' ? 'animation-none' : null;
+  if (property === 'animation-duration') {
+    if (value.includes(',')) return null;
+    const match = /^(?:(\d+(?:\.\d+)?|\.\d+))(ms|s)$/i.exec(value);
+    if (!match || !Number.isFinite(Number(match[1]))) return null;
+    return 'animation-duration';
+  }
+  if (property === 'animation-timing-function') {
+    try { parseCssTimingFunction(value); } catch { return null; }
+    return 'animation-timing-function';
+  }
+  if (property === 'transition' || property.startsWith('transition-')
+    || property.startsWith('animation-')) return null;
+  return 'static';
+}
+
+/** Byte-stable keyframe percentage formatting shared with the CSS compiler. */
+export function formatCssKeyframePercentage(offset: number): string {
+  if (!Number.isFinite(offset) || offset < 0 || offset > 1) {
+    throw new Error('CSS_MOTION_KEYFRAME_UNSUPPORTED');
+  }
+  const percentage = offset * 100;
+  const formatted = Number.isInteger(percentage)
+    ? String(percentage)
+    : percentage.toFixed(CSS_KEYFRAME_PERCENTAGE_DECIMALS).replace(/0+$/, '').replace(/\.$/, '');
+  return `${formatted}%`;
+}
+
+/** Open half-step, in milliseconds, induced by the compiler's percentage quantization. */
+export function cssKeyframeTimeQuantizationHalfStep(durationMs: number): number {
+  if (!Number.isSafeInteger(durationMs) || durationMs <= 0) {
+    throw new Error('CSS_MOTION_DURATION_INVALID');
+  }
+  return durationMs / (2 * 100 * (10 ** CSS_KEYFRAME_PERCENTAGE_DECIMALS));
 }
 
 export function projectTrackInterpolation(property: string, timing: string | CssTimingFunction): 'continuous' | 'discrete' | 'step' {
