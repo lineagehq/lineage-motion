@@ -1,10 +1,30 @@
 import { describe, expect, test } from 'vitest';
-import { canonicalBytes, sha256Hex, type TransformWaypointsTranslateOperation } from '../../domain/src/index.ts';
+import { canonicalBytes, deriveCueId, sha256Hex, type CueAuthoringOperation,
+  type TransformWaypointsTranslateOperation } from '../../domain/src/index.ts';
 import { createPhase3Seed } from '../../local-service/src/seed.ts';
-import { makeBranchCreateCommand, makeClaimAcquireCommand, makeTrackCreateCommand, makeTrajectoryCommand, parseCommand,
+import { makeBranchCreateCommand, makeClaimAcquireCommand, makeCueCommand, makeTrackCreateCommand, makeTrajectoryCommand, parseCommand,
   parseCommandResponse, parseCommitMetadata, parseImmutableRevision, MotionServiceClient } from './index.ts';
 
 describe('motion.protocol.v1', () => {
+  test('strictly transports canonical cursor cue intent without selector or candidate addressing', () => {
+    const cueId = deriveCueId('doc', 'protocol-path');
+    const operation: CueAuthoringOperation = { schemaVersion: 'motion.operation.v1', kind: 'motion.cue.create',
+      operationId: 'cue-protocol', documentId: 'doc', expectedRevision: 0, payload: { cueId,
+        semantic: { kind: 'cursor-path', cursorTargetId: 'el_cursor', startMs: 0, arriveMs: 700,
+          easing: { kind: 'keyword', value: 'ease-out' }, waypoints: [
+            { timeMs: 0, xPpm: 0, yPpm: 0 }, { timeMs: 700, xPpm: 500_000, yPpm: 500_000 },
+          ] }, targetSnapshots: [{ role: 'cursor', ordinal: 0, elementId: 'el_cursor',
+          structuralFingerprint: 'synthetic/cursor' }], replacementTrackIds: [], replacementInputDigest: null } };
+    const command = makeCueCommand(operation);
+    expect(parseCommand(command)).toEqual({ ok: true, command });
+    expect(parseCommand({ ...command, command: { ...command.command, selector: '.cursor' } }))
+      .toEqual({ ok: false, code: 'VALIDATION' });
+    expect(parseCommand({ ...command, command: { ...command.command, payload: {
+      ...command.command.payload, candidateTargetIds: ['el_other'],
+    } } })).toEqual({ ok: false, code: 'VALIDATION' });
+    expect(parseCommand({ ...command, command: { ...command.command, payload: { ...command.command.payload,
+      semantic: { ...operation.payload.semantic, arriveMs: 0 } } } })).toEqual({ ok: false, code: 'VALIDATION' });
+  });
   test('strictly carries the shared trajectory operation without widening its bundle', () => {
     const operation: TransformWaypointsTranslateOperation = { schemaVersion: 'motion.operation.v1', kind: 'motion.transform-waypoints.translate', operationId: 'trajectory', documentId: 'doc', expectedRevision: 0,
       payload: { targets: [{ elementId: 'a', trackId: 't', keyframeId: 'k', expectedTransform: 'translate(0px, 0px)' }], deltaXPpm: 1000, deltaYPpm: -1000,

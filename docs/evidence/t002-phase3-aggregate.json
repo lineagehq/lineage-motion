@@ -10,12 +10,12 @@
     "runCount": 2,
     "editorCliByteIdentical": true,
     "repeatedRunByteIdentical": true,
-    "canonicalDigest": "5bafad9d4e5b11c297509fcde29dcec510245e7d9c3bfa529c331a6f0f3934ee",
-    "compiledHtmlDigest": "7ec6b2c97b447f2eefb3827680fa75e1fef9d5af63695e5f7e4490aa361265b1",
-    "compiledCssDigest": "220c3bf703323cdfbf4c3b3572058b7d3edf075e879d5ff2dd57fbcd505331e1",
-    "exportDigest": "c180e78c5b790ce7583c5e6bd29f69df5d07ce39edfd1752284827d85cf87605",
-    "compilerReceiptDigest": "263d8bb299a8a340416cf3f26845e25096a83eb060ba9523a087404ff424e2d4",
-    "revisionReceiptDigest": "9bbff1e4d85886e00832f9e8fb286f2e477d0961e802782afe5d7fa99b4168ef"
+    "canonicalDigest": "0ca61f6c12956a76967242f5300b6602cda302dfd15952f525ba28774ca3033d",
+    "compiledHtmlDigest": "fc8436b4ec650cd448f8055492338368d459019f7ce10468971168011d2deb65",
+    "compiledCssDigest": "ba2493c5c1156dc3febe72aec3ff9cc1b2124a4919b750220307fb727db5ba7f",
+    "exportDigest": "645fcb681f4f6c4a841095f7f1334d7b1146952070966abb6ec3b3ded9e7f8cb",
+    "compilerReceiptDigest": "a97bada8d20cdee2497def5cce0b9bbfca4aba3946d5a493ef6c00aac72e54f2",
+    "revisionReceiptDigest": "39ad3736c32a2266d1a364ea6e44b4ed0057b8eb4d2b04aed40ef1b4b22b6f32"
   },
   "acceptance": {
     "commands": [

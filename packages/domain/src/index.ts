@@ -14,6 +14,12 @@ export {
   formatCssKeyframePercentage,
 } from './css-motion-semantics.js';
 import { sha256Hex } from './sha256.js';
+import {
+  CUE_GENERATOR_ID, CUE_GENERATOR_VERSION, cueExpansionInput, cueFromExpansion,
+  cueTargetSnapshots, expandCue, isAuthoringCue, replacementInputDigest,
+  type AuthoringCue, type CueOwnership, type CueReplacementBundle, type CueSemantic,
+  type CueTargetSnapshot,
+} from './cue-authoring.js';
 
 export type Diagnostic = {
   code: string;
@@ -49,12 +55,13 @@ export type SourceProvenance = {
   admissionPackageSha256?: string;
 };
 
-export type MotionCue = {
+export type TimelineCue = {
   schemaVersion: 'motion.cue.v1';
   id: string;
   label: string;
   timeMs: number;
 };
+export type MotionCue = TimelineCue | AuthoringCue;
 
 export type MotionHold = {
   schemaVersion: 'motion.hold.v1';
@@ -104,6 +111,7 @@ export type MotionDocument = {
     property: string;
     interpolation: 'continuous' | 'discrete' | 'step';
     keyframeIds: string[];
+    cueOwnership?: CueOwnership;
   }>;
   cues: MotionCue[];
   /** Source-to-story warps. Absent on imported source; authored documents store the explicit record. */
@@ -216,8 +224,16 @@ const motionDocumentSchema = z.object({
     property: identifier,
     interpolation: z.enum(['continuous', 'discrete', 'step']),
     keyframeIds: z.array(identifier).min(1),
+    cueOwnership: z.object({
+      schemaVersion: z.literal('motion.cue-ownership.v1'),
+      cueId: identifier,
+      generatorId: z.literal(CUE_GENERATOR_ID),
+      generatorVersion: z.literal(CUE_GENERATOR_VERSION),
+      targetRoleOrdinal: z.number().int().nonnegative(),
+      expansionDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    }).optional(),
   })),
-  cues: z.array(cueSchema),
+  cues: z.array(z.union([cueSchema, z.custom<AuthoringCue>(isAuthoringCue)])),
   holds: z.array(holdSchema).max(1).optional(),
   inventory: z.object({
     sourceDigest: z.string().regex(/^[a-f0-9]{64}$/),
@@ -277,14 +293,14 @@ export function validateMotionDocument(input: unknown): ValidationResult {
     || hasDuplicates(document.elements.map((element) => element.structuralFingerprint))) {
     return domainFailure('DOMAIN_DUPLICATE_ID', 'Canonical identities must be unique.');
   }
-  if (document.cues.some((cue) => cue.timeMs > document.durationMs)) {
+  if (document.cues.some((cue) => cue.schemaVersion === 'motion.cue.v1' && cue.timeMs > document.durationMs)) {
     return domainFailure('DOMAIN_CUE_TIME_INVALID', 'A cue falls outside the document duration.');
   }
   const holds = document.holds ?? [];
   if (holds.length > 0) {
     const hold = holds[0]!;
     const cue = document.cues.find((candidate) => candidate.id === hold.cueId);
-    if (!cue || cue.timeMs !== hold.sourceTimeMs + hold.durationMs) {
+    if (!cue || cue.schemaVersion !== 'motion.cue.v1' || cue.timeMs !== hold.sourceTimeMs + hold.durationMs) {
       return domainFailure('DOMAIN_HOLD_CUE_INVALID', 'The hold must end at its approved cue.');
     }
   }
@@ -438,6 +454,9 @@ export function validateMotionDocument(input: unknown): ValidationResult {
     );
   }
 
+  const cueValidation = validateAttachedCues(document);
+  if (cueValidation) return domainFailure(cueValidation, 'Canonical cue ownership or expansion has drifted.');
+
   const counts = document.inventory;
   if (
     counts.ruleCount !== document.rules.length
@@ -478,6 +497,51 @@ function expandedTrackKey(
 
 function domainFailure(code: string, summary: string): ValidationResult {
   return { ok: false, diagnostics: [{ code, severity: 'error', summary }] };
+}
+
+function validateAttachedCues(document: MotionDocument): string | null {
+  const authoringCues = document.cues.filter(isAuthoringCue);
+  const ownedTracks = document.tracks.filter((track) => track.cueOwnership);
+  if (ownedTracks.some((track) => !authoringCues.some((cue) => cue.id === track.cueOwnership!.cueId))) {
+    return 'DOMAIN_CUE_OWNERSHIP_INVALID';
+  }
+  for (const cue of authoringCues) {
+    try {
+      const currentSnapshots = cueTargetSnapshots(document, cue.semantic);
+      if (canonicalJson(currentSnapshots) !== canonicalJson(cue.targetSnapshots)) return 'DOMAIN_CUE_TARGET_DRIFT';
+      if (maximumCueMoment(cue.semantic) > document.durationMs) return 'DOMAIN_CUE_TIME_INVALID';
+      const expansion = expandCue(cueExpansionInput(cue.id, cue.semantic, cue.targetSnapshots, cue.replacement));
+      if (canonicalJson(cueFromExpansion(expansion, cue.replacement)) !== canonicalJson(cue)) {
+        return 'DOMAIN_CUE_EXPANSION_DRIFT';
+      }
+      if (expansion.inputDigest !== cue.expansionInputDigest || expansion.expansionDigest !== cue.expansionDigest
+        || canonicalJson(expansion.rules.map((rule) => rule.id)) !== canonicalJson(cue.generatedRuleIds)
+        || canonicalJson(expansion.applications.map((application) => application.id)) !== canonicalJson(cue.generatedApplicationIds)
+        || canonicalJson(expansion.tracks.map((track) => track.id)) !== canonicalJson(cue.generatedTrackIds)) {
+        return 'DOMAIN_CUE_EXPANSION_DRIFT';
+      }
+      const installedRules = cue.generatedRuleIds.map((id) => document.rules.find((rule) => rule.id === id));
+      const installedApplications = cue.generatedApplicationIds.map((id) => document.applications.find((application) => application.id === id));
+      const installedTracks = cue.generatedTrackIds.map((id) => document.tracks.find((track) => track.id === id));
+      if (installedRules.some((item) => !item) || installedApplications.some((item) => !item) || installedTracks.some((item) => !item)
+        || canonicalJson(installedRules) !== canonicalJson(expansion.rules)
+        || canonicalJson(installedApplications) !== canonicalJson(expansion.applications)
+        || canonicalJson(installedTracks) !== canonicalJson(expansion.tracks)) return 'DOMAIN_CUE_BUNDLE_DRIFT';
+      if (cue.replacement && (replacementInputDigest(cue.replacement) !== cue.replacement.inputDigest
+        || cue.replacement.trackIds.some((id) => document.tracks.some((track) => track.id === id)))) return 'DOMAIN_CUE_REPLACEMENT_DRIFT';
+      if (cue.semantic.kind === 'click' && cue.semantic.revealCueId) {
+        const revealCueId = cue.semantic.revealCueId;
+        const reveal = authoringCues.find((candidate) => candidate.id === revealCueId);
+        if (!reveal || reveal.semantic.kind !== 'reveal' || reveal.semantic.startMs !== cue.semantic.pressMs) return 'DOMAIN_CUE_SYNC_INVALID';
+      }
+    } catch { return 'DOMAIN_CUE_EXPANSION_INVALID'; }
+  }
+  return null;
+}
+
+function maximumCueMoment(semantic: CueSemantic): number {
+  return semantic.kind === 'cursor-path' ? semantic.arriveMs
+    : semantic.kind === 'click' ? semantic.pulseEndMs : semantic.completeMs;
 }
 
 export function canonicalBytes(document: MotionDocument): Uint8Array {
@@ -622,13 +686,32 @@ export type SettledHoldSetOperation = OperationEnvelope & {
   kind: 'motion.settled-hold.set';
   payload: { targets: TrajectoryTarget[]; sourceTimeMs: number; settledTimeMs: number; landingTimeMs: number; boundaryTimeMs: 2100 };
 };
+export type CueCreateOperation = OperationEnvelope & {
+  kind: 'motion.cue.create';
+  payload: { cueId: string; semantic: CueSemantic; targetSnapshots: CueTargetSnapshot[];
+    replacementTrackIds: string[]; replacementInputDigest: string | null };
+};
+export type CueUpdateOperation = OperationEnvelope & {
+  kind: 'motion.cue.update';
+  payload: { cueId: string; expectedExpansionDigest: string; semantic: CueSemantic;
+    targetSnapshots: CueTargetSnapshot[] };
+};
+export type CueDeleteOperation = OperationEnvelope & {
+  kind: 'motion.cue.delete'; payload: { cueId: string; expectedExpansionDigest: string;
+    expectedReplacementInputDigest: string | null };
+};
+export type CueDetachOperation = OperationEnvelope & {
+  kind: 'motion.cue.detach'; payload: { cueId: string; expectedExpansionDigest: string;
+    expectedReplacementInputDigest: string | null };
+};
+export type CueAuthoringOperation = CueCreateOperation | CueUpdateOperation | CueDeleteOperation | CueDetachOperation;
 export type TrajectoryAuthoringOperation = TransformPoseSetOperation | TransformWaypointsTranslateOperation
   | KeyframeGroupTimeSetOperation | KeyframeGroupEasingSetOperation | SettledHoldSetOperation;
 export type StructuralAuthoringOperation = TrackCreateOperation | KeyframeAddOperation
   | KeyframeRemoveOperation | SlotDurationSetOperation | BindingDelaySetOperation
   | SlotEasingSetOperation | HoldInsertOperation;
 export type AuthoringOperation = KeyframeValueOperation | KeyframeTimeOperation
-  | StructuralAuthoringOperation | TrajectoryAuthoringOperation | HistoryOperation;
+  | StructuralAuthoringOperation | TrajectoryAuthoringOperation | CueAuthoringOperation | HistoryOperation;
 type EditOperation = Exclude<AuthoringOperation, HistoryOperation>;
 type KeyframeEditOperation = KeyframeValueOperation | KeyframeTimeOperation;
 type InternalTrackDeleteOperation = OperationEnvelope & {
@@ -716,6 +799,10 @@ export function dispatchAuthoringOperation(
     };
   }
 
+  if (!operation.kind.startsWith('motion.cue.') && targetsCueOwnedTrack(state.document, operation)) {
+    return authoringFailure(state, 'CUE_TRACK_LOCKED');
+  }
+
   if ((state.document.holds ?? []).length > 0 && operation.kind !== 'motion.hold.insert') {
     return authoringFailure(state, 'AUTHORING_HOLD_LOCKED');
   }
@@ -743,6 +830,9 @@ function applyOperation(
   if (operation.kind === 'motion.keyframe-value.set' || operation.kind === 'motion.keyframe-time.set') {
     return applyEdit(document, operation);
   }
+  if (operation.kind.startsWith('motion.cue.')) {
+    return applyCueOperation(document, operation as CueAuthoringOperation);
+  }
   if (operation.kind === 'motion.hold.insert' || operation.kind === 'motion.internal.hold.remove') {
     return applyHold(document, operation);
   }
@@ -768,6 +858,193 @@ function applyOperation(
     | InternalTrackDeleteOperation | InternalKeyframeRestoreOperation);
 }
 
+function applyCueOperation(
+  document: MotionDocument,
+  operation: CueAuthoringOperation,
+): { ok: true; document: MotionDocument; inverse: ReducerOperation } | { ok: false; code: string } {
+  const before = structuredClone(document);
+  const fail = (code: string): { ok: false; code: string } => ({ ok: false, code });
+  const cues = document.cues.filter(isAuthoringCue);
+  if (operation.kind === 'motion.cue.create') {
+    if (cues.some((cue) => cue.id === operation.payload.cueId)
+      || canonicalIdentitySet(document).has(operation.payload.cueId)
+      || maximumCueMoment(operation.payload.semantic) > document.durationMs) return fail('CUE_CREATE_INVALID');
+    let snapshots: CueTargetSnapshot[];
+    try { snapshots = cueTargetSnapshots(document, operation.payload.semantic); } catch { return fail('CUE_TARGET_MISSING'); }
+    if (canonicalJson(snapshots) !== canonicalJson(operation.payload.targetSnapshots)) return fail('CUE_TARGET_DRIFT');
+    const replacement = collectReplacementBundle(document, operation.payload.replacementTrackIds);
+    if (!replacement.ok) return replacement;
+    if ((replacement.bundle?.inputDigest ?? null) !== operation.payload.replacementInputDigest) return fail('CUE_REPLACEMENT_STALE');
+    let expansion;
+    try { expansion = expandCue(cueExpansionInput(operation.payload.cueId, operation.payload.semantic,
+      operation.payload.targetSnapshots, replacement.bundle)); } catch { return fail('CUE_CREATE_INVALID'); }
+    const next = structuredClone(document);
+    if (replacement.bundle) removeStructuralBundle(next, replacement.bundle);
+    if (hasCueCollision(next, expansion.rules, expansion.applications, expansion.tracks)) return fail('CUE_ID_COLLISION');
+    if (hasPropertyOverlap(next, expansion.tracks)) return fail('CUE_PROPERTY_OVERLAP');
+    const cue = cueFromExpansion(expansion, replacement.bundle);
+    next.rules.push(...structuredClone(expansion.rules));
+    next.applications.push(...structuredClone(expansion.applications));
+    next.tracks.push(...structuredClone(expansion.tracks));
+    next.cues.push(cue);
+    refreshInventory(next);
+    if (cue.semantic.kind === 'click' && cue.semantic.revealCueId) {
+      const revealCueId = cue.semantic.revealCueId;
+      const reveal = next.cues.find((candidate) => isAuthoringCue(candidate) && candidate.id === revealCueId);
+      if (!reveal || !isAuthoringCue(reveal) || reveal.semantic.kind !== 'reveal'
+        || reveal.semantic.startMs !== cue.semantic.pressMs) return fail('CUE_SYNC_INVALID');
+    }
+    return cueResult(before, next, operation);
+  }
+
+  const cue = cues.find((candidate) => candidate.id === operation.payload.cueId);
+  if (!cue || cue.expansionDigest !== operation.payload.expectedExpansionDigest) return fail('CUE_EXPANSION_STALE');
+  const replacementDigest = cue.replacement?.inputDigest ?? null;
+  if ('expectedReplacementInputDigest' in operation.payload
+    && operation.payload.expectedReplacementInputDigest !== replacementDigest) return fail('CUE_REPLACEMENT_STALE');
+  if (validateAttachedCues(document)) return fail('CUE_EXPANSION_DRIFT');
+  const next = structuredClone(document);
+  const nextCue = next.cues.find((candidate) => candidate.id === cue.id)! as AuthoringCue;
+
+  if (operation.kind === 'motion.cue.update') {
+    if (maximumCueMoment(operation.payload.semantic) > document.durationMs) return fail('CUE_UPDATE_INVALID');
+    let snapshots: CueTargetSnapshot[];
+    try { snapshots = cueTargetSnapshots(document, operation.payload.semantic); } catch { return fail('CUE_TARGET_MISSING'); }
+    if (canonicalJson(snapshots) !== canonicalJson(operation.payload.targetSnapshots)) return fail('CUE_TARGET_DRIFT');
+    if (cue.replacement && (operation.payload.semantic.kind !== cue.semantic.kind
+      || canonicalJson(snapshots.map(({ role, ordinal, elementId }) => ({ role, ordinal, elementId })))
+        !== canonicalJson(cue.targetSnapshots.map(({ role, ordinal, elementId }) => ({ role, ordinal, elementId }))))) {
+      return fail('CUE_REPLACEMENT_SCOPE_CHANGE');
+    }
+    let expansion;
+    try { expansion = expandCue(cueExpansionInput(cue.id, operation.payload.semantic,
+      operation.payload.targetSnapshots, cue.replacement)); } catch { return fail('CUE_UPDATE_INVALID'); }
+    removeGeneratedBundle(next, cue);
+    if (hasCueCollision(next, expansion.rules, expansion.applications, expansion.tracks)) return fail('CUE_ID_COLLISION');
+    if (hasPropertyOverlap(next, expansion.tracks)) return fail('CUE_PROPERTY_OVERLAP');
+    Object.assign(nextCue, cueFromExpansion(expansion, cue.replacement));
+    next.rules.push(...structuredClone(expansion.rules)); next.applications.push(...structuredClone(expansion.applications));
+    next.tracks.push(...structuredClone(expansion.tracks)); refreshInventory(next);
+    if (nextCue.semantic.kind === 'click' && nextCue.semantic.revealCueId) {
+      const revealCueId = nextCue.semantic.revealCueId;
+      const reveal = next.cues.find((candidate) => isAuthoringCue(candidate) && candidate.id === revealCueId);
+      if (!reveal || !isAuthoringCue(reveal) || reveal.semantic.kind !== 'reveal'
+        || reveal.semantic.startMs !== nextCue.semantic.pressMs) return fail('CUE_SYNC_INVALID');
+    }
+    return cueResult(before, next, operation);
+  }
+
+  removeGeneratedBundle(next, cue);
+  next.cues = next.cues.filter((candidate) => candidate.id !== cue.id);
+  if (operation.kind === 'motion.cue.delete' && cue.replacement) {
+    if (hasCueCollision(next, cue.replacement.rules, cue.replacement.applications, cue.replacement.tracks)) return fail('CUE_RESTORE_COLLISION');
+    if (hasPropertyOverlap(next, cue.replacement.tracks)) return fail('CUE_RESTORE_OVERLAP');
+    next.rules.push(...structuredClone(cue.replacement.rules));
+    next.applications.push(...structuredClone(cue.replacement.applications));
+    next.tracks.push(...structuredClone(cue.replacement.tracks));
+  } else if (operation.kind === 'motion.cue.detach') {
+    next.rules.push(...cue.generatedRuleIds.map((id) => structuredClone(document.rules.find((rule) => rule.id === id)!)));
+    next.applications.push(...cue.generatedApplicationIds.map((id) => structuredClone(document.applications.find((application) => application.id === id)!)));
+    next.tracks.push(...cue.generatedTrackIds.map((id) => document.tracks.find((track) => track.id === id)!)
+      .map((track) => { const detached = structuredClone(track); delete detached.cueOwnership; return detached; }));
+  }
+  refreshInventory(next);
+  return cueResult(before, next, operation);
+}
+
+function cueResult(before: MotionDocument, next: MotionDocument, operation: CueAuthoringOperation) {
+  const inverse: InternalTrajectoryRestoreOperation = { schemaVersion: operation.schemaVersion,
+    operationId: operation.operationId, documentId: operation.documentId, expectedRevision: operation.expectedRevision,
+    kind: 'motion.internal.trajectory.restore', payload: {
+      expectedContentDigest: sha256Hex(canonicalContentBytes(next)), restore: before,
+    } };
+  return { ok: true as const, document: next, inverse };
+}
+
+function collectReplacementBundle(document: MotionDocument, trackIds: string[]):
+  { ok: true; bundle?: CueReplacementBundle } | { ok: false; code: string } {
+  if (trackIds.length === 0) return { ok: true };
+  const requested = document.tracks.filter((track) => trackIds.includes(track.id));
+  if (requested.length !== trackIds.length || requested.some((track) => track.cueOwnership)
+    || canonicalJson(requested.map((track) => track.id)) !== canonicalJson(trackIds)) return { ok: false, code: 'CUE_REPLACEMENT_INVALID' };
+  const closure = closedReplacementTrackIds(document, trackIds);
+  const applicationIds = closure.applicationIds; const ruleIds = closure.ruleIds;
+  const applications = document.applications.filter((application) => applicationIds.has(application.id));
+  const rules = document.rules.filter((rule) => ruleIds.has(rule.id));
+  const slotIds = new Set(applications.flatMap((application) => application.slots.map((slot) => slot.id)));
+  const tracks = document.tracks.filter((track) => slotIds.has(track.slotId) || ruleIds.has(track.ruleId));
+  if (canonicalJson(tracks.map((track) => track.id)) !== canonicalJson(trackIds)) return { ok: false, code: 'CUE_REPLACEMENT_SCOPE_INCOMPLETE' };
+  const partial = { schemaVersion: 'motion.cue-replacement.v1' as const, trackIds: [...trackIds], rules: structuredClone(rules),
+    applications: structuredClone(applications), tracks: structuredClone(tracks) };
+  return { ok: true, bundle: { ...partial, inputDigest: replacementInputDigest(partial) } };
+}
+
+export function projectCueReplacement(document: MotionDocument, cueId: string, semantic: CueSemantic):
+  { ok: true; trackIds: string[]; inputDigest: string | null } | { ok: false; code: string } {
+  try {
+    const expansion = expandCue(cueExpansionInput(cueId, semantic, cueTargetSnapshots(document, semantic)));
+    const initial = document.tracks.filter((track) => expansion.tracks.some((generated) =>
+      generated.elementId === track.elementId && generated.property === track.property)).map((track) => track.id);
+    const projected = collectReplacementBundle(document, closedReplacementTrackIds(document, initial).trackIds);
+    if (!projected.ok) return projected;
+    return { ok: true, trackIds: projected.bundle?.trackIds ?? [], inputDigest: projected.bundle?.inputDigest ?? null };
+  } catch { return { ok: false, code: 'CUE_REPLACEMENT_INVALID' }; }
+}
+
+function closedReplacementTrackIds(document: MotionDocument, initialTrackIds: string[]): {
+  trackIds: string[]; applicationIds: Set<string>; ruleIds: Set<string> } {
+  const initial = document.tracks.filter((track) => initialTrackIds.includes(track.id));
+  const applicationIds = new Set(document.applications.filter((application) => application.slots.some((slot) =>
+    initial.some((track) => track.slotId === slot.id))).map((application) => application.id));
+  const ruleIds = new Set<string>(); let changed = true;
+  while (changed) {
+    changed = false;
+    for (const application of document.applications.filter((candidate) => applicationIds.has(candidate.id))) {
+      for (const slot of application.slots) if (!ruleIds.has(slot.ruleId)) { ruleIds.add(slot.ruleId); changed = true; }
+    }
+    for (const application of document.applications) if (!applicationIds.has(application.id)
+      && application.slots.some((slot) => ruleIds.has(slot.ruleId))) { applicationIds.add(application.id); changed = true; }
+  }
+  const slotIds = new Set(document.applications.filter((application) => applicationIds.has(application.id))
+    .flatMap((application) => application.slots.map((slot) => slot.id)));
+  return { applicationIds, ruleIds, trackIds: document.tracks.filter((track) =>
+    slotIds.has(track.slotId) || ruleIds.has(track.ruleId)).map((track) => track.id) };
+}
+
+function removeStructuralBundle(document: MotionDocument, bundle: CueReplacementBundle): void {
+  const ruleIds = new Set(bundle.rules.map((rule) => rule.id)); const appIds = new Set(bundle.applications.map((application) => application.id));
+  const trackIds = new Set(bundle.tracks.map((track) => track.id));
+  document.rules = document.rules.filter((rule) => !ruleIds.has(rule.id));
+  document.applications = document.applications.filter((application) => !appIds.has(application.id));
+  document.tracks = document.tracks.filter((track) => !trackIds.has(track.id));
+}
+
+function removeGeneratedBundle(document: MotionDocument, cue: AuthoringCue): void {
+  document.rules = document.rules.filter((rule) => !cue.generatedRuleIds.includes(rule.id));
+  document.applications = document.applications.filter((application) => !cue.generatedApplicationIds.includes(application.id));
+  document.tracks = document.tracks.filter((track) => !cue.generatedTrackIds.includes(track.id));
+}
+
+function hasCueCollision(document: MotionDocument, rules: MotionDocument['rules'], applications: MotionDocument['applications'],
+  tracks: MotionDocument['tracks']): boolean {
+  const ids = canonicalIdentitySet(document); return [...rules, ...applications, ...tracks].some((record) => ids.has(record.id))
+    || rules.some((rule) => document.rules.some((existing) => existing.sourceName === rule.sourceName));
+}
+
+function hasPropertyOverlap(document: MotionDocument, tracks: MotionDocument['tracks']): boolean {
+  return tracks.some((track) => document.tracks.some((existing) => existing.elementId === track.elementId
+    && existing.property === track.property));
+}
+
+function targetsCueOwnedTrack(document: MotionDocument, operation: AuthoringOperation): boolean {
+  const owned = new Set(document.tracks.filter((track) => track.cueOwnership).map((track) => track.id));
+  if ('trackId' in operation && typeof operation.trackId === 'string' && owned.has(operation.trackId)) return true;
+  if ('payload' in operation && operation.payload && typeof operation.payload === 'object' && 'targets' in operation.payload
+    && Array.isArray(operation.payload.targets)) return operation.payload.targets.some((target) => target && typeof target === 'object'
+      && 'trackId' in target && owned.has(String(target.trackId)));
+  return false;
+}
+
 function applyHold(
   document: MotionDocument,
   operation: HoldInsertOperation | InternalHoldRemoveOperation,
@@ -778,7 +1055,7 @@ function applyHold(
     }
     if ((document.holds ?? []).length > 0) return { ok: false, code: 'AUTHORING_HOLD_COLLISION' };
     const cue = document.cues.find((candidate) => candidate.id === 'cue_pair');
-    if (!cue || cue.timeMs !== 2870 || document.durationMs !== 4660) {
+    if (!cue || cue.schemaVersion !== 'motion.cue.v1' || cue.timeMs !== 2870 || document.durationMs !== 4660) {
       return { ok: false, code: 'AUTHORING_HOLD_BOUNDARY_MISMATCH' };
     }
     if (document.durationMs > Number.MAX_SAFE_INTEGER - 600) {
@@ -793,7 +1070,7 @@ function applyHold(
     const next = structuredClone(document);
     next.holds = [hold];
     next.durationMs += 600;
-    next.cues = next.cues.map((candidate) => candidate.timeMs >= 2870
+    next.cues = next.cues.map((candidate) => candidate.schemaVersion === 'motion.cue.v1' && candidate.timeMs >= 2870
       ? { ...candidate, timeMs: candidate.timeMs + 600 } : candidate);
     const contentDigest = sha256Hex(canonicalContentBytes(next));
     return { ok: true, document: next, inverse: {
@@ -810,7 +1087,8 @@ function applyHold(
   const next = structuredClone(document);
   delete next.holds;
   next.durationMs -= hold.durationMs;
-  next.cues = next.cues.map((candidate) => candidate.timeMs >= hold.sourceTimeMs + hold.durationMs
+  next.cues = next.cues.map((candidate) => candidate.schemaVersion === 'motion.cue.v1'
+    && candidate.timeMs >= hold.sourceTimeMs + hold.durationMs
     ? { ...candidate, timeMs: candidate.timeMs - hold.durationMs } : candidate);
   return { ok: true, document: next, inverse: {
     schemaVersion: operation.schemaVersion, operationId: operation.operationId,
@@ -1325,7 +1603,8 @@ export function projectShotWorkspace(document: MotionDocument, config: ShotWorks
     return { eligible: false, code: 'SHOT_BOUNDARY_KEYFRAME_MISSING', ...config, trajectories, continuityTimesMs: [] };
   }
   return { eligible: true, code: null, ...config, trajectories,
-    continuityTimesMs: [...new Set(document.cues.map((cue) => cue.timeMs).filter((time) => time > 2100).concat(document.durationMs > 2100 ? [2101] : []))].sort((a, b) => a - b) };
+    continuityTimesMs: [...new Set(document.cues.filter((cue): cue is TimelineCue => cue.schemaVersion === 'motion.cue.v1')
+      .map((cue) => cue.timeMs).filter((time) => time > 2100).concat(document.durationMs > 2100 ? [2101] : []))].sort((a, b) => a - b) };
 }
 
 export function projectTrajectorySelection(document: MotionDocument, orderedElementIds: string[], momentMs: number): {
@@ -1506,6 +1785,7 @@ function parseOperation(input: unknown): AuthoringOperation | null {
       'motion.keyframe.add', 'motion.keyframe.remove', 'motion.slot-duration.set',
       'motion.binding-delay.set', 'motion.slot-easing.set',
       'motion.hold.insert',
+      'motion.cue.create', 'motion.cue.update', 'motion.cue.delete', 'motion.cue.detach',
       'motion.transform-pose.set', 'motion.transform-waypoints.translate',
       'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set',
       'motion.history.undo', 'motion.history.redo'].includes(String(value.kind))) {
@@ -1515,6 +1795,26 @@ function parseOperation(input: unknown): AuthoringOperation | null {
   const base = value as unknown as AuthoringOperation;
   if (base.kind === 'motion.history.undo' || base.kind === 'motion.history.redo') {
     return hasExactObjectKeys(value, baseKeys) ? base : null;
+  }
+  if (base.kind === 'motion.cue.create' || base.kind === 'motion.cue.update'
+    || base.kind === 'motion.cue.delete' || base.kind === 'motion.cue.detach') {
+    const payload = plainRecord(value.payload);
+    if (!payload || !hasExactObjectKeys(value, [...baseKeys, 'payload'])
+      || typeof payload.cueId !== 'string' || !/^cue_[a-f0-9]{24}$/.test(payload.cueId)) return null;
+    if (base.kind === 'motion.cue.create') {
+      return hasExactObjectKeys(payload, ['cueId', 'semantic', 'targetSnapshots', 'replacementTrackIds', 'replacementInputDigest'])
+        && validCueSemanticRecord(payload.semantic) && validCueTargetSnapshotRecords(payload.targetSnapshots)
+        && Array.isArray(payload.replacementTrackIds) && payload.replacementTrackIds.every((id) => typeof id === 'string')
+        && (payload.replacementInputDigest === null || isDigest(payload.replacementInputDigest)) ? base : null;
+    }
+    if (base.kind === 'motion.cue.update') {
+      return hasExactObjectKeys(payload, ['cueId', 'expectedExpansionDigest', 'semantic', 'targetSnapshots'])
+        && isDigest(payload.expectedExpansionDigest) && validCueSemanticRecord(payload.semantic)
+        && validCueTargetSnapshotRecords(payload.targetSnapshots) ? base : null;
+    }
+    return hasExactObjectKeys(payload, ['cueId', 'expectedExpansionDigest', 'expectedReplacementInputDigest'])
+      && isDigest(payload.expectedExpansionDigest)
+      && (payload.expectedReplacementInputDigest === null || isDigest(payload.expectedReplacementInputDigest)) ? base : null;
   }
   if (base.kind === 'motion.hold.insert') {
     const payload = plainRecord(value.payload);
@@ -1589,6 +1889,40 @@ function parseOperation(input: unknown): AuthoringOperation | null {
   return base;
 }
 
+export function parseAuthoringOperation(input: unknown): AuthoringOperation | null { return parseOperation(input); }
+
+function validCueSemanticRecord(value: unknown): value is CueSemantic {
+  const semantic = plainRecord(value); if (!semantic || typeof semantic.kind !== 'string') return false;
+  const allInteger = (keys: string[]): boolean => keys.every((key) => Number.isSafeInteger(semantic[key]));
+  if (semantic.kind === 'cursor-path') {
+    return hasExactObjectKeys(semantic, ['kind', 'cursorTargetId', 'startMs', 'arriveMs', 'easing', 'waypoints'])
+      && typeof semantic.cursorTargetId === 'string' && allInteger(['startMs', 'arriveMs'])
+      && timingFunctionSchema.safeParse(semantic.easing).success && Array.isArray(semantic.waypoints)
+      && semantic.waypoints.every((point) => { const record = plainRecord(point); return record
+        && hasExactObjectKeys(record, ['timeMs', 'xPpm', 'yPpm']) && Object.values(record).every(Number.isSafeInteger); });
+  }
+  if (semantic.kind === 'click') {
+    const expected = ['kind', 'cursorTargetId', 'pulseTargetId', 'arriveMs', 'pressMs', 'releaseMs', 'pulseEndMs',
+      'pressScalePpm', 'pulseRadiusPpm', 'pulseOpacityPpm'];
+    if ('revealCueId' in semantic) expected.push('revealCueId');
+    return hasExactObjectKeys(semantic, expected) && typeof semantic.cursorTargetId === 'string'
+      && typeof semantic.pulseTargetId === 'string' && (!('revealCueId' in semantic) || typeof semantic.revealCueId === 'string')
+      && allInteger(['arriveMs', 'pressMs', 'releaseMs', 'pulseEndMs', 'pressScalePpm', 'pulseRadiusPpm', 'pulseOpacityPpm']);
+  }
+  return semantic.kind === 'reveal' && hasExactObjectKeys(semantic, ['kind', 'targetIds', 'startMs', 'completeMs'])
+    && Array.isArray(semantic.targetIds) && semantic.targetIds.every((id) => typeof id === 'string')
+    && allInteger(['startMs', 'completeMs']);
+}
+
+function validCueTargetSnapshotRecords(value: unknown): value is CueTargetSnapshot[] {
+  return Array.isArray(value) && value.every((snapshot) => { const record = plainRecord(snapshot); return record
+    && hasExactObjectKeys(record, ['role', 'ordinal', 'elementId', 'structuralFingerprint'])
+    && typeof record.role === 'string' && Number.isSafeInteger(record.ordinal) && typeof record.elementId === 'string'
+    && typeof record.structuralFingerprint === 'string'; });
+}
+
+function isDigest(value: unknown): value is string { return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value); }
+
 function parsePoseRecord(value: Record<string, unknown>): boolean { return hasExactObjectKeys(value, ['translateXMicrounits', 'translateYMicrounits', 'scalePpm', 'rotateMicrodegrees']) && Object.values(value).every(Number.isSafeInteger) && validPose(value as TransformPose); }
 function parseStageRecord(value: Record<string, unknown>): boolean { return hasExactObjectKeys(value, ['stageDigest', 'widthMicrounits', 'heightMicrounits']) && validStage(value as StageProjection); }
 
@@ -1645,4 +1979,5 @@ export function deriveElementId(
 }
 
 export * from './css-motion-semantics.js';
+export * from './cue-authoring.js';
 export { sha256Hex } from './sha256.js';

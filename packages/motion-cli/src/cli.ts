@@ -1,14 +1,14 @@
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
-import { canonicalJson, isValidAuthoringOperationId, type HistoryOperation, type TrajectoryAuthoringOperation } from '../../domain/src/index.ts';
+import { canonicalJson, isValidAuthoringOperationId, parseAuthoringOperation, type CueAuthoringOperation, type HistoryOperation, type TrajectoryAuthoringOperation } from '../../domain/src/index.ts';
 import { MotionServiceClient, makeBranchCreateCommand, makeClaimAcquireCommand, makeClaimControlCommand,
-  makeTrackCreateCommand, makeTrajectoryCommand, type ActorKind, type CommandResponse, type MotionCommand } from '../../motion-protocol/src/index.ts';
+  makeCueCommand, makeTrackCreateCommand, makeTrajectoryCommand, type ActorKind, type CommandResponse, type MotionCommand } from '../../motion-protocol/src/index.ts';
 
 type Io = { stdout(value: string): void; stderr(value: string): void };
 export async function runCli(argv: string[], io: Io = { stdout: (value) => process.stdout.write(value),
   stderr: (value) => process.stderr.write(value) }): Promise<number> {
   if (argv[0] === 'claim-secret') { io.stdout(`${randomBytes(32).toString('base64url')}\n`); return 0; }
-  const parsed = parseArgs(argv); if (!parsed) { io.stderr('Usage: motion-cli <track-create|pose-set|waypoints-translate|moment-time-set|segment-easing-set|settled-hold-set|undo|redo|branch-create|claim-acquire|claim-renew|claim-release|claim-revoke> [options]\n'); return 2; }
+  const parsed = parseArgs(argv); if (!parsed) { io.stderr('Usage: motion-cli <track-create|pose-set|waypoints-translate|moment-time-set|segment-easing-set|settled-hold-set|cue-create|cue-update|cue-delete|cue-detach|undo|redo|branch-create|claim-acquire|claim-renew|claim-release|claim-revoke> [options]\n'); return 2; }
   try {
     const client = new MotionServiceClient(parsed.service, (...args) => fetch(...args), { actor: parsed.actor,
       capability: parsed.capability, ...(parsed.claimSecret ? { claimSecret: parsed.claimSecret } : {}) });
@@ -37,6 +37,16 @@ function parseArgs(argv: string[]): { service: string; actor: ActorKind; capabil
     const operation: HistoryOperation = { schemaVersion: 'motion.operation.v1', kind: `motion.history.${argv[0]}`,
       operationId, documentId, expectedRevision };
     try { command = makeTrajectoryCommand(operation, branchId); } catch { return null; }
+  } else if (['cue-create', 'cue-update', 'cue-delete', 'cue-detach'].includes(argv[0] ?? '')) {
+    const bundlePath = read('--bundle'); if (!bundlePath) return null;
+    let operation: CueAuthoringOperation; try {
+      const parsedOperation = parseAuthoringOperation(JSON.parse(readFileSync(bundlePath, 'utf8')));
+      if (!parsedOperation || !parsedOperation.kind.startsWith('motion.cue.')) return null;
+      operation = parsedOperation as CueAuthoringOperation;
+    } catch { return null; }
+    if (operation.kind !== `motion.${argv[0]!.replace('-', '.')}` || operation.operationId !== operationId
+      || operation.documentId !== documentId || operation.expectedRevision !== expectedRevision) return null;
+    try { command = makeCueCommand(operation, branchId); } catch { return null; }
   } else if (['pose-set', 'waypoints-translate', 'moment-time-set', 'segment-easing-set', 'settled-hold-set'].includes(argv[0] ?? '')) {
     const bundlePath = read('--bundle'); if (!bundlePath) return null;
     let operation: TrajectoryAuthoringOperation; try { operation = JSON.parse(readFileSync(bundlePath, 'utf8')) as TrajectoryAuthoringOperation; } catch { return null; }

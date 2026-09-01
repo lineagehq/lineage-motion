@@ -43,3 +43,14 @@ export function createLandingShot1EditorSeed(
   if (!validateMotionDocument(document).ok) throw new Error('LANDING_SHOT1_EDITOR_SEED_INVALID');
   return document;
 }
+
+export function createPhase4SceneDSeed(
+  repositoryRoot = resolve(import.meta.dirname, '../../..'),
+  privateDocumentPath = resolve(repositoryRoot, '.motion/private-canonical.json'),
+): MotionDocument {
+  const document = JSON.parse(readFileSync(privateDocumentPath, 'utf8')) as MotionDocument;
+  if (!validateMotionDocument(document).ok || document.inventory.ruleCount !== 9
+    || document.inventory.applicationCount !== 8 || document.inventory.slotCount !== 9
+    || document.inventory.trackCount !== 20) throw new Error('PHASE4_SCENE_D_SEED_INVALID');
+  return document;
+}

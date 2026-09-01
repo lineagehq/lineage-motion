@@ -4,13 +4,19 @@ import {
   canonicalJson,
   canonicalContentBytes,
   createAuthoringState,
+  cueTargetSnapshots,
+  deriveCueId,
   dispatchAuthoringOperation,
   projectShotWorkspace,
   projectTrajectorySelection,
   projectTransformTrajectory,
   projectTrackCreationEligibility,
+  projectCueReplacement,
   sha256Hex,
   type AuthoringOperation,
+  type AuthoringCue,
+  type CueAuthoringOperation,
+  type CueSemantic,
   type StructuralAuthoringElementId,
   type TimingFunction,
 } from '../../../packages/domain/src/index.js';
@@ -25,7 +31,7 @@ import {
   type ProjectionRect,
   type TimelineRow,
 } from '../../../packages/preview-runtime/src/index.js';
-import { MotionServiceClient, makeBranchCreateCommand, makeClaimControlCommand, makeTrackCreateCommand, makeTrajectoryCommand,
+import { MotionServiceClient, makeBranchCreateCommand, makeClaimControlCommand, makeCueCommand, makeTrackCreateCommand, makeTrajectoryCommand,
   type CommitMetadata } from '../../../packages/motion-protocol/src/index.ts';
 import './styles.css';
 
@@ -68,6 +74,8 @@ const reconciliationFailures = new Map<number, number>();
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let draftConflictRevision: number | null = null;
 let draftStaleBaseRevision: number | null = null;
+const detachedCueKinds = new Set<CueSemantic['kind']>();
+let cuePathDefaultsInitialized = false;
 
 document.body.innerHTML = `
   <main class="editor-shell">
@@ -79,6 +87,30 @@ document.body.innerHTML = `
         <form data-revoke-form><label>Claim ID <input data-claim-id placeholder="claim_…"></label><label>Lease version <input data-lease-version type="number" min="1" value="1"></label><button type="submit">Revoke claim</button></form>
       </section>` : ''}
     </header>
+    ${payload.cueWorkspace ? `<section class="cue-workspace" data-cue-workspace aria-labelledby="cue-workspace-heading">
+      <header><div><p class="eyebrow">Current action</p><h2 id="cue-workspace-heading">Click the cursor on the canvas</h2><p data-cue-guidance>The canvas is already active—no setup button required.</p></div><span class="cue-progress-count" data-cue-progress-count>Choose objects</span></header>
+      <section class="cue-role-step" aria-labelledby="cue-role-heading"><h3 id="cue-role-heading">Choose the three objects</h3>
+        <div class="cue-role-grid">
+          <article data-cue-role-card="cursor"><span class="cue-step-number">1</span><div><strong>Cursor</strong><output data-cue-role-status="cursor">Click on canvas</output></div><button type="button" data-cue-pick="cursor" aria-pressed="false" hidden>Change</button></article>
+          <article data-cue-role-card="pulse"><span class="cue-step-number">2</span><div><strong>Click target</strong><output data-cue-role-status="pulse">Waiting</output></div><button type="button" data-cue-pick="pulse" aria-pressed="false" hidden>Change</button></article>
+          <article data-cue-role-card="reveal"><span class="cue-step-number">3</span><div><strong>Reveal target</strong><output data-cue-role-status="reveal">Waiting</output></div><button type="button" data-cue-pick="reveal" aria-pressed="false" hidden>Change</button></article>
+        </div>
+        <details class="cue-target-advanced"><summary>Choose targets from a list</summary><div>
+          <label>Cursor element<select data-cue-cursor><option value="">Not selected</option>${authoring.document.elements.map((element, index) => `<option value="${element.id}">Element ${index + 1}</option>`).join('')}</select></label>
+          <label>Click target<select data-cue-pulse><option value="">Not selected</option>${authoring.document.elements.map((element, index) => `<option value="${element.id}">Element ${index + 1}</option>`).join('')}</select></label>
+          <label>Reveal target<select data-cue-reveal><option value="">Not selected</option>${authoring.document.elements.map((element, index) => `<option value="${element.id}">Element ${index + 1}</option>`).join('')}</select></label>
+        </div></details>
+      </section>
+      <div class="cue-cards">
+        <form data-cue-form="cursor-path" hidden><h3>Move the cursor</h3><p data-cue-path-guidance>Create the movement, then drag Start and Arrive on the canvas.</p><details class="cue-timing"><summary>Timing · 0 to 700 ms</summary><div class="cue-fields"><label>Start (ms)<input name="start" type="number" min="0" value="0"></label><label>Arrive (ms)<input name="arrive" type="number" min="1" value="700"></label></div></details><details class="cue-coordinate-advanced"><summary>Exact coordinates</summary><div class="cue-fields"><label>Start X (%)<input name="startX" type="number" step="0.0001" value="8"></label><label>Start Y (%)<input name="startY" type="number" step="0.0001" value="12"></label><label>End X (%)<input name="endX" type="number" step="0.0001" value="62"></label><label>End Y (%)<input name="endY" type="number" step="0.0001" value="55"></label></div></details><div class="cue-form-actions"><button type="submit" disabled>Create cursor movement</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>
+        <form data-cue-form="reveal" hidden><h3>Reveal the content</h3><p>Use the suggested timing or open Timing to fine-tune it.</p><details class="cue-timing"><summary>Timing · 800 to 1200 ms</summary><div class="cue-fields"><label>Start (ms)<input name="start" type="number" min="0" value="800"></label><label>Complete (ms)<input name="complete" type="number" min="1" value="1200"></label></div></details><div class="cue-form-actions"><button type="submit" disabled>Create reveal</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>
+        <form data-cue-form="click" hidden><h3>Add the click</h3><p>Use the suggested press and pulse, or open Details to tune them.</p><details class="cue-timing"><summary>Click details · 700 to 1300 ms</summary><div class="cue-fields"><label>Arrive (ms)<input name="arrive" type="number" min="0" value="700"></label><label>Press (ms)<input name="press" type="number" min="1" value="800"></label><label>Release (ms)<input name="release" type="number" min="2" value="920"></label><label>Pulse end (ms)<input name="pulseEnd" type="number" min="3" value="1300"></label><label>Press scale (%)<input name="scale" type="number" min="1" value="82"></label><label>Pulse radius (px)<input name="radius" type="number" min="1" value="18"></label></div></details><div class="cue-form-actions"><button type="submit" disabled>Create click</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>
+      </div>
+      <section class="cue-complete" data-cue-complete hidden><div><span aria-hidden="true">&#10003;</span><div><strong>Interaction ready</strong><p>Drag the cursor handles on the canvas, press Play, or edit a beat below.</p></div></div></section>
+      <div class="cue-history-slot" data-cue-history-slot></div>
+      <output data-cue-status role="status" aria-live="polite">Choose the cursor, then click its object on the canvas.</output>
+      <details class="cue-advanced"><summary>Edit completed beats</summary><div data-authored-cues class="authored-cues"></div></details>
+    </section>` : ''}
     <section class="shot-workspace" data-shot-workspace hidden aria-labelledby="shot-workspace-heading">
       <header><div><p class="eyebrow">Shot 1 · 0–2100 ms</p><h2 id="shot-workspace-heading">Animate on one canvas</h2><p>Select an object and moment, then drag it directly. Use the two handles for scale and rotation.</p></div></header>
       <div class="shot-grid"><fieldset data-shot-targets><legend>Object</legend></fieldset><button class="path-toggle" type="button" data-shot-mode="path" aria-pressed="true">Path</button><label class="move-together"><input type="checkbox" data-move-together><span><strong>Move together</strong><small>Translation only; scale and rotation stay on the selected object.</small></span></label></div>
@@ -140,7 +172,7 @@ document.body.innerHTML = `
           <div class="preview-shot-context"><strong data-preview-shot-object>Object 1</strong><output data-preview-shot-state>Editing 700 ms</output></div>
           <div class="preview-shot-actions" data-preview-shot-actions role="group" aria-label="Preview-side Shot controls"></div>
         </div>
-        <div class="preview-stage"><div class="preview-canvas" data-preview-canvas><iframe data-preview title="Compiled motion preview"></iframe><div class="preview-object-overlay" data-preview-object-overlay aria-label="Selectable preview objects"></div><div class="preview-selection" data-preview-selection hidden><span>Selected element</span></div><div class="trajectory-overlay" data-trajectory-overlay aria-label="Compiler-native trajectory waypoints"></div></div></div>
+      <div class="preview-stage"><div class="preview-canvas" data-preview-canvas><iframe data-preview title="Compiled motion preview"></iframe><div class="preview-object-overlay" data-preview-object-overlay aria-label="Selectable preview objects"></div><div class="cue-target-overlay" data-cue-target-overlay hidden aria-label="Choose a cue target on the canvas"></div><div class="cue-path-overlay" data-cue-path-overlay aria-label="Cursor path handles"></div><div class="preview-selection" data-preview-selection hidden><span>Selected element</span></div><div class="trajectory-overlay" data-trajectory-overlay aria-label="Compiler-native trajectory waypoints"></div></div></div>
         <div class="transport" aria-label="Preview transport">
           <button type="button" data-play>Play</button><button type="button" data-pause>Pause</button>
           <label>Preview time <input data-scrub type="range" min="0" max="${authoring.document.durationMs}" step="1" value="0"></label>
@@ -202,6 +234,16 @@ const shotPoseForm = required<HTMLFormElement>('[data-pose-form]');
 const shotStatus = required<HTMLOutputElement>('[data-shot-status]');
 const shotGuidance = required<HTMLElement>('[data-shot-guidance]');
 const shotRecovery = required<HTMLElement>('[data-shot-recovery]');
+const cueWorkspace = document.querySelector<HTMLElement>('[data-cue-workspace]');
+const cueTargetOverlay = document.querySelector<HTMLElement>('[data-cue-target-overlay]');
+const cuePathOverlay = document.querySelector<HTMLElement>('[data-cue-path-overlay]');
+type CueCanvasRole = 'cursor' | 'pulse' | 'reveal';
+type CursorPathAuthoringCue = AuthoringCue & { semantic: Extract<CueSemantic, { kind: 'cursor-path' }> };
+let cuePickRole: CueCanvasRole | null = null;
+let cueEditingKind: CueSemantic['kind'] | null = null;
+let cueCanvasGeneration = 0;
+let cueCanvasFrame: number | null = null;
+let cuePathGestureGeneration = 0;
 let shotConfig: { startMs: number; landedMs: number; settledMs: number; targetElementIds: string[] } | null = null;
 let shotSelection: string[] = [];
 let shotPrimaryElementId: string | null = null;
@@ -285,6 +327,25 @@ const appliedEasing = required<HTMLOutputElement>('[data-applied-easing]');
 const insertHoldButton = required<HTMLButtonElement>('[data-insert-hold]');
 const holdStatus = required<HTMLOutputElement>('[data-hold-status]');
 
+if (payload.cueWorkspace) {
+for (const form of document.querySelectorAll<HTMLFormElement>('[data-cue-form]')) form.addEventListener('submit', (event) => {
+  event.preventDefault(); void submitCueForm(form);
+});
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-cue-cancel-edit]')) button.addEventListener('click', () => {
+  cueEditingKind = null; renderCueCanvas();
+});
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-cue-pick]')) button.addEventListener('click', () => {
+  const role = button.dataset.cuePick as CueCanvasRole;
+  cuePickRole = role;
+  scrub(cuePickRole === 'reveal' ? 1200 : 700);
+  renderCueCanvas();
+  announceCueStatus(`Click the ${cueRoleLabel(cuePickRole).toLowerCase()} directly on the canvas.`, false);
+});
+for (const select of document.querySelectorAll<HTMLSelectElement>('[data-cue-cursor], [data-cue-pulse], [data-cue-reveal]')) {
+  select.addEventListener('change', () => { cuePickRole = null; renderCueCanvas(); });
+}
+}
+
 for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="creation-target"]')) {
   radio.addEventListener('change', () => {
     selectedCreationElementId = radio.value as StructuralAuthoringElementId;
@@ -296,6 +357,7 @@ for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="cre
 
 required<HTMLButtonElement>('[data-play]').addEventListener('click', () => {
   if (!shotConfig) previewSelection.hidden = true;
+  if (Number(scrubber.value) >= Number(scrubber.max)) scrub(0);
   controller.play();
   startPlaybackFeedback();
   republishShotGeometry();
@@ -383,10 +445,11 @@ reducedToggle.addEventListener('click', () => {
 
 renderProjection();
 await mountPreview(compiled.html, compiled.css);
+activateCueLayout();
 initializeSeedWorkspace();
 schedulePreviewSelection();
 document.querySelector('main')!.setAttribute('data-editor-ready', 'true');
-window.addEventListener('resize', () => { configurePreviewCanvas(); schedulePreviewSelection(); if (shotConfig) renderShotWorkspace(); });
+window.addEventListener('resize', () => { configurePreviewCanvas(); schedulePreviewSelection(); scheduleCueCanvas(); if (shotConfig) renderShotWorkspace(); });
 
 const inspectShotWorkspace = () => ({ open: Boolean(shotConfig), mode: shotMode, momentMs: shotMomentMs,
   selectedElementIds: [...shotSelection], revision: authoring.document.revision,
@@ -443,6 +506,14 @@ window.__motionEditor = {
   dispatch,
   openShotWorkspace,
   inspectShotWorkspace,
+  inspectCueWorkspace: () => ({ active: Boolean(cueWorkspace), pickRole: cuePickRole,
+    selectedRoles: { cursor: Boolean(cueRoleSelect('cursor').value), pulse: Boolean(cueRoleSelect('pulse').value),
+      reveal: Boolean(cueRoleSelect('reveal').value) },
+    targetCandidateCount: Number(cueTargetOverlay?.dataset.candidateCount ?? 0),
+    pathHandleCount: cuePathOverlay?.querySelectorAll('[data-waypoint-index]').length ?? 0,
+    authoredCues: authoring.document.cues.filter((cue): cue is AuthoringCue => cue.schemaVersion === 'motion.authoring-cue.v1')
+      .map((cue) => ({ kind: cue.semantic.kind, semantic: structuredClone(cue.semantic), generatedTrackCount: cue.generatedTrackIds.length })),
+  }),
   switchBranch,
   disconnectEvents: () => { eventSubscription?.close(); eventSubscriptionGeneration += 1; },
   reconnectEvents: connectEvents,
@@ -459,6 +530,7 @@ async function dispatch(
   let authoritativePreviewAlreadyMounted = false;
   const durableKind = operation.kind === 'motion.track.create' || operation.kind.startsWith('motion.transform-')
     || operation.kind.startsWith('motion.keyframe-group-') || operation.kind === 'motion.settled-hold.set'
+    || operation.kind.startsWith('motion.cue.')
     || operation.kind === 'motion.history.undo' || operation.kind === 'motion.history.redo';
   if (serviceClient && !durableKind) {
     const code = 'SERVICE_OPERATION_UNSUPPORTED';
@@ -469,6 +541,7 @@ async function dispatch(
   if (serviceClient && durableKind) {
     const command = operation.kind === 'motion.track.create' ? makeTrackCreateCommand({ operationId: operation.operationId,
       documentId: operation.documentId, branchId: activeBranchId, expectedRevision: operation.expectedRevision, elementId: operation.elementId })
+      : operation.kind.startsWith('motion.cue.') ? makeCueCommand(operation as CueAuthoringOperation, activeBranchId)
       : makeTrajectoryCommand(operation as Parameters<typeof makeTrajectoryCommand>[0], activeBranchId);
     const commandTask = reconciliation.then(async () => {
       let response;
@@ -536,7 +609,19 @@ async function dispatch(
   authoring = result.state;
   if (!authoritativePreviewAlreadyMounted) {
     compiled = compileMotionDocument(authoring.document);
-    await mountPreview(compiled.html, compiled.css);
+    let promoted = false;
+    if (previewPromotion) {
+      try {
+        await controller.promoteCompilerCssCommit({ ...previewPromotion,
+          newCommittedHtml: compiled.html, newCompilerCss: compiled.css });
+        promoted = true; lastPreviewCommitPromotion = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: true,
+          promoted: true, fallbackCode: null };
+      } catch (error) {
+        lastPreviewCommitPromotion = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: true,
+          promoted: false, fallbackCode: error instanceof Error ? error.message : 'PREVIEW_CSS_COMMIT_PROMOTION_INVALID' };
+      }
+    }
+    if (!promoted) await mountPreview(compiled.html, compiled.css);
   }
   const rows = buildTimeline(authoring.document).rows;
   const created = findCreatedTrack(rows);
@@ -578,6 +663,10 @@ async function dispatch(
   if (operation.kind === 'motion.track.create') resolveAcceptedCreationDraft();
   status.value = `${successMessage(operation.kind)} Revision ${authoring.document.revision}.`;
   status.dataset.kind = 'success';
+  if (cueWorkspace && (operation.kind === 'motion.history.undo' || operation.kind === 'motion.history.redo')) {
+    const restored = operation.kind === 'motion.history.undo' ? 'Undid the last change' : 'Redid the last change';
+    announceCueStatus(`${restored}. Revision ${authoring.document.revision}.`, false);
+  }
   if (focusSelector) {
     const focusTarget = required<HTMLElement>(focusSelector);
     if (focusTarget instanceof HTMLButtonElement && focusTarget.disabled) {
@@ -842,6 +931,7 @@ function renderProjection(): void {
     cues.append(button);
   }
   required('[data-cue-count]').textContent = String(timeline.cues.length);
+  if (payload.cueWorkspace) renderAuthoredCues();
   const hold = timeline.holds?.[0];
   insertHoldButton.disabled = Boolean(hold);
   holdStatus.value = hold
@@ -853,8 +943,451 @@ function renderProjection(): void {
     button.removeAttribute('aria-disabled');
     button.disabled = unavailable;
   }
+  if (cueWorkspace) required<HTMLElement>('[data-cue-history-slot]').hidden = undoButton.disabled && redoButton.disabled;
   updateStructuralControls(timeline.rows);
   updateSelection();
+  scheduleCueCanvas();
+}
+
+async function submitCueForm(form: HTMLFormElement): Promise<void> {
+  const kind = form.dataset.cueForm as CueSemantic['kind'];
+  const number = (name: string): number => Number(new FormData(form).get(name));
+  const cursorTargetId = required<HTMLSelectElement>('[data-cue-cursor]').value;
+  const pulseTargetId = required<HTMLSelectElement>('[data-cue-pulse]').value;
+  const revealTargetId = required<HTMLSelectElement>('[data-cue-reveal]').value;
+  const existing = authoring.document.cues.find((cue): cue is AuthoringCue => cue.schemaVersion === 'motion.authoring-cue.v1'
+    && cue.semantic.kind === kind);
+  let semantic: CueSemantic;
+  if (kind === 'cursor-path') {
+    const startMs = number('start'); const arriveMs = number('arrive');
+    semantic = { kind, cursorTargetId, startMs, arriveMs, easing: { kind: 'keyword', value: 'ease-out' }, waypoints: [
+      { timeMs: startMs, xPpm: Math.round(number('startX') * 10_000), yPpm: Math.round(number('startY') * 10_000) },
+      { timeMs: arriveMs, xPpm: Math.round(number('endX') * 10_000), yPpm: Math.round(number('endY') * 10_000) },
+    ] };
+  } else if (kind === 'reveal') {
+    semantic = { kind, targetIds: [revealTargetId], startMs: number('start'), completeMs: number('complete') };
+  } else {
+    const reveal = authoring.document.cues.find((cue): cue is AuthoringCue => cue.schemaVersion === 'motion.authoring-cue.v1'
+      && cue.semantic.kind === 'reveal');
+    semantic = { kind, cursorTargetId, pulseTargetId, arriveMs: number('arrive'), pressMs: number('press'),
+      releaseMs: number('release'), pulseEndMs: number('pulseEnd'), pressScalePpm: Math.round(number('scale') * 10_000),
+      pulseRadiusPpm: Math.round(number('radius') * 1_000_000), pulseOpacityPpm: 700_000,
+      ...(reveal ? { revealCueId: reveal.id } : {}) };
+  }
+  let operation: CueAuthoringOperation;
+  if (existing) {
+    operation = { ...operationEnvelope(), kind: 'motion.cue.update', payload: { cueId: existing.id,
+      expectedExpansionDigest: existing.expansionDigest, semantic, targetSnapshots: cueTargetSnapshots(authoring.document, semantic) } };
+  } else {
+    const cueId = deriveCueId(authoring.document.documentId, `editor-${kind}`);
+    const replacement = projectCueReplacement(authoring.document, cueId, semantic);
+    if (!replacement.ok) { announceCueStatus(cueDiagnosticMessage(replacement.code, kind), true, replacement.code); return; }
+    operation = { ...operationEnvelope(), kind: 'motion.cue.create', payload: { cueId, semantic,
+      targetSnapshots: cueTargetSnapshots(authoring.document, semantic), replacementTrackIds: replacement.trackIds,
+      replacementInputDigest: replacement.inputDigest } };
+  }
+  const result = await dispatch(operation);
+  if (result.ok) { cueEditingKind = null; renderCueCanvas(); }
+  announceCueStatus(result.ok ? `${kind === 'cursor-path' ? 'Cursor path' : kind === 'click' ? 'Click' : 'Reveal'} ${existing ? 'updated' : 'created'} at revision ${authoring.document.revision}.`
+    : cueDiagnosticMessage(result.code ?? 'UNKNOWN', kind), !result.ok, result.ok ? undefined : result.code);
+}
+
+function renderAuthoredCues(): void {
+  reconcileCueEditingProjection();
+  const container = required<HTMLElement>('[data-authored-cues]'); container.replaceChildren();
+  const createLabels: Record<CueSemantic['kind'], string> = {
+    'cursor-path': 'Create cursor path', reveal: 'Create reveal', click: 'Create click',
+  };
+  for (const form of document.querySelectorAll<HTMLFormElement>('[data-cue-form]')) {
+    form.querySelector('button[type="submit"]')!.textContent = createLabels[form.dataset.cueForm as CueSemantic['kind']];
+  }
+  for (const cue of authoring.document.cues.filter((candidate): candidate is AuthoringCue => candidate.schemaVersion === 'motion.authoring-cue.v1')) {
+    const card = document.createElement('article'); card.dataset.authoredCue = cue.semantic.kind; card.dataset.cueId = cue.id;
+    card.innerHTML = `<div><strong>${cue.label}</strong><span>${cue.generatedTrackIds.length} generated track${cue.generatedTrackIds.length === 1 ? '' : 's'}</span></div>
+      <div><button type="button" data-cue-edit>Edit</button><button type="button" data-cue-detach>Detach</button><button type="button" data-cue-delete>Delete</button></div>`;
+    card.querySelector<HTMLButtonElement>('[data-cue-edit]')!.addEventListener('click', () => {
+      cueEditingKind = cue.semantic.kind; renderCueCanvas();
+      document.querySelector<HTMLFormElement>(`[data-cue-form="${cue.semantic.kind}"]`)?.focus();
+    });
+    card.querySelector<HTMLButtonElement>('[data-cue-detach]')!.addEventListener('click', () => void terminateCue(cue, 'motion.cue.detach'));
+    card.querySelector<HTMLButtonElement>('[data-cue-delete]')!.addEventListener('click', () => void terminateCue(cue, 'motion.cue.delete'));
+    container.append(card);
+    const form = document.querySelector<HTMLFormElement>(`[data-cue-form="${cue.semantic.kind}"]`);
+    if (form) {
+      form.querySelector('button[type="submit"]')!.textContent = `Update ${cue.label.toLowerCase()}`;
+      hydrateCueForm(form, cue.semantic);
+    }
+  }
+}
+
+function reconcileCueEditingProjection(): void {
+  if (!cueEditingKind || authoring.document.cues.some((cue) => cue.schemaVersion === 'motion.authoring-cue.v1'
+    && cue.semantic.kind === cueEditingKind)) return;
+  const form = document.querySelector<HTMLFormElement>(`[data-cue-form="${cueEditingKind}"]`);
+  form?.reset();
+  for (const control of form?.querySelectorAll<HTMLInputElement>('[aria-invalid]') ?? []) control.removeAttribute('aria-invalid');
+  const output = required<HTMLOutputElement>('[data-cue-status]');
+  output.value = '';
+  output.dataset.kind = 'ready';
+  delete output.dataset.diagnosticCode;
+  cueEditingKind = null;
+}
+
+function hydrateCueForm(form: HTMLFormElement, semantic: CueSemantic): void {
+  const set = (name: string, value: number) => {
+    const input = form.elements.namedItem(name) as HTMLInputElement | null;
+    if (input) input.value = String(value);
+  };
+  if (semantic.kind === 'cursor-path') {
+    required<HTMLSelectElement>('[data-cue-cursor]').value = semantic.cursorTargetId;
+    set('start', semantic.startMs); set('arrive', semantic.arriveMs);
+    set('startX', semantic.waypoints[0]!.xPpm / 10_000); set('startY', semantic.waypoints[0]!.yPpm / 10_000);
+    set('endX', semantic.waypoints.at(-1)!.xPpm / 10_000); set('endY', semantic.waypoints.at(-1)!.yPpm / 10_000);
+  } else if (semantic.kind === 'reveal') {
+    required<HTMLSelectElement>('[data-cue-reveal]').value = semantic.targetIds[0]!;
+    set('start', semantic.startMs); set('complete', semantic.completeMs);
+  } else {
+    required<HTMLSelectElement>('[data-cue-cursor]').value = semantic.cursorTargetId;
+    required<HTMLSelectElement>('[data-cue-pulse]').value = semantic.pulseTargetId;
+    set('arrive', semantic.arriveMs); set('press', semantic.pressMs); set('release', semantic.releaseMs);
+    set('pulseEnd', semantic.pulseEndMs); set('scale', semantic.pressScalePpm / 10_000);
+    set('radius', semantic.pulseRadiusPpm / 1_000_000);
+  }
+}
+
+async function terminateCue(cue: AuthoringCue, kind: 'motion.cue.delete' | 'motion.cue.detach'): Promise<void> {
+  const result = await dispatch({ ...operationEnvelope(), kind, payload: { cueId: cue.id,
+    expectedExpansionDigest: cue.expansionDigest, expectedReplacementInputDigest: cue.replacement?.inputDigest ?? null } });
+  if (result.ok && kind === 'motion.cue.detach') detachedCueKinds.add(cue.semantic.kind);
+  announceCueStatus(result.ok ? `${cue.label} ${kind.endsWith('detach')
+    ? 'detached to ordinary tracks. The compiled result is unchanged; use Undo to restore guided editing' : 'deleted'}.`
+    : cueDiagnosticMessage(result.code ?? 'UNKNOWN', cue.semantic.kind), !result.ok, result.ok ? undefined : result.code);
+}
+
+function cueDiagnosticMessage(code: string, kind: CueSemantic['kind']): string {
+  if (code === 'CUE_REPLACEMENT_INVALID') return `${kind === 'click' ? 'Click' : kind === 'reveal' ? 'Reveal' : 'Cursor path'} tracks are ordinary tracks now. Use Undo to restore guided editing before changing this beat.`;
+  if (kind === 'click' && (code === 'CUE_UPDATE_INVALID' || code === 'CUE_MOMENT_INVALID' || code === 'CUE_TIMING_INVALID' || code.includes('CHRONOLOGY'))) {
+    return 'Timing must stay in order: Arrive < Press < Release < Pulse end. Adjust the highlighted values and try again.';
+  }
+  return `That change could not be applied. Revision ${authoring.document.revision} is unchanged.`;
+}
+
+function announceCueStatus(message: string, error: boolean, diagnosticCode?: string): void {
+  const output = required<HTMLOutputElement>('[data-cue-status]'); output.value = message; output.dataset.kind = error ? 'error' : 'success';
+  if (diagnosticCode) output.dataset.diagnosticCode = diagnosticCode; else delete output.dataset.diagnosticCode;
+}
+
+function cueRoleLabel(role: CueCanvasRole): string {
+  return role === 'cursor' ? 'Cursor' : role === 'pulse' ? 'Click target' : 'Reveal target';
+}
+
+function cueRoleSelect(role: CueCanvasRole): HTMLSelectElement {
+  return required<HTMLSelectElement>(role === 'cursor' ? '[data-cue-cursor]'
+    : role === 'pulse' ? '[data-cue-pulse]' : '[data-cue-reveal]');
+}
+
+function activateCueLayout(): void {
+  if (!cueWorkspace) return;
+  const layout = required<HTMLElement>('.primary-layout');
+  layout.insertBefore(cueWorkspace, required<HTMLElement>('.workflow'));
+  required<HTMLElement>('[data-cue-history-slot]').append(required<HTMLElement>('.workflow-footer'));
+  required<HTMLElement>('.editor-shell').classList.add('cue-active');
+  required<HTMLElement>('.topbar h1').textContent = 'Build a guided interaction';
+  required<HTMLElement>('.purpose').textContent = 'Choose the objects, shape the cursor path, and preview the result on one canvas.';
+  required<HTMLElement>('#preview-heading').textContent = 'Canvas';
+  renderCueCanvas();
+}
+
+function scheduleCueCanvas(): void {
+  if (!cueWorkspace) return;
+  if (cueCanvasFrame !== null) cancelAnimationFrame(cueCanvasFrame);
+  cueCanvasFrame = requestAnimationFrame(() => { cueCanvasFrame = null; renderCueCanvas(); });
+}
+
+function renderCueCanvas(): void {
+  if (!cueWorkspace || !cueTargetOverlay || !cuePathOverlay) return;
+  const selections = new Map<CueCanvasRole, string>([['cursor', cueRoleSelect('cursor').value],
+    ['pulse', cueRoleSelect('pulse').value], ['reveal', cueRoleSelect('reveal').value]]);
+  const authoredKinds = new Set(authoring.document.cues.filter((cue): cue is AuthoringCue => cue.schemaVersion === 'motion.authoring-cue.v1')
+    .map((cue) => cue.semantic.kind));
+  reconcileCueEditingProjection();
+  if (!missingCueTarget(selections) && !authoredKinds.has('cursor-path') && !cuePathDefaultsInitialized) initializeCuePathDefaults(selections);
+  const detachedKind = (['cursor-path', 'reveal', 'click'] as const).find((kind) => detachedCueKinds.has(kind) && !authoredKinds.has(kind));
+  const missingRole = (['cursor', 'pulse', 'reveal'] as const).find((role) => !selections.get(role));
+  if (!cuePickRole && missingRole) cuePickRole = missingRole;
+  const workflowStep = cueEditingKind ?? missingRole ? (cueEditingKind ? `edit-${cueEditingKind}` : `pick-${missingRole}`)
+    : detachedKind ? `detached-${detachedKind}`
+    : !authoredKinds.has('cursor-path') ? 'cursor-path'
+      : !authoredKinds.has('reveal') ? 'reveal' : !authoredKinds.has('click') ? 'click' : 'complete';
+  cueWorkspace.dataset.step = workflowStep;
+  const guidance: Record<string, string> = {
+    'pick-cursor': 'The canvas is active. Click the object that should move as the cursor.', 'pick-pulse': 'Now click the object the cursor should press.',
+    'pick-reveal': 'Now click the content that should appear.', 'cursor-path': 'Create the movement, then drag Start and Arrive directly on the canvas.',
+    reveal: 'Add the reveal using the suggested timing.', click: 'Add the click response to finish the interaction.',
+    complete: 'The interaction is ready. Drag the path handles or press Play to review it.',
+    'detached-cursor-path': 'The cursor path is now ordinary motion and still compiles exactly as before. Use Undo to restore guided editing.',
+    'detached-reveal': 'The reveal is now ordinary motion and still compiles exactly as before. Use Undo to restore guided editing.',
+    'detached-click': 'The click response is now ordinary motion and still compiles exactly as before. Use Undo to restore guided editing.',
+    'edit-cursor-path': 'Adjust the cursor movement, then save your changes.', 'edit-reveal': 'Adjust the reveal timing, then save your changes.',
+    'edit-click': 'Adjust the click response, then save your changes.',
+  };
+  required<HTMLElement>('[data-cue-guidance]').textContent = guidance[workflowStep] ?? guidance.complete!;
+  required<HTMLElement>('#cue-workspace-heading').textContent = workflowStep === 'pick-cursor' ? 'Choose the moving cursor object'
+    : workflowStep === 'pick-pulse' ? 'Click the destination object' : workflowStep === 'pick-reveal' ? 'Click the content to reveal'
+      : workflowStep === 'cursor-path' ? 'Shape the cursor movement' : workflowStep === 'reveal' ? 'Add the reveal'
+        : workflowStep === 'click' ? 'Add the click response' : workflowStep === 'complete' ? 'Interaction ready'
+          : workflowStep.startsWith('detached-') ? 'Guided editing detached' : 'Edit the interaction';
+  required<HTMLElement>('[data-cue-progress-count]').textContent = workflowStep === 'complete' ? 'Ready'
+    : workflowStep.startsWith('edit-') ? 'Editing' : missingRole ? 'Choose objects' : 'Build motion';
+  required<HTMLElement>('.preview-title p').textContent = workflowStep.startsWith('pick-')
+    ? guidance[workflowStep]! : workflowStep === 'complete' ? 'Drag Start or Arrive, or press Play.' : guidance[workflowStep] ?? guidance.complete!;
+  for (const role of ['cursor', 'pulse', 'reveal'] as const) {
+    const selected = Boolean(selections.get(role));
+    const card = required<HTMLElement>(`[data-cue-role-card="${role}"]`);
+    card.dataset.selected = String(selected);
+    card.dataset.current = String(workflowStep === `pick-${role}`);
+    required<HTMLOutputElement>(`[data-cue-role-status="${role}"]`).value = selected ? 'Selected' : workflowStep === `pick-${role}` ? 'Choose on canvas' : 'Waiting';
+    const button = required<HTMLButtonElement>(`[data-cue-pick="${role}"]`);
+    button.setAttribute('aria-pressed', String(cuePickRole === role));
+    button.hidden = !selected;
+    button.textContent = 'Change';
+  }
+  for (const form of document.querySelectorAll<HTMLFormElement>('[data-cue-form]')) {
+    const kind = form.dataset.cueForm as CueSemantic['kind'];
+    form.hidden = workflowStep !== kind && workflowStep !== `edit-${kind}`;
+    const cancel = form.querySelector<HTMLButtonElement>('[data-cue-cancel-edit]');
+    if (cancel) cancel.hidden = workflowStep !== `edit-${kind}`;
+  }
+  required<HTMLElement>('[data-cue-complete]').hidden = workflowStep !== 'complete';
+  const advanced = required<HTMLDetailsElement>('.cue-advanced');
+  advanced.hidden = authoredKinds.size === 0;
+  const cursorSelected = Boolean(selections.get('cursor'));
+  const pulseSelected = Boolean(selections.get('pulse'));
+  const revealSelected = Boolean(selections.get('reveal'));
+  required<HTMLButtonElement>('[data-cue-form="cursor-path"] button[type="submit"]').disabled = !cursorSelected || detachedKind === 'cursor-path';
+  required<HTMLButtonElement>('[data-cue-form="reveal"] button[type="submit"]').disabled = !revealSelected || detachedKind === 'reveal';
+  required<HTMLButtonElement>('[data-cue-form="click"] button[type="submit"]').disabled = !(cursorSelected && pulseSelected) || detachedKind === 'click';
+  renderCueTargetOverlay(selections);
+  void renderCuePathOverlay(++cueCanvasGeneration);
+}
+
+function missingCueTarget(selections: Map<CueCanvasRole, string>): boolean {
+  return (['cursor', 'pulse', 'reveal'] as const).some((role) => !selections.get(role));
+}
+
+function initializeCuePathDefaults(selections: Map<CueCanvasRole, string>): void {
+  const cursorId = selections.get('cursor'); const pulseId = selections.get('pulse');
+  if (!cursorId || !pulseId) return;
+  const form = required<HTMLFormElement>('[data-cue-form="cursor-path"]');
+  const time = (name: string) => Number((form.elements.namedItem(name) as HTMLInputElement).value);
+  const restoreTime = controller.readState().playheadMs; controller.scrub(time('start'));
+  const cursor = cueVisualBounds(cursorId); controller.scrub(time('arrive')); const pulse = cueVisualBounds(pulseId);
+  controller.scrub(restoreTime);
+  if (!cursor || !pulse) return;
+  const source = controller.sourceSize();
+  const pulseCenter = { x: (pulse.left + pulse.right) / 2, y: (pulse.top + pulse.bottom) / 2 };
+  const set = (name: string, value: number) => {
+    const input = form.elements.namedItem(name) as HTMLInputElement;
+    input.value = String(Math.round(value * 10_000) / 10_000);
+  };
+  set('startX', cursor.left / source.widthCssPixels * 100);
+  set('startY', cursor.top / source.heightCssPixels * 100);
+  set('endX', (pulseCenter.x - cursor.width / 2) / source.widthCssPixels * 100);
+  set('endY', (pulseCenter.y - cursor.height / 2) / source.heightCssPixels * 100);
+  cuePathDefaultsInitialized = true;
+}
+
+function renderCueTargetOverlay(selections: Map<CueCanvasRole, string>): void {
+  if (!cueTargetOverlay) return;
+  cueTargetOverlay.replaceChildren();
+  const entries = authoring.document.elements.map((element) => ({ elementId: element.id, bounds: cueVisualBounds(element.id) }))
+    .filter((entry): entry is { elementId: string; bounds: ProjectionRect } => Boolean(entry.bounds))
+    .sort((left, right) => left.elementId.localeCompare(right.elementId));
+  cueTargetOverlay.dataset.candidateCount = String(entries.length);
+  cueTargetOverlay.onclick = null;
+  if (cuePickRole) {
+    const commit = (elementId: string) => {
+      const role = cuePickRole; if (!role) return;
+      cueRoleSelect(role).value = elementId; cuePickRole = null; renderCueCanvas();
+      announceCueStatus(`${cueRoleLabel(role)} selected.`, false);
+    };
+    for (const [index, entry] of entries.entries()) {
+      const marker = document.createElement('span'); marker.className = 'cue-target-candidate';
+      marker.dataset.cueTargetCandidate = ''; marker.dataset.elementId = entry.elementId;
+      marker.dataset.objectLabel = `Object ${index + 1}`;
+      Object.assign(marker.style, { left: `${entry.bounds.left}px`, top: `${entry.bounds.top}px`,
+        width: `${entry.bounds.width}px`, height: `${entry.bounds.height}px` });
+      cueTargetOverlay.append(marker);
+    }
+    cueTargetOverlay.onclick = (event) => {
+      if (event.target !== cueTargetOverlay) return;
+      const overlayRect = cueTargetOverlay.getBoundingClientRect();
+      const source = controller.sourceSize();
+      const x = (event.clientX - overlayRect.left) * source.widthCssPixels / overlayRect.width;
+      const y = (event.clientY - overlayRect.top) * source.heightCssPixels / overlayRect.height;
+      const hits = entries.filter(({ bounds }) => x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom);
+      if (hits.length === 1) { commit(hits[0]!.elementId); return; }
+      if (hits.length === 0) { announceCueStatus('No selectable object is under that point. Try another visible object.', true); return; }
+      for (const marker of cueTargetOverlay.querySelectorAll<HTMLElement>('[data-cue-target-candidate]')) {
+        marker.dataset.ambiguous = String(hits.some((hit) => hit.elementId === marker.dataset.elementId));
+      }
+      const chooser = document.createElement('div'); chooser.className = 'cue-target-disambiguation';
+      chooser.dataset.cueTargetDisambiguation = ''; chooser.setAttribute('role', 'group'); chooser.setAttribute('aria-label', 'Choose the intended overlapping object');
+      Object.assign(chooser.style, { left: `${x}px`, top: `${y}px` });
+      const heading = document.createElement('strong'); heading.textContent = 'Objects overlap here'; chooser.append(heading);
+      for (const hit of hits) {
+        const button = document.createElement('button'); button.type = 'button'; button.dataset.cueTargetChoice = '';
+        button.dataset.elementId = hit.elementId;
+        button.textContent = cueTargetOverlay.querySelector<HTMLElement>(`[data-cue-target-candidate][data-element-id="${hit.elementId}"]`)?.dataset.objectLabel ?? 'Object';
+        button.addEventListener('click', (choiceEvent) => { choiceEvent.stopPropagation(); commit(hit.elementId); });
+        chooser.append(button);
+      }
+      cueTargetOverlay.querySelector('[data-cue-target-disambiguation]')?.remove();
+      cueTargetOverlay.append(chooser); chooser.querySelector<HTMLButtonElement>('button')?.focus();
+      announceCueStatus('Several objects overlap there. Choose the intended object from the neutral list.', false);
+    };
+  } else {
+    const rolesByElement = new Map<string, CueCanvasRole[]>();
+    for (const [role, elementId] of selections) if (elementId) rolesByElement.set(elementId,
+      [...(rolesByElement.get(elementId) ?? []), role]);
+    for (const [elementId, roles] of rolesByElement) {
+      const entry = entries.find((candidate) => candidate.elementId === elementId); if (!entry) continue;
+      const marker = document.createElement('span'); marker.className = 'cue-target-assignment';
+      marker.dataset.roles = roles.join(' '); marker.dataset.elementId = elementId;
+      marker.dataset.label = roles.map(cueRoleLabel).join(' · ');
+      Object.assign(marker.style, { left: `${entry.bounds.left}px`, top: `${entry.bounds.top}px`,
+        width: `${entry.bounds.width}px`, height: `${entry.bounds.height}px` });
+      cueTargetOverlay.append(marker);
+    }
+  }
+  cueTargetOverlay.hidden = cueTargetOverlay.childElementCount === 0;
+  cueTargetOverlay.dataset.picking = String(Boolean(cuePickRole));
+}
+
+async function renderCuePathOverlay(generation: number): Promise<void> {
+  if (!cuePathOverlay) return;
+  if (controller.readState().playStates.some((playState) => playState === 'running')) return;
+  const cue = authoring.document.cues.find((candidate): candidate is CursorPathAuthoringCue => candidate.schemaVersion === 'motion.authoring-cue.v1'
+    && candidate.semantic.kind === 'cursor-path');
+  cuePathOverlay.replaceChildren();
+  if (!cue || cuePickRole) {
+    required<HTMLElement>('[data-cue-path-guidance]').textContent = cuePickRole
+      ? 'Finish choosing the canvas target to edit the path.'
+      : 'Pick the cursor, create its path, then drag Start and Arrive on the canvas.';
+    return;
+  }
+  const restoreTime = controller.readState().playheadMs;
+  const samples = cue.semantic.waypoints.map((waypoint) => {
+    controller.scrub(waypoint.timeMs); return { timeMs: waypoint.timeMs, bounds: cueVisualBounds(cue.semantic.cursorTargetId) };
+  });
+  controller.scrub(restoreTime);
+  if (generation !== cueCanvasGeneration) return;
+  const handles: HTMLButtonElement[] = [];
+  for (const [index, waypoint] of cue.semantic.waypoints.entries()) {
+    const sample = samples.find((candidate) => candidate.timeMs === waypoint.timeMs);
+    if (!sample?.bounds) continue;
+    const handle = document.createElement('button'); handle.type = 'button'; handle.className = 'cue-path-waypoint';
+    const label = index === 0 ? 'Start' : index === cue.semantic.waypoints.length - 1 ? 'Arrive' : `${waypoint.timeMs} ms`;
+    Object.assign(handle.dataset, { waypointIndex: String(index), timeMs: String(waypoint.timeMs), label });
+    handle.setAttribute('aria-label', `${label} cursor position; drag to adjust the path`);
+    Object.assign(handle.style, { left: `${sample.bounds.left}px`, top: `${sample.bounds.top}px`,
+      width: `${sample.bounds.width}px`, height: `${sample.bounds.height}px` });
+    handle.addEventListener('click', () => scrub(waypoint.timeMs));
+    handle.addEventListener('pointerdown', (event) => beginCuePathDrag(event, cue, index));
+    cuePathOverlay.append(handle); handles.push(handle);
+  }
+  for (let index = 0; index < handles.length - 1; index += 1) cuePathOverlay.prepend(cuePathSegment(handles[index]!, handles[index + 1]!));
+  required<HTMLElement>('[data-cue-path-guidance]').textContent = 'Drag Start or Arrive directly on the canvas. Timing stays in the fields below.';
+}
+
+function cueVisualBounds(elementId: string): ProjectionRect | null {
+  const target = iframe.contentDocument?.querySelector<HTMLElement>(`[data-motion-id="${elementId}"]`); if (!target) return null;
+  const candidates = [target, ...target.querySelectorAll<HTMLElement>('*')];
+  const rects = candidates.map((candidate) => candidate.getBoundingClientRect())
+    .filter((rect) => Number.isFinite(rect.left) && rect.width > 0 && rect.height > 0);
+  if (rects.length === 0) {
+    let parent = target.parentElement;
+    while (parent && parent !== iframe.contentDocument?.body) {
+      const rect = parent.getBoundingClientRect(); if (rect.width > 0 && rect.height > 0) { rects.push(rect); break; }
+      parent = parent.parentElement;
+    }
+  }
+  if (rects.length === 0) return null;
+  const left = Math.min(...rects.map((rect) => rect.left)); const top = Math.min(...rects.map((rect) => rect.top));
+  const right = Math.max(...rects.map((rect) => rect.right)); const bottom = Math.max(...rects.map((rect) => rect.bottom));
+  return { left, top, right, bottom, width: right - left, height: bottom - top };
+}
+
+function cuePathSegment(from: HTMLElement, to: HTMLElement): HTMLSpanElement {
+  const segment = document.createElement('span'); segment.className = 'cue-path-segment'; segment.setAttribute('aria-hidden', 'true');
+  segment.dataset.from = from.dataset.waypointIndex ?? ''; segment.dataset.to = to.dataset.waypointIndex ?? '';
+  positionCuePathSegment(segment, from, to); return segment;
+}
+
+function positionCuePathSegment(segment: HTMLElement, from: HTMLElement, to: HTMLElement): void {
+  const center = (item: HTMLElement) => { const [dx = '0', dy = '0'] = item.style.translate.split(/\s+/);
+    return { x: Number.parseFloat(item.style.left) + Number.parseFloat(item.style.width) / 2 + (Number.parseFloat(dx) || 0),
+      y: Number.parseFloat(item.style.top) + Number.parseFloat(item.style.height) / 2 + (Number.parseFloat(dy) || 0) }; };
+  const start = center(from); const end = center(to); const dx = end.x - start.x; const dy = end.y - start.y;
+  Object.assign(segment.style, { left: `${start.x}px`, top: `${start.y}px`, width: `${Math.hypot(dx, dy)}px`,
+    transform: `translateY(-1px) rotate(${Math.atan2(dy, dx)}rad)` });
+}
+
+function refreshCuePathSegments(): void {
+  if (!cuePathOverlay) return;
+  for (const segment of cuePathOverlay.querySelectorAll<HTMLElement>('[data-from]')) {
+    const from = cuePathOverlay.querySelector<HTMLElement>(`[data-waypoint-index="${segment.dataset.from}"]`);
+    const to = cuePathOverlay.querySelector<HTMLElement>(`[data-waypoint-index="${segment.dataset.to}"]`);
+    if (from && to) positionCuePathSegment(segment, from, to);
+  }
+}
+
+function beginCuePathDrag(event: PointerEvent, cue: CursorPathAuthoringCue, waypointIndex: number): void {
+  if (event.button !== 0) return;
+  const projection = readShotProjection(); if (!projection) return;
+  const surface = event.currentTarget as HTMLButtonElement; const start = { clientX: event.clientX, clientY: event.clientY };
+  const base = cue.semantic.waypoints[waypointIndex]; if (!base) return;
+  const envelope = operationEnvelope(); const gesture = ++cuePathGestureGeneration;
+  const committed = { html: compiled.html, css: compiled.css }; let latest: { operation: CueAuthoringOperation; html: string; css: string } | null = null;
+  let draftTask = Promise.resolve(); let moved = false; event.preventDefault(); surface.setPointerCapture(event.pointerId);
+  const move = (next: PointerEvent) => {
+    let delta; try { delta = previewPointerDeltaToPpm(projection, start, { clientX: next.clientX, clientY: next.clientY }); }
+    catch { return; }
+    moved ||= Math.abs(next.clientX - start.clientX) + Math.abs(next.clientY - start.clientY) > 1; if (!moved) return;
+    const semantic = structuredClone(cue.semantic); semantic.waypoints[waypointIndex] = { ...base,
+      xPpm: base.xPpm + delta.deltaXPpm, yPpm: base.yPpm + delta.deltaYPpm };
+    const operation: CueAuthoringOperation = { ...envelope, kind: 'motion.cue.update', payload: { cueId: cue.id,
+      expectedExpansionDigest: cue.expansionDigest, semantic, targetSnapshots: cueTargetSnapshots(authoring.document, semantic) } };
+    const reduced = dispatchAuthoringOperation(authoring, operation); if (!reduced.ok) return;
+    let draftCompiled; try { draftCompiled = compileMotionDocument(reduced.state.document); } catch { return; }
+    latest = { operation, html: draftCompiled.html, css: draftCompiled.css };
+    const localDeltaX = delta.deltaXPpm * projection.sourceWidthCssPixels / 1_000_000;
+    const localDeltaY = delta.deltaYPpm * projection.sourceHeightCssPixels / 1_000_000;
+    surface.style.translate = `${localDeltaX}px ${localDeltaY}px`; refreshCuePathSegments();
+    const draft = latest; draftTask = draftTask.then(async () => {
+      if (gesture !== cuePathGestureGeneration || latest !== draft) return; await controller.applyCompilerCssDraft(draft.css);
+    }).catch(() => undefined);
+    announceCueStatus('Cursor path draft · release to apply or press Escape to cancel.', false);
+  };
+  const cleanup = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', finish);
+    window.removeEventListener('pointercancel', cancel); window.removeEventListener('keydown', escape);
+    if (surface.hasPointerCapture(event.pointerId)) surface.releasePointerCapture(event.pointerId); };
+  const restore = () => { cuePathGestureGeneration += 1; latest = null; surface.style.translate = ''; refreshCuePathSegments();
+    void draftTask.then(() => controller.restoreCommittedCompilerCss()).then(() => { scheduleCueCanvas();
+      announceCueStatus(`Cursor path unchanged at revision ${authoring.document.revision}.`, false); }); };
+  const finish = () => { cleanup(); const accepted = latest; if (!moved || !accepted) { restore(); return; }
+    void draftTask.then(async () => {
+      if (gesture !== cuePathGestureGeneration) return;
+      const result = await dispatch(accepted.operation, undefined, undefined, { schemaVersion: 'motion.preview-css-commit-promotion.v1',
+        oldCommittedHtml: committed.html, oldCompilerCss: committed.css, newCommittedHtml: accepted.html, newCompilerCss: accepted.css });
+      if (!result.ok) surface.style.translate = '';
+      scheduleCueCanvas();
+      announceCueStatus(result.ok ? `Cursor path updated at revision ${authoring.document.revision}.` : `Change rejected: ${result.code}.`, !result.ok);
+    }); };
+  const cancel = () => { cleanup(); restore(); };
+  const escape = (keyboard: KeyboardEvent) => { if (keyboard.key !== 'Escape') return; keyboard.preventDefault(); cancel(); };
+  window.addEventListener('pointermove', move); window.addEventListener('pointerup', finish, { once: true });
+  window.addEventListener('pointercancel', cancel, { once: true }); window.addEventListener('keydown', escape);
 }
 
 function updateStructuralControls(rows: TimelineRow[]): void {
@@ -1040,6 +1573,7 @@ function scrub(timeMs: number): void {
   updatePreviewPlaybackState();
   republishShotGeometry();
   schedulePreviewSelection();
+  scheduleCueCanvas();
 }
 
 function stopPlaybackFeedback(): void {
@@ -1099,10 +1633,12 @@ function renderTrack(row: TimelineRow): HTMLElement {
     interpolation: row.interpolation, timing: JSON.stringify(row.timing), timingKind: row.timing.kind,
     keyframeCount: String(row.keyframes.length),
     selected: String(row.trackId === selectedTrackId),
+    cueOwned: String(Boolean(authoring.document.tracks.find((track) => track.id === row.trackId)?.cueOwnership)),
   });
   const timing = row.timing.kind === 'steps' ? `steps(${row.timing.count}, ${row.timing.position})`
     : row.timing.kind === 'keyword' ? row.timing.value : 'cubic-bezier';
-  article.innerHTML = `<div class="track-identity"><strong>${row.property}</strong><span>${row.interpolation} motion</span><details class="canonical-ids"><summary>Canonical IDs</summary><code>Element · ${row.elementId}</code><code>Track · ${row.trackId}</code><code>Rule · ${row.ruleId}</code></details></div><div class="track-meta"><span>delay ${row.delayMs} ms</span><span>${timing}</span><span>${row.orderedSlotIds.length} ordered slot${row.orderedSlotIds.length === 1 ? '' : 's'}</span><div class="slots"></div></div><div class="keyframes"></div>`;
+  const cueOwned = Boolean(authoring.document.tracks.find((track) => track.id === row.trackId)?.cueOwnership);
+  article.innerHTML = `<div class="track-identity"><strong>${row.property}</strong><span>${row.interpolation} motion${cueOwned ? ' · cue-owned · locked' : ''}</span><details class="canonical-ids"><summary>Canonical IDs</summary><code>Element · ${row.elementId}</code><code>Track · ${row.trackId}</code><code>Rule · ${row.ruleId}</code></details></div><div class="track-meta"><span>delay ${row.delayMs} ms</span><span>${timing}</span><span>${row.orderedSlotIds.length} ordered slot${row.orderedSlotIds.length === 1 ? '' : 's'}</span><div class="slots"></div></div><div class="keyframes"></div>`;
   const slotList = article.querySelector('.slots')!;
   for (const slotId of row.orderedSlotIds) {
     const slot = document.createElement('code');
@@ -1116,11 +1652,16 @@ function renderTrack(row: TimelineRow): HTMLElement {
     marker.type = 'button'; marker.className = 'keyframe'; marker.disabled = !editable;
     marker.setAttribute('aria-pressed', String(editable && selectedKeyframeId === keyframe.id));
     Object.assign(marker.dataset, { keyframeId: keyframe.id, offset: String(keyframe.offset), value: keyframe.value, easing: JSON.stringify(keyframe.easing), timeMs: String(keyframe.timeMs) });
-    marker.innerHTML = `<strong>${keyframe.timeMs} ms</strong><code>${keyframe.id}</code><span>${keyframe.offset * 100}% · ${keyframe.value} · easing ${keyframe.easing ? JSON.stringify(keyframe.easing) : 'inherited'}</span>`;
+    marker.innerHTML = `<strong>${formatTimelineNumber(keyframe.timeMs, 3)} ms</strong><code>${keyframe.id}</code><span>${formatTimelineNumber(keyframe.offset * 100, 4)}% · ${keyframe.value} · easing ${keyframe.easing ? JSON.stringify(keyframe.easing) : 'inherited'}</span>`;
     marker.addEventListener('click', () => { selectedTrackId = row.trackId; selectedKeyframeId = keyframe.id; hasExplicitKeyframeSelection = true; renderProjection(); valueInput.focus({ preventScroll: true }); });
     keyframeList.append(marker);
   }
   return article;
+}
+
+function formatTimelineNumber(value: number, maximumFractionDigits: number): string {
+  const rounded = Number(value.toFixed(maximumFractionDigits));
+  return Object.is(rounded, -0) || rounded === 0 ? '0' : String(rounded);
 }
 
 function announceInvalidInput(input: HTMLInputElement, label: string): void {
@@ -1156,6 +1697,7 @@ async function mountPreview(compiledHtml: string, compilerCss: string): Promise<
   configurePreviewCanvas();
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
   if (shotConfig) renderShotWorkspace();
+  scheduleCueCanvas();
 }
 
 function configurePreviewCanvas(): void {

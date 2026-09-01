@@ -3,7 +3,7 @@ import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
 
 import { compileMotionDocument } from '../../packages/css-compiler/src/index.js';
-import { createLandingShot1EditorSeed, createPhase3Seed } from '../../packages/local-service/src/seed.ts';
+import { createLandingShot1EditorSeed, createPhase3Seed, createPhase4SceneDSeed } from '../../packages/local-service/src/seed.ts';
 
 const virtualId = 'virtual:motion-document';
 const resolvedVirtualId = `\0${virtualId}`;
@@ -18,7 +18,9 @@ function compiledMotionPlugin() {
       if (id !== resolvedVirtualId) return null;
       const repositoryRoot = resolve(import.meta.dirname, '../..');
       const landingShot1Workspace = process.env.LANDING_SHOT1_WORKSPACE === '1';
-      const motionDocument = landingShot1Workspace
+      const phase4CueWorkspace = process.env.PHASE4_CURSOR_CLICK_REVEAL === '1';
+      const motionDocument = phase4CueWorkspace ? createPhase4SceneDSeed(repositoryRoot, process.env.PHASE4_SCENE_D_DOCUMENT_PATH)
+        : landingShot1Workspace
         ? createLandingShot1EditorSeed(repositoryRoot, process.env.LANDING_SHOT1_DOCUMENT_PATH)
         : createPhase3Seed(repositoryRoot);
       return `export default ${JSON.stringify({
@@ -33,7 +35,7 @@ function compiledMotionPlugin() {
           landedMs: 700,
           settledMs: 2100,
           targetElementIds: motionDocument.elements.map((element) => element.id).sort(),
-        } } : {}),
+        } } : {}), ...(phase4CueWorkspace ? { cueWorkspace: { schemaVersion: 'motion.editor-cue-workspace.v1' } } : {}),
       })}`;
     },
   };

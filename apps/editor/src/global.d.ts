@@ -32,6 +32,9 @@ declare global {
         geometry: Array<{ elementId: string; timeMs: number; contentBounds: ProjectionRect; overlayBounds: ProjectionRect;
           deltasDevicePixels: { left: number; top: number; right: number; bottom: number; centerX: number; centerY: number } }>;
         activeDraft: null | { commandBytes: string; compiledHtml: string; exportDigest: string; operation: AuthoringOperation } };
+      inspectCueWorkspace: () => { active: boolean; pickRole: 'cursor' | 'pulse' | 'reveal' | null;
+        selectedRoles: { cursor: boolean; pulse: boolean; reveal: boolean }; targetCandidateCount: number; pathHandleCount: number;
+        authoredCues: Array<{ kind: 'cursor-path' | 'click' | 'reveal'; semantic: unknown; generatedTrackCount: number }> };
       switchBranch: (branchId: string) => Promise<void>;
       disconnectEvents: () => void;
       reconnectEvents: () => void;

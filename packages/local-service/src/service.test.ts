@@ -1,14 +1,37 @@
 import { readFile } from 'node:fs/promises';
 import { describe, expect, test } from 'vitest';
 
-import { canonicalContentBytes, canonicalJson, projectTrajectorySelection, sha256Hex } from '../../domain/src/index.ts';
-import { makeTrajectoryCommand, MotionServiceClient } from '../../motion-protocol/src/index.ts';
+import { canonicalContentBytes, canonicalJson, cueTargetSnapshots, deriveCueId, projectCueReplacement,
+  projectTrajectorySelection, sha256Hex, type CueAuthoringOperation, type CueSemantic } from '../../domain/src/index.ts';
+import { makeCueCommand, makeTrajectoryCommand, MotionServiceClient } from '../../motion-protocol/src/index.ts';
 import { startLocalMotionService } from './index.ts';
 import { createTrajectorySeed } from './seed.ts';
 import { SqliteProjectStore } from './sqlite-project-store.ts';
 import { phase3Command, phase3Seed, temporaryStore } from './test-support.ts';
 
 describe('loopback sole-writer service', () => {
+  test('commits one cue revision atomically, retries byte-identically, and allocates nothing for stale intent', async () => {
+    const temporary = await temporaryStore(); const seed = phase3Seed();
+    const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
+    const client = new MotionServiceClient(service.url); const target = seed.elements[0]!;
+    const semantic: CueSemantic = { kind: 'reveal', targetIds: [target.id], startMs: 100, completeMs: 500 };
+    const cueId = deriveCueId(seed.documentId, 'service-reveal'); const replacement = projectCueReplacement(seed, cueId, semantic);
+    expect(replacement.ok).toBe(true); if (!replacement.ok) throw new Error(replacement.code);
+    const operation: CueAuthoringOperation = { schemaVersion: 'motion.operation.v1', kind: 'motion.cue.create',
+      operationId: 'service-cue', documentId: seed.documentId, expectedRevision: 0, payload: { cueId, semantic,
+        targetSnapshots: cueTargetSnapshots(seed, semantic), replacementTrackIds: replacement.trackIds,
+        replacementInputDigest: replacement.inputDigest } };
+    const command = makeCueCommand(operation); const accepted = await client.dispatch(command);
+    expect(accepted).toMatchObject({ ok: true, resultingRevision: 1, receipt: { inventory: { trackCount: expect.any(Number) } } });
+    expect(await client.dispatch(command)).toEqual(accepted);
+    const stable = service.store.snapshot();
+    expect(await client.dispatch(makeCueCommand({ ...operation, operationId: 'service-cue-stale' })))
+      .toMatchObject({ ok: false, code: 'STALE_REVISION' });
+    expect(service.store.snapshot()).toEqual(stable);
+    const head = service.store.readHead(seed.documentId)!.document;
+    expect(head.cues.some((cue) => cue.id === cueId)).toBe(true);
+    await service.close(); await temporary.cleanup();
+  });
   test('durably commits and reconstructs exact trajectory undo/redo lineage', async () => {
     const temporary = await temporaryStore(); const seed = createTrajectorySeed(); const ids = seed.elements.map((element) => element.id).sort();
     const selected = projectTrajectorySelection(seed, ids, 700); if (!selected.eligible) throw new Error(selected.code!);

@@ -12,6 +12,7 @@ declare module 'virtual:motion-document' {
       settledMs: 2100;
       targetElementIds: string[];
     };
+    cueWorkspace?: { schemaVersion: 'motion.editor-cue-workspace.v1' };
   };
   export default payload;
 }

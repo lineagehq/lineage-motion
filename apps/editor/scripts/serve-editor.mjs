@@ -2,7 +2,7 @@ import { createServer as createNetServer } from 'node:net';
 import { createServer as createViteServer } from 'vite';
 
 import { startLocalMotionService } from '../../../packages/local-service/src/index.ts';
-import { createLandingShot1EditorSeed, createPhase3Seed } from '../../../packages/local-service/src/seed.ts';
+import { createLandingShot1EditorSeed, createPhase3Seed, createPhase4SceneDSeed } from '../../../packages/local-service/src/seed.ts';
 
 const databasePath = process.env.PHASE3_DATABASE_PATH;
 if (!databasePath) throw new Error('PHASE3_DATABASE_PATH_REQUIRED');
@@ -12,7 +12,9 @@ if (!humanCapability || !agentCapability) throw new Error('PHASE3_CAPABILITIES_R
 const requestedEditorPort = Number(process.env.PHASE3_EDITOR_PORT ?? 41739);
 const editorPort = requestedEditorPort === 0 ? await reserveEphemeralPort() : requestedEditorPort;
 const repositoryRoot = new URL('../../..', import.meta.url).pathname;
-const seed = process.env.LANDING_SHOT1_WORKSPACE === '1'
+const seed = process.env.PHASE4_CURSOR_CLICK_REVEAL === '1'
+  ? createPhase4SceneDSeed(repositoryRoot, process.env.PHASE4_SCENE_D_DOCUMENT_PATH)
+  : process.env.LANDING_SHOT1_WORKSPACE === '1'
   ? createLandingShot1EditorSeed(repositoryRoot, process.env.LANDING_SHOT1_DOCUMENT_PATH)
   : createPhase3Seed(repositoryRoot);
 const service = await startLocalMotionService({ databasePath, seed,
@@ -23,7 +25,7 @@ const vite = await createViteServer({ configFile: new URL('../vite.config.ts', i
 await vite.listen();
 const address = vite.httpServer?.address();
 if (!address || typeof address === 'string') throw new Error('PHASE3_EDITOR_ADDRESS_UNAVAILABLE');
-console.log(JSON.stringify({ editorUrl: `http://127.0.0.1:${address.port}`, serviceUrl: service.url }));
+console.log(JSON.stringify({ editorUrl: `http://lineage-motion.localhost:${address.port}`, serviceUrl: service.url }));
 let closing = false;
 async function close() { if (closing) return; closing = true; await vite.close(); await service.close(); process.exit(0); }
 process.on('SIGTERM', () => { void close(); }); process.on('SIGINT', () => { void close(); });

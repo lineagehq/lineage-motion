@@ -276,6 +276,7 @@ export class SqliteProjectStore implements ProjectStore {
 function isAuthoringKind(kind: string): kind is AuthoringOperation['kind'] {
   return ['motion.track.create', 'motion.transform-pose.set', 'motion.transform-waypoints.translate',
     'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set',
+    'motion.cue.create', 'motion.cue.update', 'motion.cue.delete', 'motion.cue.detach',
     'motion.history.undo', 'motion.history.redo'].includes(kind);
 }
 

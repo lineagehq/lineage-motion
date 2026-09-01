@@ -6,7 +6,8 @@ import { runCli } from './cli.ts';
 import { startLocalMotionService } from '../../local-service/src/index.ts';
 import { createTrajectorySeed } from '../../local-service/src/seed.ts';
 import { phase3Seed, temporaryStore } from '../../local-service/src/test-support.ts';
-import { projectTrajectorySelection } from '../../domain/src/index.ts';
+import { cueTargetSnapshots, deriveCueId, projectCueReplacement, projectTrajectorySelection,
+  type CueAuthoringOperation, type CueSemantic } from '../../domain/src/index.ts';
 
 const capabilities = {
   human: randomBytes(32).toString('base64url'),
@@ -14,6 +15,27 @@ const capabilities = {
 };
 
 describe('branch and claim CLI', () => {
+  test('dispatches the same strict cue operation bundle and never echoes its path or source records', async () => {
+    const temp = await temporaryStore(); const seed = phase3Seed();
+    const service = await startLocalMotionService({ databasePath: temp.databasePath, seed, capabilities });
+    const target = seed.elements[0]!; const semantic: CueSemantic = { kind: 'reveal', targetIds: [target.id],
+      startMs: 100, completeMs: 500 }; const cueId = deriveCueId(seed.documentId, 'cli-reveal');
+    const replacement = projectCueReplacement(seed, cueId, semantic);
+    expect(replacement.ok).toBe(true); if (!replacement.ok) throw new Error(replacement.code);
+    const operation: CueAuthoringOperation = { schemaVersion: 'motion.operation.v1', kind: 'motion.cue.create',
+      operationId: 'cli-cue-create', documentId: seed.documentId, expectedRevision: 0,
+      payload: { cueId, semantic, targetSnapshots: cueTargetSnapshots(seed, semantic),
+        replacementTrackIds: replacement.trackIds, replacementInputDigest: replacement.inputDigest } };
+    const bundlePath = join(temp.directory, 'cue-operation.json');
+    await writeFile(bundlePath, JSON.stringify(operation), { mode: 0o600 }); let stdout = ''; let stderr = '';
+    const code = await runCli(['cue-create', '--service', service.url, '--operation-id', operation.operationId,
+      '--document-id', seed.documentId, '--expected-revision', '0', '--bundle', bundlePath,
+      '--capability', capabilities.human], { stdout: (value) => { stdout += value; }, stderr: (value) => { stderr += value; } });
+    expect(code).toBe(0); expect(JSON.parse(stdout)).toMatchObject({ ok: true, resultingRevision: 1,
+      receipt: { inventory: { trackCount: expect.any(Number) } } });
+    expect(`${stdout}${stderr}`).not.toContain(bundlePath); expect(stdout).not.toContain('structuralFingerprint');
+    await service.close(); await temp.cleanup();
+  });
   test('dispatches a strict local trajectory bundle without echoing its bytes or path', async () => {
     const temp = await temporaryStore(); const seed = createTrajectorySeed(); const service = await startLocalMotionService({ databasePath: temp.databasePath, seed, capabilities });
     const ids = seed.elements.map((element) => element.id).sort(); const selected = projectTrajectorySelection(seed, ids, 700); if (!selected.eligible) throw new Error(selected.code!);

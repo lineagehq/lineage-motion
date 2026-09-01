@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    .stage { position: relative; width: 320px; height: 180px; background: #eef2ff; }
+    .cursor, .pulse, .reveal { position: absolute; width: 24px; height: 24px; }
+    .cursor { background: #111827; animation: cursor-path 1200ms linear both; }
+    .pulse { left: 180px; top: 96px; border-radius: 50%; background: #2563eb;
+      animation: click-pulse 600ms ease-out 700ms both; }
+    .reveal { left: 220px; top: 90px; background: #f59e0b;
+      animation: synchronized-reveal 400ms steps(2, end) 800ms both; }
+    @keyframes cursor-path {
+      0% { transform: translate(16px, 16px); background: #111827; }
+      60% { transform: translate(156px, 86px); background: #374151; }
+      100% { transform: translate(176px, 96px); background: #111827; }
+    }
+    @keyframes click-pulse {
+      0% { transform: scale(1); box-shadow: 0 0 0 0 rgb(37 99 235 / .8); }
+      35% { transform: scale(.82); box-shadow: 0 0 0 4px rgb(37 99 235 / .7); }
+      100% { transform: scale(1); box-shadow: 0 0 0 18px rgb(37 99 235 / 0); }
+    }
+    @keyframes synchronized-reveal {
+      0% { opacity: 0; visibility: hidden; }
+      50% { opacity: .5; visibility: visible; }
+      100% { opacity: 1; visibility: visible; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .cursor, .pulse, .reveal { animation-duration: 1ms; animation-delay: 0ms; }
+    }
+  </style>
+</head>
+<body><main class="stage"><div class="cursor"></div><div class="pulse"></div><div class="reveal"></div></main></body>
+</html>

@@ -2,15 +2,39 @@ import { describe, expect, test } from 'vitest';
 import { writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { compileMotionDocument } from '../../css-compiler/src/index.ts';
-import { canonicalBytes, canonicalJson, projectTrajectorySelection, projectTransformTrajectory,
+import { canonicalBytes, canonicalJson, cueTargetSnapshots, deriveCueId, projectCueReplacement,
+  projectTrajectorySelection, projectTransformTrajectory, type CueAuthoringOperation, type CueSemantic,
   type HistoryOperation, type MotionDocument, type TrajectoryAuthoringOperation } from '../../domain/src/index.ts';
-import { MotionServiceClient, makeTrackCreateCommand, makeTrajectoryCommand } from '../../motion-protocol/src/index.ts';
+import { MotionServiceClient, makeCueCommand, makeTrackCreateCommand, makeTrajectoryCommand } from '../../motion-protocol/src/index.ts';
 import { runCli } from '../../motion-cli/src/cli.ts';
 import { startLocalMotionService } from '../../local-service/src/index.ts';
 import { createTrajectorySeed } from '../../local-service/src/seed.ts';
 import { phase3Seed, temporaryStore } from '../../local-service/src/test-support.ts';
 
 describe('CLI/editor protocol parity', () => {
+  test('produces byte-identical cue wires, documents, compiler output, and receipts from equal bases', async () => {
+    const seed = phase3Seed(); const cliTemporary = await temporaryStore(); const editorTemporary = await temporaryStore();
+    const cliService = await startLocalMotionService({ databasePath: cliTemporary.databasePath, seed });
+    const editorService = await startLocalMotionService({ databasePath: editorTemporary.databasePath, seed });
+    const semantic: CueSemantic = { kind: 'reveal', targetIds: [seed.elements[0]!.id], startMs: 100, completeMs: 500 };
+    const cueId = deriveCueId(seed.documentId, 'parity-reveal'); const replacement = projectCueReplacement(seed, cueId, semantic);
+    expect(replacement.ok).toBe(true); if (!replacement.ok) throw new Error(replacement.code);
+    const operation: CueAuthoringOperation = { schemaVersion: 'motion.operation.v1', kind: 'motion.cue.create',
+      operationId: 'parity-cue', documentId: seed.documentId, expectedRevision: 0, payload: { cueId, semantic,
+        targetSnapshots: cueTargetSnapshots(seed, semantic), replacementTrackIds: replacement.trackIds,
+        replacementInputDigest: replacement.inputDigest } };
+    const bundlePath = join(cliTemporary.directory, 'cue.json'); await writeFile(bundlePath, JSON.stringify(operation), { mode: 0o600 });
+    let cliOutput = ''; expect(await runCli(['cue-create', '--service', cliService.url, '--operation-id', operation.operationId,
+      '--document-id', seed.documentId, '--expected-revision', '0', '--bundle', bundlePath],
+    { stdout: (value) => { cliOutput += value; }, stderr: () => undefined })).toBe(0);
+    const editorResponse = await new MotionServiceClient(editorService.url).dispatch(makeCueCommand(operation));
+    expect(cliOutput).toBe(canonicalJson(editorResponse));
+    const cliHead = await new MotionServiceClient(cliService.url).head(seed.documentId);
+    const editorHead = await new MotionServiceClient(editorService.url).head(seed.documentId);
+    expect(canonicalBytes(cliHead.document)).toEqual(canonicalBytes(editorHead.document));
+    expect(compileMotionDocument(cliHead.document)).toEqual(compileMotionDocument(editorHead.document));
+    await cliService.close(); await editorService.close(); await cliTemporary.cleanup(); await editorTemporary.cleanup();
+  });
   test('produces byte-identical documents, native compiler output, digests, and receipts from identical bases', async () => {
     const seed = phase3Seed(); const cliTemporary = await temporaryStore(); const editorTemporary = await temporaryStore();
     const cliService = await startLocalMotionService({ databasePath: cliTemporary.databasePath, seed });

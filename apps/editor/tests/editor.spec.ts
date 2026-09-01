@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
 
-const editorUrl = 'http://127.0.0.1:41738';
+const editorUrl = 'http://127.0.0.1:41745';
 let fallbackServer: ChildProcess | undefined;
 
 test.beforeAll(async () => {
@@ -10,7 +10,7 @@ test.beforeAll(async () => {
   const root = resolve(import.meta.dirname, '../../..');
   fallbackServer = spawn(process.execPath, [
     resolve(root, 'node_modules/vite/bin/vite.js'), '--config',
-    resolve(root, 'apps/editor/vite.config.ts'), '--host', '127.0.0.1', '--port', '41738',
+    resolve(root, 'apps/editor/vite.config.ts'), '--host', '127.0.0.1', '--port', '41745',
   ], { cwd: root, stdio: 'ignore' });
   for (let attempt = 0; attempt < 80; attempt += 1) {
     if (await serverReady()) return;

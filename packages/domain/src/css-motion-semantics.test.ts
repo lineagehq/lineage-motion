@@ -81,6 +81,10 @@ describe('motion.css-motion-semantics.v1', () => {
     expect(applicationInstanceId('node_a', 'rule_a', 'source_a')).not.toBe(applicationInstanceId('node_a', 'rule_a', 'source_b'));
   });
 
+  test.each(['background', 'box-shadow', 'scale'])('registers browser-native continuous %s animation', (property) => {
+    expect(classifyAnimatedProperty(property)).toBe('continuous');
+  });
+
   test.each(['', 'abc', 'Neutral motion \u2603'])('uses the browser-safe SHA-256 with Node parity', (value) => {
     expect(sha256Hex(value)).toBe(createHash('sha256').update(value).digest('hex'));
   });
