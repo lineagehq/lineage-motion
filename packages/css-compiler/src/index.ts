@@ -63,6 +63,7 @@ export function compileMotionDocument(document: MotionDocument): CompilerResult 
   if ((document.holds ?? []).length > 0) {
     cssParts.push(...compileHoldProjection(document));
   } else {
+  const animationsByElement = new Map<string, string[]>();
   for (const application of document.applications) {
     for (const binding of application.bindings) {
       const slotCss = application.slots.map((slot, slotIndex) => {
@@ -80,8 +81,13 @@ export function compileMotionDocument(document: MotionDocument): CompilerResult 
         ].join(' ');
       }).join(', ');
       const selector = `[data-motion-id="${escapeCssString(binding.elementId)}"]`;
-      cssParts.push(`${selector} {\n  animation: ${slotCss};\n}`);
+      const animations = animationsByElement.get(binding.elementId) ?? [];
+      animations.push(slotCss); animationsByElement.set(binding.elementId, animations);
     }
+  }
+  for (const [elementId, animations] of animationsByElement) {
+    const selector = `[data-motion-id="${escapeCssString(elementId)}"]`;
+    cssParts.push(`${selector} {\n  animation: ${animations.join(', ')};\n}`);
   }
 
   for (const rule of document.rules) {
@@ -107,6 +113,12 @@ export function compileMotionDocument(document: MotionDocument): CompilerResult 
 
   const reducedMotionCss = document.reducedMotion.css.trim();
   if (reducedMotionCss) cssParts.push(reducedMotionCss);
+  const cueRuleIds = new Set(document.rules.filter((rule) => /^cue_[a-f0-9]{16}$/.test(rule.sourceName))
+    .map((rule) => rule.id));
+  const cueOwnedElementIds = [...new Set(document.applications.filter((application) => application.slots.some((slot) =>
+    cueRuleIds.has(slot.ruleId))).flatMap((application) => application.bindings.map((binding) => binding.elementId)))].sort();
+  if (cueOwnedElementIds.length > 0) cssParts.push(`@media (prefers-reduced-motion: reduce) {\n${cueOwnedElementIds
+    .map((elementId) => `  [data-motion-id="${escapeCssString(elementId)}"] { animation: none; }`).join('\n')}\n}`);
 
   const css = `${cssParts.join('\n\n')}\n`;
   const styleElement = `<style>\n${css}</style>`;

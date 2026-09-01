@@ -17,8 +17,9 @@ export type CssTimingFunction =
 export type MotionPropertyClassification = 'continuous' | 'discrete';
 
 const PROPERTY_REGISTRY = new Map<string, MotionPropertyClassification>([
-  ['opacity', 'continuous'], ['transform', 'continuous'], ['color', 'continuous'],
-  ['background-color', 'continuous'], ['border-color', 'continuous'], ['outline-color', 'continuous'],
+  ['opacity', 'continuous'], ['transform', 'continuous'], ['scale', 'continuous'], ['color', 'continuous'],
+  ['background-color', 'continuous'], ['background', 'continuous'],
+  ['border-color', 'continuous'], ['outline-color', 'continuous'], ['box-shadow', 'continuous'],
   ['clip-path', 'continuous'], ['filter', 'continuous'], ['width', 'continuous'], ['height', 'continuous'],
   ['left', 'continuous'], ['right', 'continuous'], ['top', 'continuous'], ['bottom', 'continuous'],
   ['margin-left', 'continuous'], ['margin-right', 'continuous'], ['margin-top', 'continuous'],

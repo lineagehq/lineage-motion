@@ -12,7 +12,9 @@ browser-created animations.
 
 ## Before touching the UI
 
-1. Run the editor from the worktree being reviewed, on its own localhost port.
+1. Run the editor from the worktree being reviewed on its own named `.localhost`
+   subdomain and port (for example, `lineage-motion.localhost`). Never hand off
+   an owner QA surface on raw `localhost`, `127.0.0.1`, or another loopback URL.
 2. Confirm the page exposes the controls expected from that worktree. A running
    server from another branch is not valid QA evidence.
 3. Reload to a fresh revision-zero state. Keep private scenes and evidence out

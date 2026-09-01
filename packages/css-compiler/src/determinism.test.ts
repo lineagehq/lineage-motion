@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, test } from 'vitest';
 
 import { canonicalBytes, createAuthoringState, dispatchAuthoringOperation,
+  cueTargetSnapshots, deriveCueId, type CueSemantic,
   type StructuralAuthoringElementId } from '../../domain/src/index.js';
 import { importMotionHtml } from '../../css-import/src/index.js';
 import { compileMotionDocument } from './index.js';
@@ -74,6 +75,42 @@ describe('deterministic pure HTML/CSS compiler', () => {
         fontAssetCount: 0,
       },
     });
+  });
+
+  test('combines simultaneous cue applications on one element and disables owned motion when reduced', () => {
+    const imported = importMotionHtml(`<!doctype html><html><body><i></i><b></b><em></em></body></html>`);
+    expect(imported.document).not.toBeNull();
+    let state = createAuthoringState(imported.document!);
+    state.document.elements.push(
+      { id: 'el_compiler_cursor', selectorHint: '', structuralFingerprint: 'synthetic/compiler/cursor' },
+      { id: 'el_compiler_pulse', selectorHint: '', structuralFingerprint: 'synthetic/compiler/pulse' },
+      { id: 'el_compiler_reveal', selectorHint: '', structuralFingerprint: 'synthetic/compiler/reveal' },
+    );
+    state.document.durationMs = 2000;
+    const [cursor, pulse, reveal] = state.document.elements;
+    const applyCue = (key: string, semantic: CueSemantic) => {
+      const cueId = deriveCueId(state.document.documentId, key);
+      const result = dispatchAuthoringOperation(state, { schemaVersion: 'motion.operation.v1', kind: 'motion.cue.create',
+        operationId: `compiler:${key}`, documentId: state.document.documentId, expectedRevision: state.document.revision,
+        payload: { cueId, semantic, targetSnapshots: cueTargetSnapshots(state.document, semantic),
+          replacementTrackIds: [], replacementInputDigest: null } });
+      expect(result.ok).toBe(true); if (!result.ok) throw new Error(result.diagnostic.code);
+      state = result.state; return cueId;
+    };
+    const revealId = applyCue('reveal', { kind: 'reveal', targetIds: [reveal!.id], startMs: 800, completeMs: 1200 });
+    applyCue('path', { kind: 'cursor-path', cursorTargetId: cursor!.id, startMs: 0, arriveMs: 700,
+      easing: { kind: 'keyword', value: 'ease-out' }, waypoints: [
+        { timeMs: 0, xPpm: 0, yPpm: 0 }, { timeMs: 700, xPpm: 500_000, yPpm: 500_000 },
+      ] });
+    applyCue('click', { kind: 'click', cursorTargetId: cursor!.id, pulseTargetId: pulse!.id,
+      arriveMs: 700, pressMs: 800, releaseMs: 900, pulseEndMs: 1300, pressScalePpm: 850_000,
+      pulseRadiusPpm: 12_000_000, pulseOpacityPpm: 650_000, revealCueId: revealId });
+    const compiled = compileMotionDocument(state.document);
+    const cursorBlock = compiled.css.match(new RegExp(`\\[data-motion-id="${cursor!.id}"\\] \\{[^}]+\\}`))?.[0] ?? '';
+    expect(cursorBlock.match(/motion_rule_/g)).toHaveLength(2);
+    expect(cursorBlock).toContain(', motion_rule_');
+    expect(compiled.css).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(compiled.css).toContain(`[data-motion-id="${cursor!.id}"] { animation: none; }`);
   });
 
   test('produces byte-identical HTML, CSS, digest, and receipt on three consecutive runs', async () => {

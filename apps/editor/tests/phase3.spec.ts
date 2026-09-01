@@ -10,6 +10,7 @@ import { compileMotionDocument } from '../../../packages/css-compiler/src/index.
 import { canonicalContentBytes, projectTrajectorySelection, sha256Hex } from '../../../packages/domain/src/index.ts';
 import { MotionServiceClient } from '../../../packages/motion-protocol/src/index.ts';
 import { createPhase3Seed, createTrajectorySeed } from '../../../packages/local-service/src/seed.ts';
+import { createPreviewOverlayProjection, previewPointerDeltaToPpm } from '../../../packages/preview-runtime/src/index.ts';
 
 test.describe.configure({ mode: 'serial' });
 let processHandle: ChildProcess | undefined; let directory = ''; let editorUrl = ''; let serviceUrl = '';
@@ -119,6 +120,46 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   const readMomentAlignment = () => page.evaluate(() => ({ authoring: window.__motionEditor.inspectAuthoring(), native: window.__motionEditor.readState(),
     slider: Number((document.querySelector('[data-scrub]') as HTMLInputElement).value), visibleTime: document.querySelector<HTMLOutputElement>('[data-playhead]')!.value,
     selectedMoment: Number((document.querySelector('input[name="shot-moment"]:checked') as HTMLInputElement).value) }));
+  const awaitShotMutationSettlement = async (revision: number, momentMs: number, easing?: string) => {
+    await expect.poll(() => page.evaluate(({ revision, momentMs, easing }) => {
+      const inspected = window.__motionEditor.inspectShotWorkspace() as unknown as {
+        revision: number; momentMs: number; previewMatchesCompiler: boolean; activeDraft: unknown;
+        compilerDraft: { active: boolean }; waypointReleasePhase: string;
+        geometryPump: { running: boolean; activeSamplers: number; latestRequestId: number | null;
+          pendingRequestId: number | null; lastCommittedRequestId: number | null };
+      };
+      const operationStatus = document.querySelector<HTMLOutputElement>('[data-operation-status]')!;
+      const shotStatus = document.querySelector<HTMLOutputElement>('[data-shot-status]')!;
+      const selectedMoment = document.querySelector<HTMLInputElement>('input[name="shot-moment"]:checked')!;
+      const easingControl = document.querySelector<HTMLSelectElement>('[data-shot-easing]')!;
+      return {
+        operation: { kind: operationStatus.dataset.kind, value: operationStatus.value },
+        shot: { value: shotStatus.value, revision: inspected.revision, momentMs: inspected.momentMs,
+          selectedMomentMs: Number(selectedMoment.value), scrubMs: Number(document.querySelector<HTMLInputElement>('[data-scrub]')!.value),
+          playhead: document.querySelector<HTMLOutputElement>('[data-playhead]')!.value,
+          easing: easing === undefined ? undefined : easingControl.value },
+        previewMatchesCompiler: inspected.previewMatchesCompiler,
+        activeDraft: inspected.activeDraft,
+        compilerDraftActive: inspected.compilerDraft.active,
+        releasePhase: inspected.waypointReleasePhase,
+        overlayBusy: document.querySelector('[data-trajectory-overlay]')?.getAttribute('aria-busy'),
+        geometryPump: { running: inspected.geometryPump.running, activeSamplers: inspected.geometryPump.activeSamplers,
+          pendingRequestId: inspected.geometryPump.pendingRequestId,
+          current: inspected.geometryPump.latestRequestId !== null
+            && inspected.geometryPump.latestRequestId === inspected.geometryPump.lastCommittedRequestId },
+      };
+    }, { revision, momentMs, easing })).toEqual({
+      operation: { kind: 'success', value: `Change applied. Revision ${revision}.` },
+      shot: { value: `Revision ${revision} · 2 selected · ${momentMs} ms editable against native bounds.`, revision, momentMs,
+        selectedMomentMs: momentMs, scrubMs: momentMs, playhead: `${momentMs} ms`, easing },
+      previewMatchesCompiler: true,
+      activeDraft: null,
+      compilerDraftActive: false,
+      releasePhase: 'idle',
+      overlayBusy: 'false',
+      geometryPump: { running: false, activeSamplers: 0, pendingRequestId: null, current: true },
+    });
+  };
   await page.setViewportSize({ width: 960, height: 908 });
   await expect.poll(() => page.locator('[data-preview-canvas]').evaluate((canvas) => canvas.getBoundingClientRect().width)).toBeGreaterThan(440);
   await expect(page.locator('[data-trajectory-segment]').first()).toBeVisible();
@@ -357,9 +398,55 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
       className: hit?.className, previewObjectId: hit?.dataset.previewObjectId, transformHandle: hit?.dataset.transformHandle }; },
   { x: box.x + box.width / 2, y: box.y + box.height / 2 });
   if (activeHit.active !== 'true' || !activeHit.keyframeId) throw new Error(`ACTIVE_HIT_INVALID_${JSON.stringify(activeHit)}`);
-  const iframeWidth = await page.locator('[data-preview]').evaluate((frame) => frame.getBoundingClientRect().width);
-  const iframeHeight = await page.locator('[data-preview]').evaluate((frame) => frame.getBoundingClientRect().height);
-  expect(iframeWidth).toBeGreaterThan(0); expect(iframeWidth).toBeLessThanOrEqual(800);
+  const armGestureProjectionProbe = async (point: { x: number; y: number }) => page.evaluate(({ x, y }) => {
+    const target = document.elementFromPoint(x, y); if (!target) throw new Error('GESTURE_POINTER_TARGET_MISSING');
+    const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    const overlay = document.querySelector<HTMLElement>('[data-trajectory-overlay]')!;
+    const frameOwnMethod = Object.getOwnPropertyDescriptor(frame, 'getBoundingClientRect');
+    const overlayOwnMethod = Object.getOwnPropertyDescriptor(overlay, 'getBoundingClientRect');
+    const frameMethod = frame.getBoundingClientRect; const overlayMethod = overlay.getBoundingClientRect;
+    const rectValue = (rect: DOMRect) => ({ left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom,
+      width: rect.width, height: rect.height });
+    const capture = { input: { sourceWidthCssPixels: 0, sourceHeightCssPixels: 0,
+      iframeRect: null as ReturnType<typeof rectValue> | null, overlayRect: null as ReturnType<typeof rectValue> | null,
+      devicePixelRatio: 0 }, start: { clientX: 0, clientY: 0 }, restored: false };
+    Object.defineProperty(frame, 'getBoundingClientRect', { configurable: true, value: () => {
+      const rect = frameMethod.call(frame); capture.input.iframeRect = rectValue(rect); return rect;
+    } });
+    Object.defineProperty(overlay, 'getBoundingClientRect', { configurable: true, value: () => {
+      const rect = overlayMethod.call(overlay); capture.input.overlayRect = rectValue(rect); return rect;
+    } });
+    target.addEventListener('pointerdown', (event) => {
+      const pointer = event as PointerEvent;
+      const projection = window.__motionEditor.inspectShotWorkspace().projection!;
+      capture.input.sourceWidthCssPixels = projection.sourceWidthCssPixels;
+      capture.input.sourceHeightCssPixels = projection.sourceHeightCssPixels;
+      capture.input.devicePixelRatio = window.devicePixelRatio;
+      capture.start = { clientX: pointer.clientX, clientY: pointer.clientY };
+      if (frameOwnMethod) Object.defineProperty(frame, 'getBoundingClientRect', frameOwnMethod);
+      else delete (frame as unknown as { getBoundingClientRect?: () => DOMRect }).getBoundingClientRect;
+      if (overlayOwnMethod) Object.defineProperty(overlay, 'getBoundingClientRect', overlayOwnMethod);
+      else delete (overlay as unknown as { getBoundingClientRect?: () => DOMRect }).getBoundingClientRect;
+      capture.restored = frame.getBoundingClientRect === frameMethod && overlay.getBoundingClientRect === overlayMethod;
+      (window as unknown as { __gestureProjectionCapture: typeof capture }).__gestureProjectionCapture = capture;
+    }, { once: true });
+  }, point);
+  const takeGestureProjection = async () => {
+    const capture = await page.evaluate(() => {
+      const holder = window as unknown as { __gestureProjectionCapture?: {
+        input: { sourceWidthCssPixels: number; sourceHeightCssPixels: number;
+          iframeRect: { left: number; top: number; right: number; bottom: number; width: number; height: number } | null;
+          overlayRect: { left: number; top: number; right: number; bottom: number; width: number; height: number } | null;
+          devicePixelRatio: number };
+        start: { clientX: number; clientY: number }; restored: boolean } };
+      const value = holder.__gestureProjectionCapture; delete holder.__gestureProjectionCapture; return value;
+    });
+    if (!capture?.input.iframeRect || !capture.input.overlayRect || !capture.restored) throw new Error('GESTURE_PROJECTION_CAPTURE_INVALID');
+    const projection = createPreviewOverlayProjection({ ...capture.input,
+      iframeRect: capture.input.iframeRect, overlayRect: capture.input.overlayRect });
+    expect(projection.ok).toBe(true); if (!projection.ok) throw new Error(projection.code);
+    return { projection: projection.projection, start: capture.start };
+  };
   await page.locator('[data-scrub]').fill('700');
   await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
   const draftBaseline = await page.evaluate((elementId) => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
@@ -413,13 +500,17 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
 
   await page.locator('[data-play]').click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.readState().playStates.every((playState) => playState === 'running'))).toBe(true);
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+  const cancelledPointerStart = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(cancelledPointerStart.x, cancelledPointerStart.y); await armGestureProjectionProbe(cancelledPointerStart); await page.mouse.down();
+  const cancelledGestureProjection = await takeGestureProjection();
   expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: 700, currentTimes: [700, 700],
     playStates: ['paused', 'paused'] }, slider: 700, visibleTime: '700 ms', selectedMoment: 700 });
   expect(commandBytes).toHaveLength(0);
-  await page.evaluate(({ x, y }) => { for (let index = 1; index <= 24; index += 1) window.dispatchEvent(new PointerEvent('pointermove', {
-    pointerId: 1, buttons: 1, clientX: x + index / 2, clientY: y - index / 3, bubbles: true })); },
-  { x: box.x + box.width / 2, y: box.y + box.height / 2 });
+  const cancelledPointerEnd = await page.evaluate(({ x, y }) => { let consumed = { clientX: x, clientY: y };
+    for (let index = 1; index <= 24; index += 1) { const event = new PointerEvent('pointermove', {
+      pointerId: 1, buttons: 1, clientX: x + index / 2, clientY: y - index / 3, bubbles: true });
+      window.dispatchEvent(event); consumed = { clientX: event.clientX, clientY: event.clientY }; }
+    return consumed; }, cancelledPointerStart);
   await expect.poll(() => page.evaluate(() => (window.__motionEditor.inspectShotWorkspace() as unknown as {
     activeDraft: { appliedCount: number } | null }).activeDraft?.appliedCount ?? 0)).toBeGreaterThan(0);
   const cancelledDraft = await page.evaluate((elementId) => { const workspace = window.__motionEditor.inspectShotWorkspace() as unknown as {
@@ -438,8 +529,10 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   expect(cancelledDraft.workspace.activeDraft.operation.payload.stage).toMatchObject({ widthMicrounits: 800_000_000, heightMicrounits: 450_000_000 });
   expect(cancelledDraft.workspace.activeDraft.moveCount).toBeGreaterThan(10);
   expect(cancelledDraft.workspace.activeDraft.appliedCount).toBeLessThan(cancelledDraft.workspace.activeDraft.moveCount);
-  expect(cancelledDraft.workspace.activeDraft.operation.payload.deltaXPpm).toBe(Math.round(12 / iframeWidth * 1_000_000));
-  expect(cancelledDraft.workspace.activeDraft.operation.payload.deltaYPpm).toBe(Math.round(-8 / iframeHeight * 1_000_000));
+  const cancelledExpectedDelta = previewPointerDeltaToPpm(cancelledGestureProjection.projection,
+    cancelledGestureProjection.start, cancelledPointerEnd);
+  expect(cancelledDraft.workspace.activeDraft.operation.payload.deltaXPpm).toBe(cancelledExpectedDelta.deltaXPpm);
+  expect(cancelledDraft.workspace.activeDraft.operation.payload.deltaYPpm).toBe(cancelledExpectedDelta.deltaYPpm);
   expect(cancelledDraft.workspace.activeDraft.controllerDraft.active).toBe(true);
   expect(cancelledDraft.workspace.geometryPump.lastCommittedRequestId).toBe(draftBaseline.geometryRequestId);
   expect(cancelledDraft.srcdoc).toBe(committedSrcdoc); expect(cancelledDraft.stableDocument).toBe(true); expect(cancelledDraft.loadCount).toBe(0);
@@ -492,15 +585,29 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   box = await canvasObjectTargets.nth(0).boundingBox(); if (!box) throw new Error('PREVIEW_OBJECT_TARGET_MISSING_AFTER_CANCEL');
   const iframeBox = await page.locator('[data-preview]').boundingBox(); if (!iframeBox) throw new Error('TRAJECTORY_FRAME_MISSING');
   const offFrameDelta = { x: iframeBox.x - 1 - (box.x + box.width / 2), y: -4 };
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
+  const releasedPointerStart = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  await page.mouse.move(releasedPointerStart.x, releasedPointerStart.y);
+  await armGestureProjectionProbe(releasedPointerStart); await page.mouse.down();
+  const releasedGestureProjection = await takeGestureProjection();
   await page.mouse.move(box.x + box.width / 2 + offFrameDelta.x / 2, box.y + box.height / 2 - 2);
+  await page.evaluate(() => window.addEventListener('pointermove', (event) => {
+    const pointer = event as PointerEvent;
+    (window as unknown as { __releasedPointerEnd: { clientX: number; clientY: number } }).__releasedPointerEnd = {
+      clientX: pointer.clientX, clientY: pointer.clientY };
+  }, { once: true }));
   await page.mouse.move(box.x + box.width / 2 + offFrameDelta.x, box.y + box.height / 2 + offFrameDelta.y);
+  const releasedPointerEnd = await page.evaluate(() => { const holder = window as unknown as {
+    __releasedPointerEnd?: { clientX: number; clientY: number } }; const value = holder.__releasedPointerEnd;
+    delete holder.__releasedPointerEnd; return value; });
+  if (!releasedPointerEnd) throw new Error('RELEASED_POINTER_END_MISSING');
   const releasedDraft = await page.evaluate(() => (window.__motionEditor.inspectShotWorkspace() as unknown as { activeDraft: {
     commandBytes: string; operation: { expectedRevision: number; payload: { targets: Array<{ keyframeId: string }>; deltaXPpm: number; deltaYPpm: number;
       stage: { widthMicrounits: number; heightMicrounits: number } } } } }).activeDraft);
   expect(releasedDraft.operation.expectedRevision).toBe(0); expect(releasedDraft.operation.payload.targets[0]?.keyframeId).toBe(activeHit.keyframeId);
-  expect(releasedDraft.operation.payload.deltaXPpm).toBe(Math.round(offFrameDelta.x / iframeWidth * 1_000_000));
-  expect(releasedDraft.operation.payload.deltaYPpm).toBe(Math.round(offFrameDelta.y / iframeHeight * 1_000_000));
+  const releasedExpectedDelta = previewPointerDeltaToPpm(releasedGestureProjection.projection,
+    releasedGestureProjection.start, releasedPointerEnd);
+  expect(releasedDraft.operation.payload.deltaXPpm).toBe(releasedExpectedDelta.deltaXPpm);
+  expect(releasedDraft.operation.payload.deltaYPpm).toBe(releasedExpectedDelta.deltaYPpm);
   expect(Number.isSafeInteger(releasedDraft.operation.payload.deltaXPpm)).toBe(true); expect(Number.isSafeInteger(releasedDraft.operation.payload.deltaYPpm)).toBe(true);
   expect(Number.isSafeInteger(releasedDraft.operation.payload.stage.widthMicrounits * releasedDraft.operation.payload.deltaXPpm / 1_000_000)).toBe(true);
   expect(Number.isSafeInteger(releasedDraft.operation.payload.stage.heightMicrounits * releasedDraft.operation.payload.deltaYPpm / 1_000_000)).toBe(true);
@@ -574,6 +681,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 8));
   await page.getByRole('button', { name: 'Apply pose' }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
+  await awaitShotMutationSettlement(2, 700);
   expect(commandBytes).toHaveLength(2);
   const groupedCommand = JSON.parse(commandBytes[1]!) as { expectedRevision: number; command: { kind: string; expectedRevision: number;
     payload: { targets: typeof currentGroup.targets } } };
@@ -593,6 +701,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     geometryPump: { lastCommittedRequestId: number } }).geometryPump.lastCommittedRequestId)).toBe(retimeGeometryRequestId + 1);
   await page.locator('[data-shot-easing]').selectOption('ease-in-out'); await page.locator('[data-shot-apply-easing]').click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(4);
+  await awaitShotMutationSettlement(4, 840, 'ease-in-out');
   expect(commandBytes).toHaveLength(4); expect(commandStatuses).toEqual([200, 200, 200, 200]);
   const timingCommands = commandBytes.slice(2, 4).map((bytes) => JSON.parse(bytes) as { expectedRevision: number; command: {
     kind: string; expectedRevision: number; payload: { expectedEasing?: unknown } } });
@@ -752,6 +861,43 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     expect(commandBytes).toHaveLength(requestCount + 1);
     const wire = JSON.parse(commandBytes.at(-1)!) as { expectedRevision: number; command: { kind: string; expectedRevision: number } };
     expect(wire.expectedRevision).toBe(revision - 1); expect(wire.command.expectedRevision).toBe(revision - 1); expect(wire.command.kind).toBe(kind);
+    await expect.poll(() => page.evaluate(({ kind, revision }) => {
+      const authoring = window.__motionEditor.inspectAuthoring();
+      const inspected = window.__motionEditor.inspectShotWorkspace() as unknown as {
+        revision: number; previewMatchesCompiler: boolean; activeDraft: unknown;
+        compilerDraft: { active: boolean }; waypointReleasePhase: string;
+        geometryPump: { running: boolean; activeSamplers: number; latestRequestId: number | null;
+          pendingRequestId: number | null; lastCommittedRequestId: number | null };
+      };
+      const operationStatus = document.querySelector<HTMLOutputElement>('[data-operation-status]')!;
+      return {
+        operation: { kind: operationStatus.dataset.kind, value: operationStatus.value },
+        authoringRevision: authoring.revision,
+        workspaceRevision: inspected.revision,
+        previewMatchesCompiler: inspected.previewMatchesCompiler,
+        activeDraft: inspected.activeDraft,
+        compilerDraftActive: inspected.compilerDraft.active,
+        releasePhase: inspected.waypointReleasePhase,
+        overlayBusy: document.querySelector('[data-trajectory-overlay]')?.getAttribute('aria-busy'),
+        geometryPump: { running: inspected.geometryPump.running, activeSamplers: inspected.geometryPump.activeSamplers,
+          pendingRequestId: inspected.geometryPump.pendingRequestId,
+          current: inspected.geometryPump.latestRequestId !== null
+            && inspected.geometryPump.latestRequestId === inspected.geometryPump.lastCommittedRequestId,
+          lastCommittedRequestId: inspected.geometryPump.lastCommittedRequestId },
+      };
+    }, { kind, revision })).toEqual({
+      operation: { kind: 'success', value: kind === 'motion.history.undo'
+        ? `Undid the last change. Revision ${revision}.` : `Redid the change. Revision ${revision}.` },
+      authoringRevision: revision,
+      workspaceRevision: revision,
+      previewMatchesCompiler: true,
+      activeDraft: null,
+      compilerDraftActive: false,
+      releasePhase: 'idle',
+      overlayBusy: 'false',
+      geometryPump: { running: false, activeSamplers: 0, pendingRequestId: null, current: true,
+        lastCommittedRequestId: previousGeometryRequestId + 1 },
+    });
     const restored = await page.evaluate(() => window.__motionEditor.inspectAuthoring()); const expected = durableSnapshots[restoredRevision]!;
     expect(restored).toMatchObject({ revision, contentDigest: expected.contentDigest, exportDigest: expected.exportDigest, compiledHtml: expected.compiledHtml });
     const preview = await page.evaluate(() => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
@@ -1394,6 +1540,8 @@ test('an open editor refreshes from CLI commit via metadata-only SSE and immutab
   { stdout: (value) => { output += value; }, stderr: () => undefined })).toBe(0);
   expect(JSON.parse(output)).toMatchObject({ ok: true, resultingRevision: 1 });
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().lastCommitSeq)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().lastCommit?.commitSeq)).toBe(1);
   const proof = await page.evaluate(() => { const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
     return { state: window.__motionEditor.inspectAuthoring(), exact: iframe.srcdoc === window.__motionEditor.compiledHtml,
       animationCount: iframe.contentDocument!.getAnimations().length,
@@ -1519,6 +1667,8 @@ test('a disconnected editor resumes from its durable cursor and refetches the im
   { stdout: () => undefined, stderr: () => undefined })).toBe(0);
   await page.unroute('**/api/v1/documents/*/events');
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().lastCommitSeq)).toBe(1);
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().lastCommit?.commitSeq)).toBe(1);
   const proof = await page.evaluate(() => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
     return { state: window.__motionEditor.inspectAuthoring(), exact: frame.srcdoc === window.__motionEditor.compiledHtml,
       native: frame.contentDocument!.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation') }; });

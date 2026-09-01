@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'vitest';
 import { randomBytes } from 'node:crypto';
 import { MotionServiceClient, makeBranchCreateCommand, makeClaimAcquireCommand, makeClaimControlCommand,
-  makeTrackCreateCommand } from '../../motion-protocol/src/index.ts';
+  makeCueCommand, makeTrackCreateCommand } from '../../motion-protocol/src/index.ts';
+import { cueTargetSnapshots, deriveCueId, projectCueReplacement,
+  type CueAuthoringOperation, type CueSemantic } from '../../domain/src/index.ts';
 import { startLocalMotionService } from './index.ts';
 import { phase3Seed, temporaryStore } from './test-support.ts';
 
@@ -15,6 +17,25 @@ const agent = (url: string, secret = secretA) => new MotionServiceClient(url, (.
   { actor: 'agent', capability: 'cli-agent', claimSecret: secret });
 
 describe('minimum branches and claims', () => {
+  test('applies the same claim boundary to cue authoring and leaves unauthorized attempts allocation-free', async () => {
+    const temp = await temporaryStore(); const seed = phase3Seed();
+    const service = await startLocalMotionService({ databasePath: temp.databasePath, seed });
+    const target = seed.elements[0]!; const semantic: CueSemantic = { kind: 'reveal', targetIds: [target.id],
+      startMs: 100, completeMs: 500 }; const cueId = deriveCueId(seed.documentId, 'claimed-reveal');
+    const replacement = projectCueReplacement(seed, cueId, semantic);
+    expect(replacement.ok).toBe(true); if (!replacement.ok) throw new Error(replacement.code);
+    const operation: CueAuthoringOperation = { schemaVersion: 'motion.operation.v1', kind: 'motion.cue.create',
+      operationId: 'claimed-cue', documentId: seed.documentId, expectedRevision: 0, payload: { cueId, semantic,
+        targetSnapshots: cueTargetSnapshots(seed, semantic), replacementTrackIds: replacement.trackIds,
+        replacementInputDigest: replacement.inputDigest } };
+    const client = agent(service.url); const before = service.store.snapshot();
+    expect(await client.dispatch(makeCueCommand(operation))).toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM' });
+    expect(service.store.snapshot()).toEqual(before);
+    expect(await client.dispatch(makeClaimAcquireCommand({ operationId: 'claimed-cue-acquire', documentId: seed.documentId,
+      expectedRevision: 0, scope: 'document' }))).toMatchObject({ ok: true });
+    expect(await client.dispatch(makeCueCommand(operation))).toMatchObject({ ok: true, resultingRevision: 1 });
+    await service.close(); await temp.cleanup();
+  });
   test('requires provisioned high-entropy capabilities and rejects repository-known impersonation', async () => {
     const temp = await temporaryStore(); const seed = phase3Seed();
     await expect(startLocalMotionService({ databasePath: temp.databasePath, seed,

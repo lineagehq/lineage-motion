@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { canonicalBytes, canonicalJson, isValidAuthoringOperationId, sha256Hex, validateMotionDocument,
-  type HistoryOperation, type MotionDocument, type TrajectoryAuthoringOperation } from '../../domain/src/index.ts';
+  type CueAuthoringOperation, type HistoryOperation, type MotionDocument, type TrajectoryAuthoringOperation } from '../../domain/src/index.ts';
 
 export const PROTOCOL_VERSION = 'motion.protocol.v1' as const;
 export const MAIN_BRANCH_ID = 'main' as const;
@@ -31,6 +31,40 @@ const groupTime = z.object({ ...authorBase, kind: z.literal('motion.keyframe-gro
 const groupEasing = z.object({ ...authorBase, kind: z.literal('motion.keyframe-group-easing.set'), payload: z.object({ targets, expectedEasing: timing, easing: timing }).strict() }).strict();
 const settledHold = z.object({ ...authorBase, kind: z.literal('motion.settled-hold.set'), payload: z.object({ targets, sourceTimeMs: z.number().int().min(1).max(2100), settledTimeMs: z.number().int().min(2).max(2099), landingTimeMs: z.number().int().min(1).max(2098), boundaryTimeMs: z.literal(2100) }).strict() }).strict();
 const history = z.object({ ...authorBase, kind: z.enum(['motion.history.undo', 'motion.history.redo']) }).strict();
+const cueSnapshot = z.object({ role: z.string().min(1), ordinal: z.number().int().nonnegative(), elementId: z.string().min(1),
+  structuralFingerprint: z.string().min(1) }).strict();
+const cursorSemantic = z.object({ kind: z.literal('cursor-path'), cursorTargetId: z.string().min(1), startMs: revision,
+  arriveMs: revision, easing: timing, waypoints: z.array(z.object({ timeMs: revision, xPpm: z.number().int().safe(),
+    yPpm: z.number().int().safe() }).strict()).min(2) }).strict().superRefine((value, context) => {
+      if (value.arriveMs <= value.startMs || value.waypoints[0]?.timeMs !== value.startMs
+        || value.waypoints.at(-1)?.timeMs !== value.arriveMs
+        || value.waypoints.some((point, index) => index > 0 && point.timeMs <= value.waypoints[index - 1]!.timeMs)) {
+        context.addIssue({ code: 'custom', message: 'CUE_MOMENT_ORDER' });
+      }
+    });
+const clickSemantic = z.object({ kind: z.literal('click'), cursorTargetId: z.string().min(1), pulseTargetId: z.string().min(1),
+  arriveMs: revision, pressMs: revision, releaseMs: revision, pulseEndMs: revision,
+  pressScalePpm: z.number().int().positive().safe(), pulseRadiusPpm: z.number().int().positive().safe(),
+  pulseOpacityPpm: z.number().int().positive().max(1_000_000), revealCueId: z.string().regex(/^cue_[a-f0-9]{24}$/).optional() }).strict()
+  .superRefine((value, context) => { if (!(value.arriveMs < value.pressMs && value.pressMs < value.releaseMs
+    && value.releaseMs < value.pulseEndMs)) context.addIssue({ code: 'custom', message: 'CUE_MOMENT_ORDER' }); });
+const revealSemantic = z.object({ kind: z.literal('reveal'), targetIds: z.array(z.string().min(1)).min(1),
+  startMs: revision, completeMs: revision }).strict().superRefine((value, context) => {
+    if (value.completeMs <= value.startMs || new Set(value.targetIds).size !== value.targetIds.length) {
+      context.addIssue({ code: 'custom', message: 'CUE_REVEAL_INVALID' });
+    }
+  });
+const cueSemantic = z.discriminatedUnion('kind', [cursorSemantic, clickSemantic, revealSemantic]);
+const cueId = z.string().regex(/^cue_[a-f0-9]{24}$/); const digestOrNull = z.string().regex(/^[a-f0-9]{64}$/).nullable();
+const cueCreate = z.object({ ...authorBase, kind: z.literal('motion.cue.create'), payload: z.object({ cueId,
+  semantic: cueSemantic, targetSnapshots: z.array(cueSnapshot).min(1), replacementTrackIds: z.array(z.string().min(1)),
+  replacementInputDigest: digestOrNull }).strict() }).strict();
+const cueUpdate = z.object({ ...authorBase, kind: z.literal('motion.cue.update'), payload: z.object({ cueId,
+  expectedExpansionDigest: z.string().regex(/^[a-f0-9]{64}$/), semantic: cueSemantic,
+  targetSnapshots: z.array(cueSnapshot).min(1) }).strict() }).strict();
+const cueTerminal = (kind: 'motion.cue.delete' | 'motion.cue.detach') => z.object({ ...authorBase, kind: z.literal(kind),
+  payload: z.object({ cueId, expectedExpansionDigest: z.string().regex(/^[a-f0-9]{64}$/),
+    expectedReplacementInputDigest: digestOrNull }).strict() }).strict();
 const controlBase = { schemaVersion: z.literal('motion.control.v1'), operationId, documentId: z.string().min(1),
   expectedRevision: revision } as const;
 const branchCreate = z.object({ ...controlBase, kind: z.literal('motion.branch.create'),
@@ -41,7 +75,8 @@ const claimAcquire = z.object({ ...controlBase, kind: z.literal('motion.claim.ac
 const leaseControl = (kind: 'motion.claim.renew' | 'motion.claim.release' | 'motion.claim.revoke') => z.object({
   ...controlBase, kind: z.literal(kind), payload: z.object({ claimId: z.string().regex(/^claim_[a-f0-9]{24}$/),
     leaseVersion: z.number().int().positive().safe() }).strict() }).strict();
-export const operationSchema = z.discriminatedUnion('kind', [trackCreate, poseSet, waypointTranslate, groupTime, groupEasing, settledHold, history, branchCreate, claimAcquire,
+export const operationSchema = z.discriminatedUnion('kind', [trackCreate, poseSet, waypointTranslate, groupTime, groupEasing, settledHold,
+  cueCreate, cueUpdate, cueTerminal('motion.cue.delete'), cueTerminal('motion.cue.detach'), history, branchCreate, claimAcquire,
   leaseControl('motion.claim.renew'), leaseControl('motion.claim.release'), leaseControl('motion.claim.revoke')]);
 export const commandSchema = z.object({ protocolVersion: z.literal(PROTOCOL_VERSION), operationId,
   documentId: z.string().min(1), branchId, expectedRevision: revision, command: operationSchema }).strict()
@@ -55,6 +90,7 @@ export const commandSchema = z.object({ protocolVersion: z.literal(PROTOCOL_VERS
 export type MotionCommand = z.infer<typeof commandSchema>;
 export type TrackCreateCommand = MotionCommand & { command: z.infer<typeof trackCreate> };
 export type TrajectoryCommand = MotionCommand & { command: TrajectoryAuthoringOperation };
+export type CueCommand = MotionCommand & { command: CueAuthoringOperation };
 export type ClaimAcquireCommand = MotionCommand & { command: z.infer<typeof claimAcquire> };
 export type ProtocolErrorCode = 'VALIDATION' | 'STALE_REVISION' | 'UNAUTHORIZED_CLAIM' | 'OPERATION_ID_CONFLICT'
   | 'UNSUPPORTED_VERSION' | 'STORAGE_FAILURE';
@@ -62,7 +98,8 @@ export type RevisionReceipt = { schemaVersion: 'motion.revision-receipt.v1'; pro
   documentId: string; branchId: string; expectedRevision: number; resultingRevision: number; operationDigest: string;
   canonicalDigest: string; inventory: { ruleCount: number; applicationCount: number; slotCount: number; trackCount: number } };
 export type ControlReceipt = { schemaVersion: 'motion.control-receipt.v1'; protocolVersion: typeof PROTOCOL_VERSION;
-  kind: Exclude<MotionCommand['command']['kind'], 'motion.track.create' | TrajectoryAuthoringOperation['kind'] | 'motion.history.undo' | 'motion.history.redo'>; documentId: string; branchId: string;
+  kind: Exclude<MotionCommand['command']['kind'], 'motion.track.create' | TrajectoryAuthoringOperation['kind']
+    | CueAuthoringOperation['kind'] | 'motion.history.undo' | 'motion.history.redo'>; documentId: string; branchId: string;
   expectedRevision: number; resultingRevision: number; operationDigest: string; claimId?: string; leaseVersion?: number };
 export type CommandSuccess = { ok: true; protocolVersion: typeof PROTOCOL_VERSION; operationId: string; documentId: string;
   branchId: string; expectedRevision: number; resultingRevision: number; operationDigest: string; canonicalDigest?: string;
@@ -116,7 +153,8 @@ const immutableRevisionSchema = z.object({ document: z.custom<MotionDocument>((v
   canonicalDigest: digest }).strict().superRefine((value, context) => { if (sha256Hex(canonicalBytes(value.document)) !== value.canonicalDigest)
     context.addIssue({ code: 'custom', message: 'REVISION_DIGEST' }); });
 const commitMetadataSchema = z.object({ documentId: z.string(), branchId, revision, digest,
-  kind: z.enum(['motion.track.create', 'motion.transform-pose.set', 'motion.transform-waypoints.translate', 'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set', 'motion.history.undo', 'motion.history.redo', 'motion.branch.create', 'motion.claim.acquire', 'motion.claim.renew',
+  kind: z.enum(['motion.track.create', 'motion.transform-pose.set', 'motion.transform-waypoints.translate', 'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set',
+    'motion.cue.create', 'motion.cue.update', 'motion.cue.delete', 'motion.cue.detach', 'motion.history.undo', 'motion.history.redo', 'motion.branch.create', 'motion.claim.acquire', 'motion.claim.renew',
     'motion.claim.release', 'motion.claim.revoke']), commitSeq: z.number().int().positive() }).strict();
 
 export function parseCommand(input: unknown): { ok: true; command: MotionCommand } | { ok: false; code: ProtocolErrorCode } {
@@ -201,6 +239,9 @@ export function makeTrackCreateCommand(input: { operationId: string; documentId:
     payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear', startValue: 0, endValue: 1 } }, input.branchId ?? MAIN_BRANCH_ID) as TrackCreateCommand; }
 export function makeTrajectoryCommand(operation: TrajectoryAuthoringOperation | HistoryOperation, branchIdValue: string = MAIN_BRANCH_ID): MotionCommand {
   return envelope(operation as MotionCommand['command'], branchIdValue);
+}
+export function makeCueCommand(operation: CueAuthoringOperation, branchIdValue: string = MAIN_BRANCH_ID): CueCommand {
+  return envelope(operation as MotionCommand['command'], branchIdValue) as CueCommand;
 }
 export function makeBranchCreateCommand(input: { operationId: string; documentId: string; sourceBranchId?: string;
   expectedRevision: number; branchId: string }): MotionCommand { return envelope({ schemaVersion: 'motion.control.v1',
