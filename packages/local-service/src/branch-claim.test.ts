@@ -29,7 +29,9 @@ describe('minimum branches and claims', () => {
         targetSnapshots: cueTargetSnapshots(seed, semantic), replacementTrackIds: replacement.trackIds,
         replacementInputDigest: replacement.inputDigest } };
     const client = agent(service.url); const before = service.store.snapshot();
-    expect(await client.dispatch(makeCueCommand(operation))).toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM' });
+    expect(await client.dispatch(makeCueCommand(operation))).toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM', diagnostic: {
+      schemaVersion: 'motion.diagnostic.v1', code: 'CLAIM_SECRET_INVALID', category: 'authorization', retryable: false,
+    } });
     expect(service.store.snapshot()).toEqual(before);
     expect(await client.dispatch(makeClaimAcquireCommand({ operationId: 'claimed-cue-acquire', documentId: seed.documentId,
       expectedRevision: 0, scope: 'document' }))).toMatchObject({ ok: true });
@@ -46,7 +48,9 @@ describe('minimum branches and claims', () => {
     const rejected = await fetch(`${service.url}/api/v1/commands`, { method: 'POST', headers: {
       'content-type': 'application/json', authorization: 'Bearer human-editor', 'x-motion-actor': 'human',
     }, body: JSON.stringify(command) });
-    expect(await rejected.json()).toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM' });
+    expect(await rejected.json()).toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM', diagnostic: {
+      schemaVersion: 'motion.diagnostic.v1', code: 'ACTOR_FORBIDDEN', category: 'authorization', retryable: false,
+    } });
     expect((service.store.snapshot() as { events: unknown[] }).events).toEqual([]);
     const human = new MotionServiceClient(service.url, (...args) => fetch(...args),
       { actor: 'human', capability: capabilities.human });
@@ -68,7 +72,9 @@ describe('minimum branches and claims', () => {
         branchId: 'main', expectedRevision: 0, scope: 'branch' })),
     ]);
     expect([a, b].filter((response) => response.ok)).toHaveLength(1);
-    expect([a, b].filter((response) => !response.ok)).toEqual([{ ok: false, code: 'UNAUTHORIZED_CLAIM' }]);
+    expect([a, b].filter((response) => !response.ok)).toEqual([{ ok: false, code: 'UNAUTHORIZED_CLAIM', diagnostic: {
+      schemaVersion: 'motion.diagnostic.v1', code: 'CLAIM_OVERLAP', category: 'authorization', retryable: true,
+    } }]);
     const snapshot = service.store.snapshot() as { events: Array<{ operation_id: string }>; claims: unknown[];
       documents: Array<{ last_revision: number }>; branches: Array<{ head_revision: number }> };
     expect(snapshot.events).toHaveLength(1); expect(snapshot.claims).toHaveLength(1);
@@ -87,7 +93,8 @@ describe('minimum branches and claims', () => {
       receipt: { kind: 'motion.branch.create' } }); expect(await human.dispatch(create)).toEqual(created);
     expect(await human.dispatch(makeBranchCreateCommand({ operationId: 'branch-create', documentId: seed.documentId,
       expectedRevision: 0, branchId: 'other' })))
-      .toEqual({ ok: false, code: 'OPERATION_ID_CONFLICT' });
+      .toEqual({ ok: false, code: 'OPERATION_ID_CONFLICT', diagnostic: { schemaVersion: 'motion.diagnostic.v1',
+        code: 'OPERATION_ID_CONFLICT', category: 'protocol', retryable: false } });
     expect((await human.head(seed.documentId, 'feature')).document).toEqual(seed);
     expect(await human.dispatch(makeTrackCreateCommand({ operationId: 'main-write', documentId: seed.documentId,
       expectedRevision: 0, elementId: 'el_a2849ff826f3e167' }))).toMatchObject({ ok: true, resultingRevision: 1 });
@@ -110,32 +117,42 @@ describe('minimum branches and claims', () => {
       branchId: 'feature', expectedRevision: 0, scope: 'branch' });
     const [left, right] = await Promise.all([a.dispatch(documentClaim), b.dispatch(branchClaim)]);
     expect([left, right].filter((value) => value.ok)).toHaveLength(1);
-    expect([left, right].filter((value) => !value.ok)).toEqual([{ ok: false, code: 'UNAUTHORIZED_CLAIM' }]);
+    expect([left, right].filter((value) => !value.ok)).toEqual([{ ok: false, code: 'UNAUTHORIZED_CLAIM', diagnostic: {
+      schemaVersion: 'motion.diagnostic.v1', code: 'CLAIM_OVERLAP', category: 'authorization', retryable: true,
+    } }]);
     const won = left.ok ? left : right; const wonClient = left.ok ? a : b; const branch = left.ok ? 'main' : 'feature';
     if (!won.ok) throw new Error('CLAIM_RACE_NO_WINNER');
     expect(won).toMatchObject({ claimId: expect.stringMatching(/^claim_/), leaseVersion: 1 });
     const retryCommand = left.ok ? documentClaim : branchClaim; expect(await wonClient.dispatch(retryCommand)).toEqual(won);
     const write = makeTrackCreateCommand({ operationId: 'claimed-write', documentId: seed.documentId, branchId: branch,
       expectedRevision: 0, elementId: 'el_2dbee68b1ea318c8' });
-    expect(await agent(service.url, left.ok ? secretB : secretA).dispatch(write)).toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM' });
+    expect(await agent(service.url, left.ok ? secretB : secretA).dispatch(write)).toEqual({ ok: false,
+      code: 'UNAUTHORIZED_CLAIM', diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'CLAIM_SECRET_INVALID',
+        category: 'authorization', retryable: false } });
     expect(await wonClient.dispatch(write)).toMatchObject({ ok: true, resultingRevision: 1 });
     const renew = makeClaimControlCommand({ kind: 'motion.claim.renew', operationId: 'renew', documentId: seed.documentId,
       branchId: branch, expectedRevision: 1, claimId: won.claimId!, leaseVersion: 1 });
     const renewed = await wonClient.dispatch(renew); expect(renewed).toMatchObject({ ok: true, leaseVersion: 2 });
     const beforeStale = service.store.snapshot(); expect(await wonClient.dispatch({ ...renew,
-      operationId: 'stale-renew', command: { ...renew.command, operationId: 'stale-renew' } })).toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM' });
+      operationId: 'stale-renew', command: { ...renew.command, operationId: 'stale-renew' } })).toEqual({ ok: false,
+      code: 'UNAUTHORIZED_CLAIM', diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'CLAIM_LEASE_STALE',
+        category: 'authorization', retryable: true } });
     expect(service.store.snapshot()).toEqual(beforeStale);
     const revoke = makeClaimControlCommand({ kind: 'motion.claim.revoke', operationId: 'revoke', documentId: seed.documentId,
       branchId: branch, expectedRevision: 1, claimId: won.claimId!, leaseVersion: 2 });
     expect(await human.dispatch(revoke)).toMatchObject({ ok: true, leaseVersion: 3 });
     expect(await wonClient.dispatch(makeTrackCreateCommand({ operationId: 'after-revoke', documentId: seed.documentId,
-      branchId: branch, expectedRevision: 1, elementId: 'el_a2849ff826f3e167' }))).toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM' });
+      branchId: branch, expectedRevision: 1, elementId: 'el_a2849ff826f3e167' }))).toEqual({ ok: false,
+      code: 'UNAUTHORIZED_CLAIM', diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'CLAIM_EXPIRED',
+        category: 'authorization', retryable: true } });
     const featureRevision = branch === 'feature' ? 1 : 0;
     const featureClaim = await b.dispatch(makeClaimAcquireCommand({ operationId: 'feature-claim', documentId: seed.documentId,
       branchId: 'feature', expectedRevision: featureRevision, scope: 'branch' }));
     if (!featureClaim.ok) throw new Error('FEATURE_CLAIM_FAILED');
     expect(await b.dispatch(makeTrackCreateCommand({ operationId: 'wrong-scope', documentId: seed.documentId,
-      expectedRevision: branch === 'main' ? 1 : 0, elementId: 'el_a2849ff826f3e167' }))).toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM' });
+      expectedRevision: branch === 'main' ? 1 : 0, elementId: 'el_a2849ff826f3e167' }))).toEqual({ ok: false,
+      code: 'UNAUTHORIZED_CLAIM', diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'CLAIM_SCOPE_MISMATCH',
+        category: 'authorization', retryable: false } });
     expect(await b.dispatch(makeClaimControlCommand({ kind: 'motion.claim.release', operationId: 'release', documentId: seed.documentId,
       branchId: 'feature', expectedRevision: featureRevision, claimId: featureClaim.claimId!, leaseVersion: 1 })))
       .toMatchObject({ ok: true, leaseVersion: 2 });
@@ -144,7 +161,8 @@ describe('minimum branches and claims', () => {
     expect(expiring).toMatchObject({ ok: true }); now += 120_000;
     expect(await b.dispatch(makeTrackCreateCommand({ operationId: 'expired-write', documentId: seed.documentId,
       branchId: 'feature', expectedRevision: featureRevision, elementId: 'el_a2849ff826f3e167' })))
-      .toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM' });
+      .toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM', diagnostic: { schemaVersion: 'motion.diagnostic.v1',
+        code: 'CLAIM_EXPIRED', category: 'authorization', retryable: true } });
     expect(await a.dispatch(makeClaimAcquireCommand({ operationId: 'after-expiry', documentId: seed.documentId,
       branchId: 'feature', expectedRevision: featureRevision, scope: 'branch' }))).toMatchObject({ ok: true });
     await service.close(); await temp.cleanup();
@@ -156,7 +174,9 @@ describe('minimum branches and claims', () => {
       fault: (point) => { if (!injected && point === 'after-inserts') { injected = true; throw new Error('CONTROL_FAULT'); } } });
     const command = makeBranchCreateCommand({ operationId: 'faulted-control', documentId: seed.documentId,
       expectedRevision: 0, branchId: 'feature' }); const client = new MotionServiceClient(service.url); const before = service.store.snapshot();
-    expect(await client.dispatch(command)).toEqual({ ok: false, code: 'STORAGE_FAILURE' }); expect(service.store.snapshot()).toEqual(before);
+    expect(await client.dispatch(command)).toEqual({ ok: false, code: 'STORAGE_FAILURE', diagnostic: {
+      schemaVersion: 'motion.diagnostic.v1', code: 'STORAGE_FAILURE', category: 'storage', retryable: true,
+    } }); expect(service.store.snapshot()).toEqual(before);
     expect(await client.dispatch(command)).toMatchObject({ ok: true }); await service.close(); await temp.cleanup();
   });
 
@@ -191,7 +211,9 @@ describe('minimum branches and claims', () => {
     expect(revoked.event).toMatchObject({ branchId: 'main', revision: 1, digest: main.canonicalDigest });
     const beforeStale = service.store.snapshot(); const stale = await agent(service.url).dispatch(makeClaimAcquireCommand({
       operationId: 'diverged-stale', documentId: seed.documentId, branchId: 'main', expectedRevision: 1, scope: 'document' }));
-    expect(stale).toEqual({ ok: false, code: 'STALE_REVISION', currentRevision: 2, currentDigest: feature.canonicalDigest });
+    expect(stale).toEqual({ ok: false, code: 'STALE_REVISION', currentRevision: 2, currentDigest: feature.canonicalDigest,
+      diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'STALE_REVISION', category: 'revision', retryable: true,
+        currentRevision: 2, currentDigest: feature.canonicalDigest } });
     expect(service.store.snapshot()).toEqual(beforeStale);
     const stored = service.store.snapshot() as { events: Array<{ branch_id: string; resulting_revision: number }> };
     expect(stored.events.slice(-3).every((event) => event.branch_id === 'main' && event.resulting_revision === 1)).toBe(true);

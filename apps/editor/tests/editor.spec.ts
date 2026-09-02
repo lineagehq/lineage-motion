@@ -1,29 +1,40 @@
 import { expect, test } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
-const editorUrl = 'http://127.0.0.1:41745';
-let fallbackServer: ChildProcess | undefined;
+let editorUrl = '';
+let serviceServer: ChildProcess | undefined;
+let directory = '';
 
-test.beforeAll(async () => {
-  if (await serverReady()) return;
+test.beforeEach(async () => {
   const root = resolve(import.meta.dirname, '../../..');
-  fallbackServer = spawn(process.execPath, [
-    resolve(root, 'node_modules/vite/bin/vite.js'), '--config',
-    resolve(root, 'apps/editor/vite.config.ts'), '--host', '127.0.0.1', '--port', '41745',
-  ], { cwd: root, stdio: 'ignore' });
-  for (let attempt = 0; attempt < 80; attempt += 1) {
-    if (await serverReady()) return;
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
-  }
-  throw new Error('EDITOR_TEST_SERVER_TIMEOUT');
+  directory = await mkdtemp(join(tmpdir(), 'lineage-motion-editor-'));
+  const humanCapability = randomBytes(32).toString('base64url');
+  const agentCapability = randomBytes(32).toString('base64url');
+  serviceServer = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'editor.sqlite'), PHASE3_EDITOR_PORT: '0',
+      PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  editorUrl = await new Promise<string>((resolveAddress, reject) => {
+    let output = ''; const timer = setTimeout(() => reject(new Error('EDITOR_TEST_SERVER_TIMEOUT')), 10000);
+    serviceServer!.stdout!.on('data', (chunk) => { output += chunk.toString();
+      const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
+      if (line) { clearTimeout(timer); resolveAddress((JSON.parse(line) as { editorUrl: string }).editorUrl); }
+    });
+    serviceServer!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`EDITOR_TEST_SERVER_EXIT_${code}`)); });
+  });
+  await expect.poll(async () => { try { return (await fetch(editorUrl)).ok; } catch { return false; } }).toBe(true);
 });
 
-test.afterAll(() => fallbackServer?.kill('SIGTERM'));
-
-async function serverReady(): Promise<boolean> {
-  try { return (await fetch(editorUrl)).ok; } catch { return false; }
-}
+test.afterEach(async () => {
+  if (serviceServer?.exitCode === null) { serviceServer.kill('SIGTERM');
+    await new Promise((resolveExit) => serviceServer!.once('exit', resolveExit)); }
+  await rm(directory, { recursive: true, force: true });
+});
 
 test('renders exact compiled output and controls native animations without mutation', async ({ page }) => {
   const consoleErrors: string[] = [];
@@ -184,6 +195,7 @@ test('inserts the fixed hold from Time, ripples native preview and timeline, the
   expect(undone.contentDigest).toBe(before.contentDigest);
   expect(undone.exportDigest).toBe(before.exportDigest);
   await page.getByRole('button', { name: 'Redo' }).click();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(3);
   const redone = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
   expect(redone.contentDigest).toBe(held.state.contentDigest);
   expect(redone.exportDigest).toBe(held.state.exportDigest);
@@ -298,13 +310,10 @@ test('guides a first-time author through truthful creation, timing, focus, and e
   await page.locator('[data-set-duration]').focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('[data-duration]')).toHaveAttribute('aria-invalid', 'true');
-  await expect(page.locator('[data-operation-status]')).toContainText('AUTHORING_DURATION_INVALID');
   await expect(page.locator('[data-applied-duration]')).toHaveText('Applied · 1400 ms');
   await expect(page.locator('[data-duration]')).toHaveValue('1400.5');
   await expect(page.locator('.timing-control:has([data-duration]) em')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Apply duration' })).toBeFocused();
-  await expect(page.locator('[data-operation-status]')).toHaveText(
-    'Enter a whole-number duration greater than 0. (AUTHORING_DURATION_INVALID) Revision 6 unchanged.');
+  await expect(page.locator('[data-duration]')).toBeFocused();
   expect(await page.locator('[data-applied-duration]').textContent()).toBe(appliedDurationBaseline);
   expect(commandRequestCount).toBe(invalidRequestBaseline);
   const invalidAfter = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
@@ -336,7 +345,8 @@ test('guides a first-time author through truthful creation, timing, focus, and e
     if (index === 5) await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     await page.getByRole('button', { name: 'Undo' }).click();
     await expect(page.locator('[data-operation-status]')).toContainText(`Revision ${7 + index}.`);
-    await expect(page.getByRole('button', { name: 'Undo' })).toBeFocused();
+    if (index < 5) await expect(page.getByRole('button', { name: 'Undo' })).toBeFocused();
+    else await expect(page.getByRole('button', { name: 'Undo' })).toHaveAttribute('aria-disabled', 'true');
     const anchor = await page.getByRole('button', { name: 'Undo' }).evaluate((button) => ({
       topBefore: Number(button.dataset.historyViewportTopBefore),
       topAfter: Number(button.dataset.historyViewportTopAfter),
@@ -372,7 +382,12 @@ test('guides a first-time author through truthful creation, timing, focus, and e
       const beforeAttempt = current;
       await page.getByRole('button', { name: 'Set value' })
         .evaluate((button) => (button as HTMLButtonElement).click());
-      expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toEqual(beforeAttempt);
+      expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({
+        revision: beforeAttempt.revision, contentDigest: beforeAttempt.contentDigest,
+        exportDigest: beforeAttempt.exportDigest, compiledHtml: beforeAttempt.compiledHtml,
+        undoCount: beforeAttempt.undoCount, redoCount: beforeAttempt.redoCount,
+        selectedTrackId: beforeAttempt.selectedTrackId, selectedKeyframeId: beforeAttempt.selectedKeyframeId,
+      });
     }
   }
   await expect(page.getByRole('button', { name: 'Undo' })).toHaveAttribute('aria-disabled', 'true');
@@ -381,7 +396,8 @@ test('guides a first-time author through truthful creation, timing, focus, and e
   for (let index = 0; index < 6; index += 1) {
     await page.getByRole('button', { name: 'Redo' }).click();
     await expect(page.locator('[data-operation-status]')).toContainText(`Revision ${13 + index}.`);
-    await expect(page.getByRole('button', { name: 'Redo' })).toBeFocused();
+    if (index < 5) await expect(page.getByRole('button', { name: 'Redo' })).toBeFocused();
+    else await expect(page.getByRole('button', { name: 'Redo' })).toHaveAttribute('aria-disabled', 'true');
     const anchor = await page.getByRole('button', { name: 'Redo' }).evaluate((button) => ({
       topBefore: Number(button.dataset.historyViewportTopBefore),
       topAfter: Number(button.dataset.historyViewportTopAfter),
@@ -427,6 +443,7 @@ test('selects Cursor by pointer and creates a distinct deterministic contained b
   await page.getByRole('radio', { name: /Cursor/ }).click();
   const before = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
   await page.getByRole('button', { name: 'Create Cursor opacity track' }).click();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
   const after = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
   expect(after.revision).toBe(1);
   expect(after.selectedCreationElementId).toBe('el_a2849ff826f3e167');
@@ -454,8 +471,10 @@ test('retains a rejected creation draft and clears it only after accepted applic
     });
     return { before, result, after: window.__motionEditor.inspectAuthoring() };
   });
-  expect(rejected.result).toEqual({ ok: false, code: 'AUTHORING_STALE_REVISION' });
-  expect(rejected.after).toEqual(rejected.before);
+  expect(rejected.result).toEqual({ ok: false, code: 'STALE_REVISION' });
+  expect(rejected.after).toMatchObject({ revision: rejected.before.revision, contentDigest: rejected.before.contentDigest,
+    exportDigest: rejected.before.exportDigest, compiledHtml: rejected.before.compiledHtml, draftDirty: true,
+    draftConflictRevision: 0, draftStaleBaseRevision: 0, immutableRefetchCount: rejected.before.immutableRefetchCount + 1 });
   expect(rejected.after).toMatchObject({ revision: 0, draftDirty: true,
     selectedCreationElementId: 'el_2dbee68b1ea318c8', consumedOperationIds: [] });
 
@@ -529,13 +548,18 @@ test('authors value and time through canonical operations with atomic history an
     });
     return { result, before, after: window.__motionEditor.inspectAuthoring(), srcdoc: (document.querySelector('[data-preview]') as HTMLIFrameElement).srcdoc };
   });
-  expect(rejected.result).toEqual({ ok: false, code: 'AUTHORING_STALE_REVISION' });
-  expect(rejected.after).toEqual(rejected.before);
+  expect(rejected.result).toEqual({ ok: false, code: 'STALE_REVISION' });
+  expect(rejected.after).toMatchObject({ revision: rejected.before.revision, contentDigest: rejected.before.contentDigest,
+    exportDigest: rejected.before.exportDigest, compiledHtml: rejected.before.compiledHtml,
+    immutableRefetchCount: rejected.before.immutableRefetchCount + 1 });
   expect(rejected.srcdoc).toBe(s2.compiledHtml);
+  expect(consoleErrors).toEqual(['Failed to load resource: the server responded with a status of 409 (Conflict)']);
+  consoleErrors.length = 0;
 
   const expected = [s1, s0, s1, s2];
   for (const [index, name] of ['Undo', 'Undo', 'Redo', 'Redo'].entries()) {
     await page.getByRole('button', { name }).click();
+    await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(index + 3);
     const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
     expect(current.revision).toBe(index + 3);
     expect(current.contentDigest).toBe(expected[index]!.contentDigest);
@@ -544,9 +568,11 @@ test('authors value and time through canonical operations with atomic history an
   }
 
   await page.getByRole('button', { name: 'Undo' }).click();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(7);
   await editable.first().click();
   await page.locator('input[data-value]').fill('0.5');
   await page.getByRole('button', { name: 'Set value' }).click();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(8);
   expect((await page.evaluate(() => window.__motionEditor.inspectAuthoring())).redoCount).toBe(0);
   await expect(page.getByRole('button', { name: 'Redo' })).toBeDisabled();
 

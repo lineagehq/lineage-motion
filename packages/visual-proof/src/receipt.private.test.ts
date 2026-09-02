@@ -13,9 +13,14 @@ test('sanitized aggregate receipts prove every exact acceptance threshold', asyn
   if (visualText === null) return;
   const chromeText = await readFile(`${repositoryRoot}artifacts/t004-chrome-qa.json`, 'utf8');
   const importText = await readFile(`${repositoryRoot}.motion/receipts/t002-private.json`, 'utf8');
+  const landingImportText = await readFile(
+    `${repositoryRoot}.motion/receipts/landing-shot1-private-import.json`,
+    'utf8',
+  );
   const visual = JSON.parse(visualText);
   const chrome = JSON.parse(chromeText);
   const privateImport = JSON.parse(importText);
+  const landingPrivateImport = JSON.parse(landingImportText);
   const aggregateText = await readFile(`${repositoryRoot}docs/evidence/t002-phase3-aggregate.json`, 'utf8');
   const aggregate = JSON.parse(aggregateText);
 
@@ -56,6 +61,17 @@ test('sanitized aggregate receipts prove every exact acceptance threshold', asyn
     inventory: { ruleCount: 9, applicationCount: 8, unsupportedCount: 0, missingCount: 0 },
     determinism: { runCount: 3, byteIdentical: true },
   });
+  expect(landingPrivateImport).toMatchObject({
+    schemaVersion: 'motion.private-import-receipt.v2',
+    passed: true,
+    admission: { authenticated: true, integrityValid: true, diagnosticCodes: [] },
+    import: {
+      diagnosticCodes: [],
+      inventory: { ruleCount: 2, applicationCount: 2, unsupportedCount: 0, missingCount: 0 },
+    },
+    determinism: { runCount: 3, byteIdentical: true },
+    privacy: { aggregateOnly: true, liveValueCount: 0 },
+  });
   expect(aggregate).toMatchObject({
     schemaVersion: 'motion.phase3-aggregate-proof.v1',
     passed: true,
@@ -66,7 +82,7 @@ test('sanitized aggregate receipts prove every exact acceptance threshold', asyn
   expect(aggregate.invariantMatrix).toEqual(expect.arrayContaining(
     Array.from({ length: 10 }, (_, index) => expect.objectContaining({ invariant: index + 1, passed: true })),
   ));
-  for (const text of [visualText, chromeText, importText, aggregateText]) {
+  for (const text of [visualText, chromeText, importText, landingImportText, aggregateText]) {
     expect(text).not.toMatch(/\/Users\/|[A-Za-z]:\\|sourcePath|selectorHint|presigned/i);
   }
 });

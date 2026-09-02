@@ -15,7 +15,9 @@ describe('restart and lost-response recovery', () => {
     const temporary = await temporaryStore(); const seed = phase3Seed(); let injected = false;
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed,
       fault: (candidate) => { if (!injected && candidate === point) { injected = true; throw new Error(`FAULT_${point}`); } } });
-    expect(await new MotionServiceClient(service.url).dispatch(phase3Command(`fault-${point}`))).toEqual({ ok: false, code: 'STORAGE_FAILURE' });
+    expect(await new MotionServiceClient(service.url).dispatch(phase3Command(`fault-${point}`))).toEqual({ ok: false,
+      code: 'STORAGE_FAILURE', diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'STORAGE_FAILURE',
+        category: 'storage', retryable: true } });
     expect(service.store.readHead(seed.documentId)?.document.revision).toBe(0); await service.close();
     const restarted = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
     expect(restarted.store.readHead(seed.documentId)?.document.revision).toBe(0);
@@ -27,7 +29,8 @@ describe('restart and lost-response recovery', () => {
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed,
       fault: (point) => { if (!injected && point === 'after-commit') { injected = true; throw new Error('LOST_RESPONSE'); } } });
     const command = phase3Command('lost-response');
-    expect(await new MotionServiceClient(service.url).dispatch(command)).toEqual({ ok: false, code: 'STORAGE_FAILURE' });
+    expect(await new MotionServiceClient(service.url).dispatch(command)).toEqual({ ok: false, code: 'STORAGE_FAILURE',
+      diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'STORAGE_FAILURE', category: 'storage', retryable: true } });
     expect(service.store.readHead(seed.documentId)?.document.revision).toBe(1); await service.close();
     const restarted = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
     const retry = await new MotionServiceClient(restarted.url).dispatch(command);
