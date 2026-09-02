@@ -45,4 +45,13 @@ CREATE TABLE claims(claim_id TEXT PRIMARY KEY, document_id TEXT NOT NULL, branch
   FOREIGN KEY(document_id) REFERENCES documents(document_id));
 CREATE INDEX claims_scope ON claims(document_id,branch_id,active,expires_at);
 `,
+}, {
+  version: 3,
+  checksum: 'durable-read-actors-v3',
+  sql: `
+ALTER TABLE events ADD COLUMN actor_kind TEXT CHECK(actor_kind IN ('human','agent'));
+ALTER TABLE events ADD COLUMN actor_id TEXT;
+ALTER TABLE events ADD COLUMN affected_ids_json TEXT;
+ALTER TABLE claims ADD COLUMN actor_id TEXT;
+`,
 }] as const;

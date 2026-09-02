@@ -16,10 +16,17 @@ export {
 import { sha256Hex } from './sha256.js';
 import {
   CUE_GENERATOR_ID, CUE_GENERATOR_VERSION, cueExpansionInput, cueFromExpansion,
-  cueTargetSnapshots, expandCue, isAuthoringCue, replacementInputDigest,
+  cueTargetSnapshots, deriveCueId, expandCue, isAuthoringCue, replacementInputDigest,
   type AuthoringCue, type CueOwnership, type CueReplacementBundle, type CueSemantic,
   type CueTargetSnapshot,
 } from './cue-authoring.js';
+import type { OperationIntentPayload, OperationPreparation, OperationPreparationRequest,
+  PreparedOperationIntent } from './operation-preparation.js';
+export { DURABLE_OPERATION_KINDS, projectWorkspace,
+  type DurableOperationKind, type WorkspaceProjection, type WritableValue } from './workspace-projection.js';
+export { PREPARABLE_OPERATION_KINDS, type OperationIntentPayload, type OperationPreparation,
+  type OperationPreparationRequest, type PreparableOperationKind, type PreparedOperationIntent,
+  type ViewportIntent } from './operation-preparation.js';
 
 export type Diagnostic = {
   code: string;
@@ -674,6 +681,22 @@ export type TransformWaypointsTranslateOperation = OperationEnvelope & {
   kind: 'motion.transform-waypoints.translate';
   payload: { targets: TrajectoryTarget[]; deltaXPpm: number; deltaYPpm: number; stage: StageProjection };
 };
+export type TrajectoryInsertionTarget = {
+  elementId: string;
+  trackId: string;
+  beforeKeyframeId: string;
+  afterKeyframeId: string;
+  expectedBeforeTransform: string;
+  expectedAfterTransform: string;
+};
+export type TransformWaypointAddOperation = OperationEnvelope & {
+  kind: 'motion.transform-waypoint.add';
+  payload: { targets: TrajectoryInsertionTarget[]; timeMs: number };
+};
+export type TransformWaypointRemoveOperation = OperationEnvelope & {
+  kind: 'motion.transform-waypoint.remove';
+  payload: { targets: TrajectoryTarget[]; timeMs: number };
+};
 export type KeyframeGroupTimeSetOperation = OperationEnvelope & {
   kind: 'motion.keyframe-group-time.set';
   payload: { targets: TrajectoryTarget[]; sourceTimeMs: number; targetTimeMs: number; landingTimeMs: number; settledTimeMs: number };
@@ -706,6 +729,7 @@ export type CueDetachOperation = OperationEnvelope & {
 };
 export type CueAuthoringOperation = CueCreateOperation | CueUpdateOperation | CueDeleteOperation | CueDetachOperation;
 export type TrajectoryAuthoringOperation = TransformPoseSetOperation | TransformWaypointsTranslateOperation
+  | TransformWaypointAddOperation | TransformWaypointRemoveOperation
   | KeyframeGroupTimeSetOperation | KeyframeGroupEasingSetOperation | SettledHoldSetOperation;
 export type StructuralAuthoringOperation = TrackCreateOperation | KeyframeAddOperation
   | KeyframeRemoveOperation | SlotDurationSetOperation | BindingDelaySetOperation
@@ -989,6 +1013,185 @@ export function projectCueReplacement(document: MotionDocument, cueId: string, s
     if (!projected.ok) return projected;
     return { ok: true, trackIds: projected.bundle?.trackIds ?? [], inputDigest: projected.bundle?.inputDigest ?? null };
   } catch { return { ok: false, code: 'CUE_REPLACEMENT_INVALID' }; }
+}
+
+type PreparedMaterialization = { preparation: OperationPreparation; operation: TrajectoryAuthoringOperation | CueAuthoringOperation | null };
+
+export function prepareOperationIntent(document: MotionDocument, branchId: string, canonicalDigest: string,
+  exportDigest: string, request: OperationPreparationRequest): PreparedMaterialization {
+  const empty = (reasonCode: string): PreparedMaterialization => ({ operation: null, preparation: {
+    schemaVersion: 'motion.operation-preparation.v1', documentId: request.documentId, branchId,
+    revision: document.revision, canonicalDigest, exportDigest, kind: request.kind,
+    normalizedIntent: null, resolvedElementIds: [], resolvedTrackIds: [],
+    resolvedKeyframeIds: [], resolvedCueId: null, resolvedTargetElementIds: [], resolvedReplacementTrackIds: [],
+    expectedExpansionDigest: null, expectedReplacementInputDigest: null, stage: null,
+    derivationDigest: null, eligibility: false, reasonCode,
+  } });
+  if (request.documentId !== document.documentId || request.branchId !== branchId
+    || request.expectedRevision !== document.revision || request.kind !== request.intent.kind) return empty('DERIVATION_STALE');
+  try {
+    if (!validPublicIntentIdentity(request.intent)) return empty('DERIVATION_INVALID');
+    const normalizedIntent = normalizeOperationIntent(request.intent);
+    const base = { schemaVersion: 'motion.operation.v1' as const, operationId: 'prepared-operation',
+      documentId: document.documentId, expectedRevision: document.revision };
+    let operation: TrajectoryAuthoringOperation | CueAuthoringOperation;
+    let stage: StageProjection | null = null;
+    if (normalizedIntent.kind === 'motion.transform-waypoint.add') {
+      const targets: TrajectoryInsertionTarget[] = [];
+      for (const elementId of normalizedIntent.elementIds) {
+        const trajectory = projectTransformTrajectory(document, elementId);
+        if (!trajectory.eligible) return empty(trajectory.code);
+        const afterIndex = trajectory.waypoints.findIndex((waypoint) => waypoint.timeMs > normalizedIntent.timeMs);
+        const beforePoint = afterIndex > 0 ? trajectory.waypoints[afterIndex - 1] : undefined;
+        const afterPoint = afterIndex > 0 ? trajectory.waypoints[afterIndex] : undefined;
+        if (!beforePoint || !afterPoint || normalizedIntent.timeMs <= 0 || normalizedIntent.timeMs >= 2100) {
+          return empty('AUTHORING_TRAJECTORY_INSERT_INVALID');
+        }
+        targets.push({ elementId, trackId: trajectory.trackId, beforeKeyframeId: beforePoint.keyframeId,
+          afterKeyframeId: afterPoint.keyframeId, expectedBeforeTransform: beforePoint.transformBytes,
+          expectedAfterTransform: afterPoint.transformBytes });
+      }
+      targets.sort((left, right) => `${left.elementId}\0${left.trackId}`.localeCompare(`${right.elementId}\0${right.trackId}`));
+      if (!completeTrajectoryInsertionBundle(document, targets)) return empty('AUTHORING_TRAJECTORY_BUNDLE_INCOMPLETE');
+      operation = { ...base, kind: normalizedIntent.kind, payload: { targets, timeMs: normalizedIntent.timeMs } };
+    } else if (normalizedIntent.kind === 'motion.transform-waypoint.remove') {
+      const selected = projectTrajectorySelection(document, normalizedIntent.elementIds, normalizedIntent.timeMs);
+      if (!selected.eligible) return empty(selected.code ?? 'AUTHORING_TRAJECTORY_TARGET_INVALID');
+      const resolved = selected.targets.map((target) => resolveTrajectoryTarget(document, target));
+      if (resolved.some((entry) => !entry)
+        || !completeTrajectoryMomentBundle(document,
+          resolved as NonNullable<ReturnType<typeof resolveTrajectoryTarget>>[], normalizedIntent.timeMs)) {
+        return empty('AUTHORING_TRAJECTORY_BUNDLE_INCOMPLETE');
+      }
+      operation = { ...base, kind: normalizedIntent.kind, payload: { targets: selected.targets,
+        timeMs: normalizedIntent.timeMs } };
+    } else if (normalizedIntent.kind === 'motion.transform-pose.set') {
+      const selected = projectTrajectorySelection(document, [normalizedIntent.elementId], normalizedIntent.momentMs);
+      if (!selected.eligible || selected.targets.length !== 1) return empty(selected.code ?? 'AUTHORING_TRAJECTORY_TARGET_INVALID');
+      stage = stageFromViewport(exportDigest, normalizedIntent.viewport);
+      operation = { ...base, kind: normalizedIntent.kind, ...selected.targets[0]!,
+        payload: { pose: normalizedIntent.pose, stage } };
+    } else if (normalizedIntent.kind === 'motion.transform-waypoints.translate') {
+      const selected = projectTrajectorySelection(document, normalizedIntent.elementIds, normalizedIntent.momentMs);
+      if (!selected.eligible) return empty(selected.code ?? 'AUTHORING_TRAJECTORY_TARGET_INVALID');
+      stage = stageFromViewport(exportDigest, normalizedIntent.viewport);
+      operation = { ...base, kind: normalizedIntent.kind, payload: { targets: selected.targets,
+        deltaXPpm: normalizedIntent.deltaXPpm, deltaYPpm: normalizedIntent.deltaYPpm, stage } };
+    } else if (normalizedIntent.kind === 'motion.keyframe-group-time.set') {
+      const selected = projectTrajectorySelection(document, normalizedIntent.elementIds, normalizedIntent.sourceTimeMs);
+      if (!selected.eligible) return empty(selected.code ?? 'AUTHORING_TRAJECTORY_TARGET_INVALID');
+      operation = { ...base, kind: normalizedIntent.kind, payload: { targets: selected.targets,
+        sourceTimeMs: normalizedIntent.sourceTimeMs, targetTimeMs: normalizedIntent.targetTimeMs,
+        landingTimeMs: normalizedIntent.landingTimeMs, settledTimeMs: normalizedIntent.settledTimeMs } };
+    } else if (normalizedIntent.kind === 'motion.keyframe-group-easing.set') {
+      const selected = projectTrajectorySelection(document, normalizedIntent.elementIds, normalizedIntent.momentMs);
+      if (!selected.eligible) return empty(selected.code ?? 'AUTHORING_TRAJECTORY_TARGET_INVALID');
+      operation = { ...base, kind: normalizedIntent.kind, payload: { targets: selected.targets,
+        expectedEasing: normalizedIntent.expectedEasing, easing: normalizedIntent.easing } };
+    } else if (normalizedIntent.kind === 'motion.settled-hold.set') {
+      const selected = projectTrajectorySelection(document, normalizedIntent.elementIds, normalizedIntent.sourceTimeMs);
+      if (!selected.eligible) return empty(selected.code ?? 'AUTHORING_TRAJECTORY_TARGET_INVALID');
+      operation = { ...base, kind: normalizedIntent.kind, payload: { targets: selected.targets,
+        sourceTimeMs: normalizedIntent.sourceTimeMs, settledTimeMs: normalizedIntent.settledTimeMs,
+        landingTimeMs: normalizedIntent.landingTimeMs, boundaryTimeMs: normalizedIntent.boundaryTimeMs } };
+    } else if (normalizedIntent.kind === 'motion.cue.create') {
+      const cueId = deriveCueId(document.documentId, normalizedIntent.creationKey);
+      const replacement = projectCueReplacement(document, cueId, normalizedIntent.semantic);
+      if (!replacement.ok) return empty(replacement.code);
+      operation = { ...base, kind: normalizedIntent.kind, payload: { cueId, semantic: normalizedIntent.semantic,
+        targetSnapshots: cueTargetSnapshots(document, normalizedIntent.semantic), replacementTrackIds: replacement.trackIds,
+        replacementInputDigest: replacement.inputDigest } };
+    } else {
+      const cue = document.cues.find((candidate): candidate is AuthoringCue => isAuthoringCue(candidate)
+        && candidate.id === normalizedIntent.cueId);
+      if (!cue) return empty('CUE_TARGET_MISSING');
+      if (normalizedIntent.kind === 'motion.cue.update') operation = { ...base, kind: normalizedIntent.kind,
+        payload: { cueId: cue.id, expectedExpansionDigest: cue.expansionDigest, semantic: normalizedIntent.semantic,
+          targetSnapshots: cueTargetSnapshots(document, normalizedIntent.semantic) } };
+      else operation = { ...base, kind: normalizedIntent.kind, payload: { cueId: cue.id,
+        expectedExpansionDigest: cue.expansionDigest, expectedReplacementInputDigest: cue.replacement?.inputDigest ?? null } };
+    }
+    const hiddenDerivation = { schemaVersion: 'motion.operation-derivation.v1', documentId: document.documentId,
+      branchId, revision: document.revision, canonicalDigest, exportDigest, normalizedIntent, operation: {
+        ...operation, operationId: null,
+      } };
+    const derivationDigest = sha256Hex(canonicalJson(hiddenDerivation));
+    const targets = operationTargets(operation);
+    const insertionTargets = operation.kind === 'motion.transform-waypoint.add' ? operation.payload.targets : [];
+    const cuePayload = operation.kind.startsWith('motion.cue.') ? operation.payload : null;
+    const cue = cuePayload && 'cueId' in cuePayload ? document.cues.find((candidate) => candidate.id === cuePayload.cueId) : undefined;
+    return { operation, preparation: { schemaVersion: 'motion.operation-preparation.v1', documentId: document.documentId,
+      branchId, revision: document.revision, canonicalDigest, exportDigest, kind: request.kind, normalizedIntent,
+      resolvedElementIds: [...new Set([...targets.map((target) => target.elementId), ...insertionTargets.map((target) => target.elementId)])],
+      resolvedTrackIds: [...new Set([...targets.map((target) => target.trackId), ...insertionTargets.map((target) => target.trackId)])],
+      resolvedKeyframeIds: [...new Set([...targets.map((target) => target.keyframeId),
+        ...insertionTargets.flatMap((target) => [target.beforeKeyframeId, target.afterKeyframeId])])],
+      resolvedCueId: cuePayload && 'cueId' in cuePayload ? cuePayload.cueId : null,
+      resolvedTargetElementIds: cuePayload && 'semantic' in cuePayload ? semanticElementIds(cuePayload.semantic) : [],
+      resolvedReplacementTrackIds: cuePayload && 'replacementTrackIds' in cuePayload ? [...cuePayload.replacementTrackIds] : [],
+      expectedExpansionDigest: cue?.schemaVersion === 'motion.authoring-cue.v1' ? cue.expansionDigest : null,
+      expectedReplacementInputDigest: cue?.schemaVersion === 'motion.authoring-cue.v1' ? cue.replacement?.inputDigest ?? null : null,
+      stage, derivationDigest, eligibility: true, reasonCode: null } };
+  } catch (error) { return empty(error instanceof Error ? error.message : 'DERIVATION_INVALID'); }
+}
+
+function operationTargets(operation: TrajectoryAuthoringOperation | CueAuthoringOperation): TrajectoryTarget[] {
+  if (operation.kind === 'motion.transform-pose.set') return [{ elementId: operation.elementId,
+    trackId: operation.trackId, keyframeId: operation.keyframeId, expectedTransform: operation.expectedTransform }];
+  if (operation.kind === 'motion.transform-waypoints.translate' || operation.kind === 'motion.transform-waypoint.remove'
+    || operation.kind === 'motion.keyframe-group-time.set'
+    || operation.kind === 'motion.keyframe-group-easing.set' || operation.kind === 'motion.settled-hold.set') {
+    return operation.payload.targets;
+  }
+  return [];
+}
+
+export function materializePreparedIntent(document: MotionDocument, branchId: string, canonicalDigest: string,
+  exportDigest: string, intent: PreparedOperationIntent): { ok: true; operation: TrajectoryAuthoringOperation | CueAuthoringOperation }
+  | { ok: false; code: string } {
+  const prepared = prepareOperationIntent(document, branchId, canonicalDigest, exportDigest, {
+    schemaVersion: 'motion.operation-preparation-request.v1', documentId: intent.documentId, branchId,
+    expectedRevision: intent.expectedRevision, kind: intent.kind, intent: intent.intent,
+  });
+  if (!prepared.operation || !prepared.preparation.derivationDigest) return { ok: false,
+    code: prepared.preparation.reasonCode ?? 'DERIVATION_INVALID' };
+  if (prepared.preparation.derivationDigest !== intent.derivationDigest) return { ok: false, code: 'DERIVATION_STALE' };
+  return { ok: true, operation: { ...prepared.operation, operationId: intent.operationId } };
+}
+
+function normalizeOperationIntent(intent: OperationIntentPayload): OperationIntentPayload {
+  const value = structuredClone(intent);
+  if ('elementIds' in value) value.elementIds = [...new Set(value.elementIds)].sort();
+  return value;
+}
+
+function validPublicIntentIdentity(intent: OperationIntentPayload): boolean {
+  const stable = (value: string) => /^[A-Za-z0-9._:-]{1,128}$/.test(value);
+  if ('elementId' in intent && !stable(intent.elementId)) return false;
+  if ('elementIds' in intent && (!intent.elementIds.length || intent.elementIds.some((id) => !stable(id)))) return false;
+  if ('cueId' in intent && !/^cue_[a-f0-9]{24}$/.test(intent.cueId)) return false;
+  if ('creationKey' in intent && !stable(intent.creationKey)) return false;
+  if ('semantic' in intent) {
+    const ids = semanticElementIds(intent.semantic);
+    if (ids.some((id) => !stable(id))) return false;
+    if (intent.semantic.kind === 'click' && intent.semantic.revealCueId
+      && !/^cue_[a-f0-9]{24}$/.test(intent.semantic.revealCueId)) return false;
+  }
+  return true;
+}
+
+function stageFromViewport(exportDigest: string, viewport: { widthCssPixels: number; heightCssPixels: number }): StageProjection {
+  const widthMicrounits = viewport.widthCssPixels * 1_000_000;
+  const heightMicrounits = viewport.heightCssPixels * 1_000_000;
+  if (!Number.isSafeInteger(widthMicrounits) || widthMicrounits <= 0
+    || !Number.isSafeInteger(heightMicrounits) || heightMicrounits <= 0) throw new Error('TRAJECTORY_STAGE_INVALID');
+  return { stageDigest: sha256Hex(`${exportDigest}\0${widthMicrounits}\0${heightMicrounits}`),
+    widthMicrounits, heightMicrounits };
+}
+
+function semanticElementIds(semantic: CueSemantic): string[] {
+  return [...new Set(semantic.kind === 'reveal' ? semantic.targetIds : semantic.kind === 'cursor-path'
+    ? [semantic.cursorTargetId] : [semantic.cursorTargetId, semantic.pulseTargetId])].sort();
 }
 
 function closedReplacementTrackIds(document: MotionDocument, initialTrackIds: string[]): {
@@ -1627,12 +1830,93 @@ export function projectTrajectorySelection(document: MotionDocument, orderedElem
 function applyTrajectoryOperation(document: MotionDocument, operation: TrajectoryAuthoringOperation): { ok: true; document: MotionDocument; inverse: ReducerOperation } | { ok: false; code: string } {
   const before = structuredClone(document);
   const next = structuredClone(document);
+  if (operation.kind === 'motion.transform-waypoint.add') {
+    const { targets, timeMs } = operation.payload;
+    if (!validTrajectoryInsertionTargets(targets) || !completeTrajectoryInsertionBundle(next, targets)
+      || !Number.isSafeInteger(timeMs) || timeMs <= 0 || timeMs >= 2100) {
+      return { ok: false, code: 'AUTHORING_TRAJECTORY_INSERT_INVALID' };
+    }
+    for (const target of targets) {
+      const trajectory = projectTransformTrajectory(next, target.elementId);
+      if (!trajectory.eligible || trajectory.trackId !== target.trackId
+        || trajectory.waypoints.some((waypoint) => waypoint.timeMs === timeMs)) {
+        return { ok: false, code: 'AUTHORING_TRAJECTORY_INSERT_STALE' };
+      }
+      const beforePoint = trajectory.waypoints.find((waypoint) => waypoint.keyframeId === target.beforeKeyframeId);
+      const afterPoint = trajectory.waypoints.find((waypoint) => waypoint.keyframeId === target.afterKeyframeId);
+      if (!beforePoint || !afterPoint || beforePoint.transformBytes !== target.expectedBeforeTransform
+        || afterPoint.transformBytes !== target.expectedAfterTransform
+        || !(beforePoint.timeMs < timeMs && timeMs < afterPoint.timeMs)) {
+        return { ok: false, code: 'AUTHORING_TRAJECTORY_INSERT_STALE' };
+      }
+      const adjacentIndex = trajectory.waypoints.findIndex((waypoint) => waypoint.keyframeId === beforePoint.keyframeId);
+      if (trajectory.waypoints[adjacentIndex + 1]?.keyframeId !== afterPoint.keyframeId) {
+        return { ok: false, code: 'AUTHORING_TRAJECTORY_INSERT_STALE' };
+      }
+      const track = next.tracks.find((candidate) => candidate.id === target.trackId)!;
+      const rule = next.rules.find((candidate) => candidate.id === track.ruleId)!;
+      const ruleTrack = rule.tracks.find((candidate) => candidate.property === 'transform')!;
+      const application = next.applications.find((candidate) => candidate.slots.some((slot) => slot.id === track.slotId))!;
+      const slotIndex = application.slots.findIndex((slot) => slot.id === track.slotId);
+      const slot = application.slots[slotIndex]!;
+      const binding = application.bindings.find((candidate) => candidate.elementId === target.elementId)!;
+      const delayMs = binding.delayOverridesMs[slotIndex]!;
+      const offset = trajectoryOffsetForTime(timeMs, delayMs, slot.durationMs);
+      if (offset === null || offset <= 0 || offset >= 1 || !Number.isSafeInteger(offset * 1_000_000)) {
+        return { ok: false, code: 'AUTHORING_TRAJECTORY_TIME_UNREPRESENTABLE' };
+      }
+      const ratio = (timeMs - beforePoint.timeMs) / (afterPoint.timeMs - beforePoint.timeMs);
+      const interpolate = (left: number, right: number) => Math.round(left + (right - left) * ratio);
+      const pose: TransformPose = {
+        translateXMicrounits: interpolate(beforePoint.pose.translateXMicrounits, afterPoint.pose.translateXMicrounits),
+        translateYMicrounits: interpolate(beforePoint.pose.translateYMicrounits, afterPoint.pose.translateYMicrounits),
+        scalePpm: interpolate(beforePoint.pose.scalePpm, afterPoint.pose.scalePpm),
+        rotateMicrodegrees: interpolate(beforePoint.pose.rotateMicrodegrees, afterPoint.pose.rotateMicrodegrees),
+      };
+      if (!validPose(pose)) return { ok: false, code: 'AUTHORING_TRAJECTORY_INSERT_INVALID' };
+      const keyframeId = structuralId('kf', `${track.id}\0transform\0${Math.round(offset * 1_000_000)}`);
+      if (canonicalIdentitySet(next).has(keyframeId)) return { ok: false, code: 'AUTHORING_ID_COLLISION' };
+      const sourceFrame = ruleTrack.keyframes.find((frame) => frame.id === beforePoint.keyframeId)!;
+      const insertion = ruleTrack.keyframes.findIndex((frame) => frame.offset > offset);
+      if (insertion < 1) return { ok: false, code: 'AUTHORING_TRAJECTORY_INSERT_INVALID' };
+      ruleTrack.keyframes.splice(insertion, 0, {
+        id: keyframeId,
+        offset,
+        value: serializeTransformPose(pose),
+        ...(sourceFrame.easing ? { easing: structuredClone(sourceFrame.easing) } : {}),
+      });
+      track.keyframeIds = ruleTrack.keyframes.map((frame) => frame.id);
+    }
+    const inverse: InternalTrajectoryRestoreOperation = { schemaVersion: operation.schemaVersion,
+      operationId: operation.operationId, documentId: operation.documentId, expectedRevision: operation.expectedRevision,
+      kind: 'motion.internal.trajectory.restore', payload: {
+        expectedContentDigest: sha256Hex(canonicalContentBytes(next)), restore: before,
+      } };
+    return { ok: true, document: next, inverse };
+  }
   const targets = operation.kind === 'motion.transform-pose.set' ? [{ elementId: operation.elementId, trackId: operation.trackId, keyframeId: operation.keyframeId, expectedTransform: operation.expectedTransform }] : operation.payload.targets;
   if (!validTrajectoryTargets(targets)) return { ok: false, code: 'AUTHORING_TRAJECTORY_BUNDLE_INVALID' };
   const resolved = targets.map((target) => resolveTrajectoryTarget(next, target));
   if (resolved.some((item) => !item)) return { ok: false, code: 'AUTHORING_TRAJECTORY_TARGET_INVALID' };
   const entries = resolved as NonNullable<ReturnType<typeof resolveTrajectoryTarget>>[];
-  if (operation.kind === 'motion.transform-pose.set') {
+  if (operation.kind === 'motion.transform-waypoint.remove') {
+    const { timeMs } = operation.payload;
+    if (!Number.isSafeInteger(timeMs) || timeMs <= 0 || timeMs >= 2100
+      || !completeTrajectoryMomentBundle(next, entries, timeMs)) {
+      return { ok: false, code: 'AUTHORING_TRAJECTORY_REMOVE_INVALID' };
+    }
+    for (const entry of uniqueRuleEntries(entries)) {
+      if (entry.timeMs !== timeMs || entry.ruleTrack.keyframes.length <= 3) {
+        return { ok: false, code: 'AUTHORING_TRAJECTORY_REMOVE_INVALID' };
+      }
+      const index = entry.ruleTrack.keyframes.findIndex((frame) => frame.id === entry.keyframe.id);
+      if (index <= 0 || index >= entry.ruleTrack.keyframes.length - 1) {
+        return { ok: false, code: 'AUTHORING_TRAJECTORY_REMOVE_INVALID' };
+      }
+      entry.ruleTrack.keyframes.splice(index, 1);
+      entry.track.keyframeIds = entry.ruleTrack.keyframes.map((frame) => frame.id);
+    }
+  } else if (operation.kind === 'motion.transform-pose.set') {
     if (!validStage(operation.payload.stage) || !validPose(operation.payload.pose)) return { ok: false, code: 'AUTHORING_TRAJECTORY_PAYLOAD_INVALID' };
     const value = serializeTransformPose(operation.payload.pose);
     if (value === entries[0]!.keyframe.value) return { ok: false, code: 'AUTHORING_ZERO_CHANGE' };
@@ -1718,14 +2002,23 @@ function resolveTrajectoryTarget(document: MotionDocument, target: TrajectoryTar
 }
 function uniqueRuleEntries<T extends { ruleTrack: RuleTrack }>(entries: T[]): T[] { return entries.filter((entry, index) => entries.findIndex((candidate) => candidate.ruleTrack.id === entry.ruleTrack.id) === index); }
 function completeTrajectoryMomentBundle(document: MotionDocument, entries: NonNullable<ReturnType<typeof resolveTrajectoryTarget>>[], timeMs: number): boolean {
+  const selectedRuleIds = new Set(entries.map((entry) => entry.track.ruleId));
   const expected: string[] = [];
-  for (const track of document.tracks.filter((candidate) => candidate.property === 'transform')) {
+  for (const track of document.tracks.filter((candidate) => candidate.property === 'transform' && selectedRuleIds.has(candidate.ruleId))) {
     const projection = projectTransformTrajectory(document, track.elementId); if (!projection.eligible) return false;
     const point = projection.waypoints.find((item) => item.timeMs === timeMs);
     if (point) expected.push(`${track.id}\0${point.keyframeId}`);
   }
   expected.sort();
   const actual = entries.map((entry) => `${entry.track.id}\0${entry.keyframe.id}`).sort(); return canonicalJson(expected) === canonicalJson(actual);
+}
+function completeTrajectoryInsertionBundle(document: MotionDocument, targets: TrajectoryInsertionTarget[]): boolean {
+  const selectedRuleIds = new Set(targets.map((target) => document.tracks.find((track) => track.id === target.trackId)?.ruleId)
+    .filter((ruleId): ruleId is string => Boolean(ruleId)));
+  const expected = document.tracks.filter((track) => track.property === 'transform' && selectedRuleIds.has(track.ruleId))
+    .map((track) => `${track.elementId}\0${track.id}`).sort();
+  const actual = targets.map((target) => `${target.elementId}\0${target.trackId}`).sort();
+  return canonicalJson(expected) === canonicalJson(actual);
 }
 function projectTrajectoryKeyframeTimes(ruleTrack: RuleTrack, delayMs: number, durationMs: number,
   maximumTimeMs: number): Map<string, number> | null {
@@ -1766,6 +2059,14 @@ function parseTranslateLength(raw: string): number | null {
   return Number(microunits);
 }
 function validTrajectoryTargets(value: TrajectoryTarget[]): boolean { return value.length > 0 && value.every((target) => target && typeof target.elementId === 'string' && typeof target.trackId === 'string' && typeof target.keyframeId === 'string' && typeof target.expectedTransform === 'string') && new Set(value.map((target) => `${target.elementId}\0${target.trackId}\0${target.keyframeId}`)).size === value.length && value.every((target, index) => index === 0 || `${value[index - 1]!.elementId}\0${value[index - 1]!.trackId}` < `${target.elementId}\0${target.trackId}`); }
+function validTrajectoryInsertionTargets(value: TrajectoryInsertionTarget[]): boolean {
+  if (!Array.isArray(value) || value.length === 0) return false;
+  const keys = value.map((target) => `${target.elementId}\0${target.trackId}`);
+  return new Set(keys).size === keys.length && value.every((target, index) => target
+    && ['elementId', 'trackId', 'beforeKeyframeId', 'afterKeyframeId', 'expectedBeforeTransform', 'expectedAfterTransform']
+      .every((key) => typeof target[key as keyof TrajectoryInsertionTarget] === 'string')
+    && (index === 0 || keys[index - 1]! < keys[index]!));
+}
 function validPose(pose: TransformPose): boolean { return [pose.translateXMicrounits, pose.translateYMicrounits, pose.scalePpm, pose.rotateMicrodegrees].every(Number.isSafeInteger) && pose.scalePpm > 0 && pose.scalePpm <= 10_000_000; }
 function validStage(stage: StageProjection): boolean { return /^[a-f0-9]{64}$/.test(stage.stageDigest) && Number.isSafeInteger(stage.widthMicrounits) && stage.widthMicrounits > 0 && Number.isSafeInteger(stage.heightMicrounits) && stage.heightMicrounits > 0; }
 function exactShotConfig(config: ShotWorkspaceConfig): boolean { return config && Object.keys(config).sort().join(',') === 'landedMs,settledMs,startMs,targetElementIds' && [config.startMs, config.landedMs, config.settledMs].every(Number.isSafeInteger) && Array.isArray(config.targetElementIds) && config.targetElementIds.every((id) => typeof id === 'string'); }
@@ -1787,6 +2088,7 @@ function parseOperation(input: unknown): AuthoringOperation | null {
       'motion.hold.insert',
       'motion.cue.create', 'motion.cue.update', 'motion.cue.delete', 'motion.cue.detach',
       'motion.transform-pose.set', 'motion.transform-waypoints.translate',
+      'motion.transform-waypoint.add', 'motion.transform-waypoint.remove',
       'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set',
       'motion.history.undo', 'motion.history.redo'].includes(String(value.kind))) {
     return null;
@@ -1828,7 +2130,18 @@ function parseOperation(input: unknown): AuthoringOperation | null {
       && typeof value.expectedTransform === 'string' && hasExactObjectKeys(value, [...baseKeys, 'elementId', 'trackId', 'keyframeId', 'expectedTransform', 'payload'])
       && payload && hasExactObjectKeys(payload, ['pose', 'stage']) && pose && parsePoseRecord(pose) && stage && parseStageRecord(stage) ? base : null;
   }
-  if (base.kind === 'motion.transform-waypoints.translate' || base.kind === 'motion.keyframe-group-time.set'
+  if (base.kind === 'motion.transform-waypoint.add') {
+    const payload = plainRecord(value.payload); if (!payload || !hasExactObjectKeys(value, [...baseKeys, 'payload'])
+      || !hasExactObjectKeys(payload, ['targets', 'timeMs']) || !Number.isSafeInteger(payload.timeMs)
+      || !Array.isArray(payload.targets)) return null;
+    const targets = payload.targets.map(plainRecord);
+    return targets.every((target) => target && hasExactObjectKeys(target,
+      ['elementId', 'trackId', 'beforeKeyframeId', 'afterKeyframeId', 'expectedBeforeTransform', 'expectedAfterTransform'])
+      && Object.values(target).every((member) => typeof member === 'string'))
+      && validTrajectoryInsertionTargets(payload.targets as TrajectoryInsertionTarget[]) ? base : null;
+  }
+  if (base.kind === 'motion.transform-waypoints.translate' || base.kind === 'motion.transform-waypoint.remove'
+    || base.kind === 'motion.keyframe-group-time.set'
     || base.kind === 'motion.keyframe-group-easing.set' || base.kind === 'motion.settled-hold.set') {
     const payload = plainRecord(value.payload); if (!payload || !hasExactObjectKeys(value, [...baseKeys, 'payload'])) return null;
     const targets = payload.targets; if (!Array.isArray(targets) || !targets.every((target) => {
@@ -1839,6 +2152,8 @@ function parseOperation(input: unknown): AuthoringOperation | null {
       const stage = plainRecord(payload.stage); return hasExactObjectKeys(payload, ['targets', 'deltaXPpm', 'deltaYPpm', 'stage'])
         && Number.isSafeInteger(payload.deltaXPpm) && Number.isSafeInteger(payload.deltaYPpm) && stage && parseStageRecord(stage) ? base : null;
     }
+    if (base.kind === 'motion.transform-waypoint.remove') return hasExactObjectKeys(payload, ['targets', 'timeMs'])
+      && Number.isSafeInteger(payload.timeMs) ? base : null;
     if (base.kind === 'motion.keyframe-group-time.set') return hasExactObjectKeys(payload, ['targets', 'sourceTimeMs', 'targetTimeMs', 'landingTimeMs', 'settledTimeMs'])
       && ['sourceTimeMs', 'targetTimeMs', 'landingTimeMs', 'settledTimeMs'].every((key) => Number.isSafeInteger(payload[key])) ? base : null;
     if (base.kind === 'motion.keyframe-group-easing.set') return hasExactObjectKeys(payload, ['targets', 'expectedEasing', 'easing'])

@@ -99,7 +99,9 @@ describe('branch/claim bounded recovery', () => {
       fault: (point) => { if (!injected && point === 'after-commit') { injected = true; throw new Error('LOST'); } } });
     const client = new MotionServiceClient(service.url, (...args) => fetch(...args), { actor: 'agent', capability: 'cli-agent', claimSecret: secret });
     const command = makeClaimAcquireCommand({ operationId: 'lost-acquire', documentId: seed.documentId, expectedRevision: 0, scope: 'document' });
-    expect(await client.dispatch(command)).toEqual({ ok: false, code: 'STORAGE_FAILURE' }); await service.close();
+    expect(await client.dispatch(command)).toEqual({ ok: false, code: 'STORAGE_FAILURE', diagnostic: {
+      schemaVersion: 'motion.diagnostic.v1', code: 'STORAGE_FAILURE', category: 'storage', retryable: true,
+    } }); await service.close();
     const restarted = await startLocalMotionService({ databasePath: temp.databasePath, seed, now: () => 100 });
     const retryClient = new MotionServiceClient(restarted.url, (...args) => fetch(...args), { actor: 'agent', capability: 'cli-agent', claimSecret: secret });
     const retry = await retryClient.dispatch(command); expect(retry).toMatchObject({ ok: true, leaseVersion: 1 });
@@ -137,7 +139,8 @@ describe('branch/claim bounded recovery', () => {
     expect(release).toMatchObject({ ok: true, resultingRevision: 1, leaseVersion: 3 });
     expect(await client.dispatch(makeTrackCreateCommand({ operationId: 'restart-after-release', documentId: seed.documentId,
       branchId: 'main', expectedRevision: 1, elementId: 'el_2dbee68b1ea318c8' })))
-      .toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM' });
+      .toEqual({ ok: false, code: 'UNAUTHORIZED_CLAIM', diagnostic: { schemaVersion: 'motion.diagnostic.v1',
+        code: 'CLAIM_EXPIRED', category: 'authorization', retryable: true } });
     expect(JSON.stringify(service.store.snapshot())).not.toContain(secret);
     await service.close(); await temp.cleanup();
   });

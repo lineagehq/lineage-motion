@@ -17,6 +17,7 @@ declare global {
         unavailableSelection: boolean; unavailableCreation: boolean; draftConflictRevision: number | null; lastCommitSeq: number;
         draftStaleBaseRevision: number | null; draftDirty: boolean; draftValues: Record<string, string>;
         pendingRevision: number | null;
+        publicationPending: boolean; publicationState: 'settled' | 'pending' | 'failed'; publicationFailureCode: string | null;
         serviceBacked: boolean; activeBranchId: string; immutableRefetchCount: number;
         lastCommit: import('../../../packages/motion-protocol/src/index.ts').CommitMetadata | null;
       };
@@ -35,9 +36,20 @@ declare global {
       inspectCueWorkspace: () => { active: boolean; pickRole: 'cursor' | 'pulse' | 'reveal' | null;
         selectedRoles: { cursor: boolean; pulse: boolean; reveal: boolean }; targetCandidateCount: number; pathHandleCount: number;
         authoredCues: Array<{ kind: 'cursor-path' | 'click' | 'reveal'; semantic: unknown; generatedTrackCount: number }> };
+      inspectCollaboration: () => {
+        workspace: import('../../../packages/domain/src/index.ts').WorkspaceProjection | null;
+        branches: import('../../../packages/motion-protocol/src/index.ts').BranchList | null;
+        claims: import('../../../packages/motion-protocol/src/index.ts').ActiveClaimList | null;
+        activity: import('../../../packages/motion-protocol/src/index.ts').ActivityPage | null;
+        diagnostic: import('../../../packages/motion-protocol/src/index.ts').MotionDiagnostic | null;
+      };
       switchBranch: (branchId: string) => Promise<void>;
       disconnectEvents: () => void;
       reconnectEvents: () => void;
+      delayNextPublication: () => void;
+      releasePublication: () => void;
+      failNextPublication: () => void;
+      retryPublication: () => Promise<boolean>;
     };
   }
 }

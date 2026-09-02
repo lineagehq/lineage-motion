@@ -1,7 +1,9 @@
 import { createServer, type Server, type ServerResponse } from 'node:http';
 
-import { canonicalJson, type MotionDocument } from '../../domain/src/index.ts';
-import { parseCommand, type CommitMetadata } from '../../motion-protocol/src/index.ts';
+import { canonicalJson, sha256Hex, type MotionDocument } from '../../domain/src/index.ts';
+import { compileMotionDocument } from '../../css-compiler/src/index.ts';
+import { parseCommandDetailed, parseOperationPreparationRequest, type CommandFailure,
+  type CommitMetadata } from '../../motion-protocol/src/index.ts';
 import type { ProjectStore } from '../../project-store/src/index.ts';
 import { acquireStoreLock, type StoreLock } from './lock-runner.ts';
 import { prepareStorePath } from './paths.ts';
@@ -33,16 +35,87 @@ export async function startLocalMotionService(options: { databasePath: string; s
     try {
       if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { ok: true });
       if (request.method === 'POST' && url.pathname === '/api/v1/commands') {
-        const parsed = parseCommand(await readJson(request));
-        if (!parsed.ok) return json(response, parsed.code === 'UNSUPPORTED_VERSION' ? 400 : 422, parsed);
+        let input: unknown; try { input = await readJson(request); }
+        catch { return json(response, 422, commandFailure('VALIDATION', 'PROTOCOL_COMMAND_INVALID', 'protocol', false, '$')); }
+        const parsed = parseCommandDetailed(input);
+        if (!parsed.ok) return json(response, parsed.response.code === 'UNSUPPORTED_VERSION' ? 400 : 422, parsed.response);
         const auth = authenticate(request, capabilities);
-        if (!auth) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        if (!auth) return json(response, 403, commandFailure('UNAUTHORIZED_CLAIM', 'ACTOR_FORBIDDEN', 'authorization', false));
         let result;
         try { result = store!.execute(parsed.command, { ...auth, now: options.now?.() ?? Date.now() }); }
-        catch { return json(response, 500, { ok: false, code: 'STORAGE_FAILURE' }); }
+        catch { return json(response, 500, commandFailure('STORAGE_FAILURE', 'STORAGE_FAILURE', 'storage', true)); }
         if ('event' in result && !result.replayed) publish(subscribers.get(result.event.documentId), result.event);
         return json(response, result.response.ok ? 200 : result.response.code === 'STALE_REVISION' ? 409
           : result.response.code === 'UNAUTHORIZED_CLAIM' ? 403 : 422, result.response);
+      }
+      if (request.method === 'POST' && url.pathname === '/api/v1/commands/validate') {
+        let input: unknown; try { input = await readJson(request); }
+        catch { const invalid = commandFailure('VALIDATION', 'PROTOCOL_COMMAND_INVALID', 'protocol', false, '$');
+          return json(response, 422, { schemaVersion: 'motion.command-validation.v1', valid: false, response: invalid }); }
+        const parsed = parseCommandDetailed(input);
+        if (!parsed.ok) return json(response, 422, { schemaVersion: 'motion.command-validation.v1', valid: false,
+          response: parsed.response });
+        const auth = authenticate(request, capabilities);
+        if (!auth) return json(response, 403, { schemaVersion: 'motion.command-validation.v1', valid: false, response: {
+          ok: false, code: 'UNAUTHORIZED_CLAIM', diagnostic: { schemaVersion: 'motion.diagnostic.v1',
+            code: 'ACTOR_FORBIDDEN', category: 'authorization', retryable: false } } });
+        const checked = store!.validate(parsed.command, { ...auth, now: options.now?.() ?? Date.now() });
+        return json(response, 200, { schemaVersion: 'motion.command-validation.v1', valid: checked.ok,
+          response: checked.ok ? { ok: true } : checked });
+      }
+      const preparation = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/branches\/([^/]+)\/operations\/prepare$/);
+      if (request.method === 'POST' && preparation) {
+        if (!authenticate(request, capabilities)) return json(response, 403,
+          commandFailure('UNAUTHORIZED_CLAIM', 'ACTOR_FORBIDDEN', 'authorization', false));
+        let parsed; try { parsed = parseOperationPreparationRequest(await readJson(request)); }
+        catch { return json(response, 422, commandFailure('VALIDATION', 'PROTOCOL_PREPARATION_REQUEST_INVALID',
+          'protocol', false, '$')); }
+        const documentId = decodeURIComponent(preparation[1]!); const branchId = decodeURIComponent(preparation[2]!);
+        if (parsed.documentId !== documentId || parsed.branchId !== branchId)
+          return json(response, 422, commandFailure('VALIDATION', 'PROTOCOL_PREPARATION_REQUEST_INVALID',
+            'protocol', false, '$'));
+        let found; try { found = store!.prepareOperation(parsed); }
+        catch { return json(response, 500, commandFailure('STORAGE_FAILURE', 'STORAGE_FAILURE', 'storage', true)); }
+        return json(response, found ? 200 : 404, found ??
+          commandFailure('VALIDATION', 'BRANCH_NOT_FOUND', 'target', false));
+      }
+      const workspace = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/branches\/([^/]+)\/workspace$/);
+      if (request.method === 'GET' && workspace) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        const found = store!.readWorkspace(decodeURIComponent(workspace[1]!), decodeURIComponent(workspace[2]!));
+        return json(response, found ? 200 : 404, found ?? { ok: false });
+      }
+      const branches = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/branches$/);
+      if (request.method === 'GET' && branches) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        const found = store!.listBranches(decodeURIComponent(branches[1]!)); return json(response, found ? 200 : 404, found ?? { ok: false });
+      }
+      const claims = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/claims$/);
+      if (request.method === 'GET' && claims) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        if (url.searchParams.get('status') !== 'active') return json(response, 400, { ok: false, code: 'VALIDATION' });
+        const found = store!.listActiveClaims(decodeURIComponent(claims[1]!), options.now?.() ?? Date.now());
+        return json(response, found ? 200 : 404, found ?? { ok: false });
+      }
+      const activity = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/activity$/);
+      if (request.method === 'GET' && activity) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        const after = parseNonnegative(url.searchParams.get('afterCommitSeq'), 0); const limit = parsePositive(url.searchParams.get('limit'), 100);
+        if (after === null || limit === null || limit > 500) return json(response, 400, { ok: false, code: 'VALIDATION' });
+        const found = store!.listActivity(decodeURIComponent(activity[1]!), after, limit);
+        return json(response, found ? 200 : 404, found ?? { ok: false });
+      }
+      const exportProof = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/branches\/([^/]+)\/export-proof$/);
+      if (request.method === 'GET' && exportProof) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        const documentId = decodeURIComponent(exportProof[1]!); const branchIdValue = decodeURIComponent(exportProof[2]!);
+        const found = store!.readHead(documentId, branchIdValue); if (!found) return json(response, 404, { ok: false });
+        const compiled = compileMotionDocument(found.document); return json(response, 200, {
+          schemaVersion: 'motion.export-proof.v1', documentId, branchId: branchIdValue, revision: found.document.revision,
+          canonicalDigest: found.canonicalDigest, htmlDigest: sha256Hex(compiled.html), cssDigest: sha256Hex(compiled.css),
+          exportDigest: compiled.exportDigest, reducedMotionDigest: sha256Hex(found.document.reducedMotion.css), counts: {
+            ruleCount: found.document.inventory.ruleCount, applicationCount: found.document.inventory.applicationCount,
+            slotCount: found.document.inventory.slotCount, trackCount: found.document.inventory.trackCount } });
       }
       const head = url.pathname.match(/^\/api\/v1\/documents\/([^/]+)\/(?:branches\/([^/]+)\/)?head$/);
       if (request.method === 'GET' && head) {
@@ -106,4 +179,13 @@ async function readJson(request: import('node:http').IncomingMessage): Promise<u
 }
 async function closeServer(server: Server): Promise<void> {
   await new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
+}
+function parseNonnegative(value: string | null, fallback: number): number | null { if (value === null) return fallback;
+  return /^\d+$/.test(value) && Number.isSafeInteger(Number(value)) ? Number(value) : null; }
+function parsePositive(value: string | null, fallback: number): number | null { const parsed = parseNonnegative(value, fallback);
+  return parsed !== null && parsed > 0 ? parsed : null; }
+function commandFailure(code: CommandFailure['code'], diagnosticCode: string,
+  category: CommandFailure['diagnostic']['category'], retryable: boolean, fieldPath?: string): CommandFailure {
+  return { ok: false, code, diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: diagnosticCode, category, retryable,
+    ...(fieldPath ? { fieldPath } : {}) } };
 }

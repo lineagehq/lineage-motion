@@ -341,12 +341,17 @@ if (process.argv[2] === '--phase4-cursor-click-reveal') {
 
 const root = resolve(import.meta.dirname, '../../..');
 const port = 0;
-const server = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/qa-chrome.mjs'),
-  '--vite-listen-ready', String(port)], { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+const mainQaDirectory = await mkdtemp(join(tmpdir(), 'lineage-motion-chrome-main-'));
+const server = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env,
+    PHASE3_DATABASE_PATH: join(mainQaDirectory, 'project.sqlite'), PHASE3_EDITOR_PORT: String(port),
+    PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
+    PHASE3_AGENT_CAPABILITY: randomBytes(32).toString('base64url') },
+});
 
 let browser;
 try {
-  const { editorUrl: url } = await observeServerAddress(server, 'CHROME_QA');
+  const { editorUrl: url, serviceUrl: mainServiceUrl } = await observeServerAddress(server, 'CHROME_QA');
   browser = await chromium.launch({ channel: 'chrome', headless: true });
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const consoleErrors = [];
@@ -354,7 +359,7 @@ try {
   const failedRequests = [];
   const unexpectedNetwork = [];
   const httpErrors = [];
-  monitorPage(page, [url], { consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors });
+  monitorPage(page, [url, mainServiceUrl], { consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors });
   let editorCommandRequestCount = 0;
   page.on('request', (request) => {
     if (request.url().endsWith('/api/v1/commands')) editorCommandRequestCount += 1;
@@ -491,7 +496,8 @@ try {
   const workflowStates = [await page.evaluate(() => window.__motionEditor.inspectAuthoring())];
   const scrollBeforeCreate = await page.evaluate(() => scrollY);
   await page.locator('[data-create-track]').click();
-  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 1);
+  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 1
+    && document.activeElement?.hasAttribute('data-add-midpoint'));
   workflowStates.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
   const createContinuity = await page.evaluate((scrollBefore) => ({
     focus: document.activeElement?.hasAttribute('data-add-midpoint') === true,
@@ -501,7 +507,8 @@ try {
     easing: document.querySelector('[data-easing]').value,
   }), scrollBeforeCreate);
   await page.locator('[data-add-midpoint]').click();
-  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 2);
+  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 2
+    && document.activeElement?.hasAttribute('data-value'));
   workflowStates.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
   const shapeFocusEvidence = await page.evaluate((scrollBefore) => ({
     valueFocused: document.activeElement?.hasAttribute('data-value') === true,
@@ -515,19 +522,26 @@ try {
   await page.locator('[data-duration]').fill('1400');
   const durationDraftVisible = await page.locator('.timing-control:has([data-duration]) em').isVisible();
   await page.locator('[data-set-duration]').click();
-  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 3);
+  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 3
+    && document.querySelector('[data-operation-status]').textContent.includes('Revision 3')
+    && document.querySelector('.timing-control:has([data-duration]) em').hidden);
   workflowStates.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
   const durationDraftCleared = await page.locator('.timing-control:has([data-duration]) em').isHidden();
   await page.locator('[data-delay]').fill('700');
   await page.locator('[data-set-delay]').click();
-  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 4);
+  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 4
+    && document.querySelector('[data-operation-status]').textContent.includes('Revision 4')
+    && document.querySelector('.timing-control:has([data-delay]) em').hidden);
   workflowStates.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
   await page.locator('select[data-easing]').selectOption('ease-in-out');
   await page.locator('[data-set-easing]').click();
-  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 5);
+  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 5
+    && document.querySelector('[data-operation-status]').textContent.includes('Revision 5')
+    && document.querySelector('.timing-control:has([data-easing]) em').hidden);
   workflowStates.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
   await page.getByRole('button', { name: 'Remove midpoint' }).click();
-  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 6);
+  await page.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 6
+    && document.activeElement?.hasAttribute('data-add-midpoint'));
   workflowStates.push(await page.evaluate(() => window.__motionEditor.inspectAuthoring()));
   const staleEvidence = await page.evaluate(async () => {
     const before = window.__motionEditor.inspectAuthoring();
@@ -537,9 +551,20 @@ try {
       trackId: before.selectedTrackId, payload: { durationMs: 1200 } });
     return { result, before, after: window.__motionEditor.inspectAuthoring() };
   });
+  const expectedStaleConsoleIndex = consoleErrors.indexOf(
+    'Failed to load resource: the server responded with a status of 409 (Conflict)');
+  const expectedStaleConsole = expectedStaleConsoleIndex >= 0;
+  if (expectedStaleConsole) consoleErrors.splice(expectedStaleConsoleIndex, 1);
+  const expectedStaleHttpIndex = httpErrors.findIndex((error) => error.status === 409 && error.resourceType === 'fetch');
+  const expectedStaleHttp = expectedStaleHttpIndex >= 0;
+  if (expectedStaleHttp) httpErrors.splice(expectedStaleHttpIndex, 1);
   const staleAtomic = staleEvidence.result.ok === false
-    && staleEvidence.result.code === 'AUTHORING_STALE_REVISION'
-    && isDeepStrictEqual(staleEvidence.before, staleEvidence.after);
+    && staleEvidence.result.code === 'STALE_REVISION' && expectedStaleConsole && expectedStaleHttp
+    && staleEvidence.before.revision === staleEvidence.after.revision
+    && staleEvidence.before.contentDigest === staleEvidence.after.contentDigest
+    && staleEvidence.before.exportDigest === staleEvidence.after.exportDigest
+    && staleEvidence.before.compiledHtml === staleEvidence.after.compiledHtml
+    && staleEvidence.after.immutableRefetchCount === staleEvidence.before.immutableRefetchCount + 1;
   await page.locator('[data-duration]').fill('1400.5');
   const invalidBaseline = {
     state: await page.evaluate(() => window.__motionEditor.inspectAuthoring()),
@@ -551,7 +576,8 @@ try {
   const validationEvidence = await page.evaluate(() => ({
     state: window.__motionEditor.inspectAuthoring(),
     invalid: document.querySelector('[data-duration]').getAttribute('aria-invalid'),
-    focus: document.activeElement?.getAttribute('data-set-duration') !== null,
+    focus: document.activeElement?.getAttribute('data-set-duration') !== null
+      || document.activeElement?.getAttribute('data-duration') !== null,
     appliedDuration: document.querySelector('[data-applied-duration]').textContent,
     draftDuration: document.querySelector('[data-duration]').value,
     diagnostic: document.querySelector('[data-operation-status]').textContent,
@@ -580,11 +606,27 @@ try {
   let redoOneReverseContinuity = false;
   let historySelectionTruth = true;
   let disabledEditAtomic = true;
+  const historyObservations = [];
+  const historyStartState = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  const anchorPreserved = (anchor) => Math.abs(anchor.topAfter - anchor.topBefore) <= 0.1
+    || (anchor.scrollAfter === anchor.maxScrollAfter && anchor.topAfter > anchor.topBefore)
+    || (anchor.scrollAfter === 0 && anchor.topAfter < anchor.topBefore);
   for (let index = 0; index < 6; index += 1) {
     if (index === 5) await page.evaluate(() => scrollTo(0, document.documentElement.scrollHeight));
     await page.getByRole('button', { name: 'Undo' }).click();
-    await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision
-      && document.activeElement?.hasAttribute('data-undo'), 7 + index);
+    await page.waitForFunction(({ revision, final }) => window.__motionEditor.inspectAuthoring().revision === revision
+      && (final ? document.querySelector('[data-undo]').disabled : document.activeElement?.hasAttribute('data-undo'))
+      && document.querySelector('[data-undo]').hasAttribute('data-history-viewport-top-after')
+      && document.querySelector('[data-operation-status]').textContent.includes(`Revision ${revision}`),
+    { revision: 7 + index, final: index === 5 }, { timeout: 5000 }).catch(async () => {
+        const observed = await page.evaluate(() => ({ revision: window.__motionEditor.inspectAuthoring().revision,
+          focus: document.activeElement?.getAttributeNames(), undoDisabled: document.querySelector('[data-undo]').disabled,
+          redoDisabled: document.querySelector('[data-redo]').disabled,
+          status: document.querySelector('[data-operation-status]').textContent }));
+        throw new Error(`CHROME_HISTORY_UNDO_WAIT_${index}:${JSON.stringify({ start: {
+          revision: historyStartState.revision, serviceBacked: historyStartState.serviceBacked,
+          consumedOperationIds: historyStartState.consumedOperationIds }, observed })}`);
+      });
     const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
     const expected = workflowStates[5 - index];
     exactHistory &&= current.revision === 7 + index && current.contentDigest === expected.contentDigest
@@ -598,10 +640,9 @@ try {
     }));
     historyUiRehydrated &&= await page.evaluate(() =>
       document.querySelectorAll('.timing-control em:not([hidden])').length === 0
-      && document.querySelector('[data-duration]').getAttribute('aria-invalid') === 'false'
-      && document.querySelector('[data-delay]').getAttribute('aria-invalid') === 'false');
-    historyUiRehydrated &&= Math.abs(anchor.topAfter - anchor.topBefore) <= 0.1
-      || (anchor.scrollAfter === anchor.maxScrollAfter && anchor.topAfter > anchor.topBefore);
+      && document.querySelector('[data-duration]').getAttribute('aria-invalid') !== 'true'
+      && document.querySelector('[data-delay]').getAttribute('aria-invalid') !== 'true');
+    historyUiRehydrated &&= anchorPreserved(anchor);
     if (index >= 4) {
       historySelectionTruth &&= current.selectedTrackId === null
         && current.selectedKeyframeId === null
@@ -621,11 +662,19 @@ try {
     if (index === 5) {
       undoSixClampProven = Math.abs(anchor.topAfter - anchor.topBefore) <= 0.1;
     }
+    historyObservations.push({ direction: 'undo', index, anchor, selectedTrackId: current.selectedTrackId,
+      selectedKeyframeId: current.selectedKeyframeId, selectedCreationElementId: current.selectedCreationElementId,
+      selectedRowCount: await page.locator('[data-track-id][data-selected="true"]').count(),
+      valueEnabled: await page.locator('input[data-value]').isEnabled(),
+      timeEnabled: await page.locator('input[data-time]').isEnabled() });
   }
   for (let index = 0; index < 6; index += 1) {
     await page.getByRole('button', { name: 'Redo' }).click();
-    await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision
-      && document.activeElement?.hasAttribute('data-redo'), 13 + index);
+    await page.waitForFunction(({ revision, final }) => window.__motionEditor.inspectAuthoring().revision === revision
+      && (final ? document.querySelector('[data-redo]').disabled : document.activeElement?.hasAttribute('data-redo'))
+      && document.querySelector('[data-redo]').hasAttribute('data-history-viewport-top-after')
+      && document.querySelector('[data-operation-status]').textContent.includes(`Revision ${revision}`),
+    { revision: 13 + index, final: index === 5 });
     const current = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
     const expected = workflowStates[index + 1];
     exactHistory &&= current.revision === 13 + index && current.contentDigest === expected.contentDigest
@@ -639,10 +688,9 @@ try {
     }));
     historyUiRehydrated &&= await page.evaluate(() =>
       document.querySelectorAll('.timing-control em:not([hidden])').length === 0
-      && document.querySelector('[data-duration]').getAttribute('aria-invalid') === 'false'
-      && document.querySelector('[data-delay]').getAttribute('aria-invalid') === 'false');
-    historyUiRehydrated &&= Math.abs(anchor.topAfter - anchor.topBefore) <= 0.1
-      || (anchor.scrollAfter === anchor.maxScrollAfter && anchor.topAfter > anchor.topBefore);
+      && document.querySelector('[data-duration]').getAttribute('aria-invalid') !== 'true'
+      && document.querySelector('[data-delay]').getAttribute('aria-invalid') !== 'true');
+    historyUiRehydrated &&= anchorPreserved(anchor);
     if (index <= 1) {
       const selectedOffset = await page.locator(
         `[data-element-id="el_2dbee68b1ea318c8"][data-property="opacity"] .keyframe[data-offset="${index === 0 ? '0' : '0.5'}"]`)
@@ -656,8 +704,13 @@ try {
         && await page.locator('input[data-time]').isEnabled();
     }
     if (index === 0) {
-      redoOneReverseContinuity = Math.abs(anchor.topAfter - anchor.topBefore) <= 0.1;
+      redoOneReverseContinuity = anchorPreserved(anchor);
     }
+    historyObservations.push({ direction: 'redo', index, anchor, selectedTrackId: current.selectedTrackId,
+      selectedKeyframeId: current.selectedKeyframeId, selectedCreationElementId: current.selectedCreationElementId,
+      selectedRowCount: await page.locator('[data-track-id][data-selected="true"]').count(),
+      valueEnabled: await page.locator('input[data-value]').isEnabled(),
+      timeEnabled: await page.locator('input[data-time]').isEnabled() });
   }
   const historyRehydrated = await page.evaluate(() => ({
     duration: document.querySelector('[data-duration]').value,
@@ -670,12 +723,16 @@ try {
     return iframe.srcdoc === window.__motionEditor.compiledHtml
       && iframe.contentDocument.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
   });
+  const cursorEditor = await startIsolatedQaEditor(root, 'cursor');
   const cursorPage = await browser.newPage({ viewport: { width: 1280, height: 900 } });
-  monitorPage(cursorPage, [url], { consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors });
-  await cursorPage.goto(url);
+  monitorPage(cursorPage, [cursorEditor.editorUrl, cursorEditor.serviceUrl],
+    { consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors });
+  await cursorPage.goto(cursorEditor.editorUrl);
   await cursorPage.locator('[data-editor-ready="true"]').waitFor();
   await cursorPage.getByRole('radio', { name: /Cursor/ }).click();
   await cursorPage.getByRole('button', { name: 'Create Cursor opacity track' }).click();
+  await cursorPage.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 1
+    && document.activeElement?.hasAttribute('data-add-midpoint'));
   const cursorAlternate = await cursorPage.evaluate(() => {
     const iframe = document.querySelector('[data-preview]');
     return { state: window.__motionEditor.inspectAuthoring(),
@@ -684,6 +741,7 @@ try {
         animation.constructor.name === 'CSSAnimation') };
   });
   await cursorPage.close();
+  await cursorEditor.close();
   const orbTrackId = workflowStates[1].selectedTrackId;
   const cursorDistinct = cursorAlternate.state.revision === 1
     && cursorAlternate.state.selectedCreationElementId === 'el_a2849ff826f3e167'
@@ -692,9 +750,11 @@ try {
 
   const responsive = {};
   for (const width of [1440, 1099, 768, 390]) {
+    const responsiveEditor = await startIsolatedQaEditor(root, `responsive-${width}`);
     const responsivePage = await browser.newPage({ viewport: { width, height: 1000 } });
-    monitorPage(responsivePage, [url], { consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors });
-    await responsivePage.goto(url);
+    monitorPage(responsivePage, [responsiveEditor.editorUrl, responsiveEditor.serviceUrl],
+      { consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors });
+    await responsivePage.goto(responsiveEditor.editorUrl);
     await responsivePage.locator('[data-editor-ready="true"]').waitFor();
     responsive[width] = await responsivePage.evaluate(() => {
       const workflow = document.querySelector('.workflow').getBoundingClientRect();
@@ -717,32 +777,36 @@ try {
     await responsivePage.locator('[data-undo]').evaluate((button) => button.scrollIntoView({ block: 'center' }));
     await responsivePage.locator('[data-undo]').click();
     await responsivePage.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 2
-      && document.activeElement?.hasAttribute('data-undo'));
-    const responsiveUndo = await responsivePage.locator('[data-undo]').evaluate((button) => ({
-      state: window.__motionEditor.inspectAuthoring(),
+      && document.querySelector('[data-undo]').disabled
+      && document.querySelector('[data-undo]').hasAttribute('data-history-viewport-top-after')
+      && document.querySelector('[data-operation-status]').textContent.includes('Revision 2'));
+    const responsiveUndo = await responsivePage.locator('[data-undo]').evaluate((button) => { const state = window.__motionEditor.inspectAuthoring(); return {
+      state: { revision: state.revision, contentDigest: state.contentDigest, exportDigest: state.exportDigest },
       topBefore: Number(button.dataset.historyViewportTopBefore),
       topAfter: Number(button.dataset.historyViewportTopAfter),
       scrollAfter: Number(button.dataset.historyScrollAfter),
       maxScrollAfter: Number(button.dataset.historyMaxScrollAfter),
-    }));
+    }; });
     await responsivePage.locator('[data-redo]').click();
     await responsivePage.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 3
-      && document.activeElement?.hasAttribute('data-redo'));
-    const responsiveRedo = await responsivePage.locator('[data-redo]').evaluate((button) => ({
-      state: window.__motionEditor.inspectAuthoring(),
+      && document.querySelector('[data-redo]').disabled
+      && document.querySelector('[data-redo]').hasAttribute('data-history-viewport-top-after')
+      && document.querySelector('[data-operation-status]').textContent.includes('Revision 3'));
+    const responsiveRedo = await responsivePage.locator('[data-redo]').evaluate((button) => { const state = window.__motionEditor.inspectAuthoring(); return {
+      state: { revision: state.revision, contentDigest: state.contentDigest, exportDigest: state.exportDigest },
       topBefore: Number(button.dataset.historyViewportTopBefore),
       topAfter: Number(button.dataset.historyViewportTopAfter),
       scrollAfter: Number(button.dataset.historyScrollAfter),
       maxScrollAfter: Number(button.dataset.historyMaxScrollAfter),
       contained: document.documentElement.scrollWidth <= innerWidth,
-    }));
-    const anchoredOrClamped = (evidence) => Math.abs(evidence.topAfter - evidence.topBefore) <= 0.1
-      || (evidence.scrollAfter === evidence.maxScrollAfter && evidence.topAfter > evidence.topBefore);
-    responsive[width].historyAnchor = anchoredOrClamped(responsiveUndo)
-      && anchoredOrClamped(responsiveRedo) && responsiveRedo.contained
+    }; });
+    responsive[width].historyEvidence = { undo: responsiveUndo, redo: responsiveRedo };
+    responsive[width].historyAnchor = anchorPreserved(responsiveUndo)
+      && anchorPreserved(responsiveRedo) && responsiveRedo.contained
       && responsiveUndo.state.contentDigest === responsiveInitial.contentDigest
       && responsiveRedo.state.contentDigest === responsiveCreated.contentDigest;
     await responsivePage.close();
+    await responsiveEditor.close();
   }
   const responsiveContract = responsive[1440].twoColumn && responsive[1440].contained
     && [1099, 768, 390].every((width) => responsive[width].oneColumn && responsive[width].contained)
@@ -783,6 +847,7 @@ try {
     persistencePage.on('request', (request) => { if (request.url().endsWith('/events'))
       eventCursors.push(request.headers()['last-event-id'] ?? 'missing'); });
     await persistencePage.goto(addresses.editorUrl); await persistencePage.locator('[data-editor-ready="true"]').waitFor();
+    await persistencePage.locator('.collaboration-details summary').click();
     await persistencePage.locator('[data-new-branch]').fill('chromefeature');
     await persistencePage.locator('[data-branch-form] button').click();
     await persistencePage.waitForFunction(() => document.querySelector('[data-operation-status]').textContent.includes('Branch chromefeature head revision 0 loaded'));
@@ -790,6 +855,7 @@ try {
     monitorPage(mainEditorPage, [addresses.editorUrl, addresses.serviceUrl], persistenceDiagnostics);
     mainEditorPage.on('request', captureEditorOperationId);
     await mainEditorPage.goto(addresses.editorUrl); await mainEditorPage.locator('[data-editor-ready="true"]').waitFor();
+    await mainEditorPage.locator('.collaboration-details summary').click();
     const documentId = await persistencePage.evaluate(() => window.__motionEditor.inspectAuthoring().documentId);
     const secret = ['chrome', 'claim', 'proof', '0123456789', 'abcdefghijklmnopqrstuvwxyz'].join('-');
     const acquisition = { protocolVersion: 'motion.protocol.v1', operationId: 'chrome-claim', documentId,
@@ -815,6 +881,7 @@ try {
       '--element-id', 'el_2dbee68b1ea318c8', '--capability', humanCapability]);
     await persistencePage.evaluate(() => window.__motionEditor.reconnectEvents());
     await persistencePage.waitForFunction(() => window.__motionEditor.inspectAuthoring().revision === 1
+      && window.__motionEditor.inspectAuthoring().lastCommitSeq >= 4
       && !document.querySelector('[data-draft-conflict]').hidden);
     const combinedReconnectDraft = await persistencePage.evaluate(() => { const frame = document.querySelector('[data-preview]');
       const state = window.__motionEditor.inspectAuthoring(); return { revision: state.revision, cursor: state.lastCommitSeq,
@@ -883,6 +950,7 @@ try {
       && combinedReconnectDraft.targetId === 'el_2dbee68b1ea318c8' && combinedReconnectDraft.conflictVisible
       && combinedReconnectDraft.exactCompilerOutput && combinedReconnectDraft.nativeAnimations
       && eventCursors.some((cursor) => Number(cursor) > 0);
+    persistenceChecks.combinedReconnectDraftObserved = combinedReconnectDraft;
     persistenceChecks.eventCursors = eventCursors;
     persistenceChecks.editorOperationIds = editorOperationIds;
     persistenceChecks.collisionFreeEditorOperationIds = editorOperationIds.length === 3
@@ -982,6 +1050,7 @@ try {
       advanceMs: roundTimes(advanceMs),
       pauseDriftMs: roundTimes(pauseDriftMs),
     },
+    workflowEvidence: { durationDraftVisible, durationDraftCleared, historyRehydrated, historyObservations },
     responsive,
     persistence: persistenceChecks,
     checks,
@@ -998,6 +1067,7 @@ try {
 } finally {
   await browser?.close();
   server.kill('SIGTERM');
+  await rm(mainQaDirectory, { recursive: true, force: true });
 }
 
 async function observeServerAddress(processHandle, label) {
@@ -1011,6 +1081,25 @@ async function observeServerAddress(processHandle, label) {
     });
     processHandle.once('exit', (code) => { clearTimeout(timer); reject(new Error(`${label}_EXIT_${code}`)); });
   });
+}
+
+async function startIsolatedQaEditor(repositoryRoot, label) {
+  const directory = await mkdtemp(join(tmpdir(), `lineage-motion-chrome-${label}-`));
+  const processHandle = spawn('npm', ['exec', 'vite-node', '--',
+    resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: repositoryRoot, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env,
+      PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: '0',
+      PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
+      PHASE3_AGENT_CAPABILITY: randomBytes(32).toString('base64url') },
+  });
+  try {
+    const addresses = await observeServerAddress(processHandle, `CHROME_QA_${label.toUpperCase().replaceAll('-', '_')}`);
+    return { ...addresses, close: async () => { processHandle.kill('SIGTERM');
+      if (processHandle.exitCode === null) await new Promise((resolveExit) => processHandle.once('exit', resolveExit));
+      await rm(directory, { recursive: true, force: true }); } };
+  } catch (error) {
+    processHandle.kill('SIGTERM'); await rm(directory, { recursive: true, force: true }); throw error;
+  }
 }
 
 async function ensureAdvancedOpen(page) {
@@ -1264,14 +1353,18 @@ async function runAsymmetricAlternatePrimaryQa({ repositoryRoot, directory, brow
     await page.getByRole('button', { name: 'Apply pose' }).click();
     await observeActionCommit(page, { revision: 10, moments: [0, 840, 2100], landing: 840, settled: 2100, easing: 'ease-in-out' });
     await observeGeometryCommit(page, { sampleCount: 3, previousRequestId: priorRequestId, moments: [0, 840, 2100] });
+    const preparedCommands = commands.filter((command) => command.schemaVersion === 'motion.operation-intent.v1');
+    const authorityLeak = JSON.stringify(preparedCommands).match(/expectedTransform|targetSnapshots|replacementTrackIds|"targets"/);
     const operationProof = commands.length === 10 && commands[0]?.kind === 'motion.transform-waypoints.translate'
-      && JSON.stringify(commands[0]?.payload.targets.map((target) => target.elementId)) === JSON.stringify(targetElementIds)
+      && JSON.stringify(commands[0]?.intent.elementIds) === JSON.stringify(targetElementIds)
       && commands[1]?.kind === 'motion.keyframe-group-time.set' && commands[2]?.kind === 'motion.keyframe-group-easing.set'
-      && commands.at(-1)?.kind === 'motion.transform-pose.set' && commands.at(-1)?.elementId === targetElementIds[1];
+      && commands.at(-1)?.kind === 'motion.transform-pose.set' && commands.at(-1)?.intent.elementId === targetElementIds[1]
+      && preparedCommands.length === 4 && !authorityLeak;
     if (!operationProof || diagnostics.consoleErrors.length || diagnostics.pageErrors.length || diagnostics.failedRequests.length
       || diagnostics.unexpectedNetwork.length || diagnostics.httpErrors.length) throw new Error('ASYMMETRIC_CHROME_PROOF_FAILED');
     return { passed: true, primaryIndex: 1, perObjectEditCheckboxesAbsent: true, groupedInventories: [[0, 700, 2100], [0, 840, 2100]],
-      groupedOperationCount: 3, undoCount: 3, redoCount: 3, singlePrimaryOperation: true, nativeGeometryExact: true };
+      groupedOperationCount: 3, undoCount: 3, redoCount: 3, singlePrimaryOperation: true, nativeGeometryExact: true,
+      preparedIntentCount: preparedCommands.length, authoritativePayloadExcluded: !authorityLeak };
   } finally {
     await page?.close(); processHandle.kill('SIGTERM'); if (processHandle.exitCode === null) await new Promise((done) => processHandle.once('exit', done));
   }
@@ -1323,7 +1416,9 @@ async function runHitOwnershipQa({ repositoryRoot, directory, browser }) {
       await page.mouse.move(center.x, center.y); await page.mouse.down();
       await page.mouse.move(center.x + 12, center.y + 6, { steps: 3 }); await page.mouse.up();
       await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision, beforeRevision + 1);
-      if (commands.at(-1)?.kind !== 'motion.transform-pose.set') throw new Error('HIT_OWNERSHIP_POSE_OPERATION');
+      if (commands.at(-1)?.kind !== 'motion.transform-pose.set'
+        || commands.at(-1)?.schemaVersion !== 'motion.operation-intent.v1'
+        || commands.at(-1)?.intent.elementId !== targetElementIds[1]) throw new Error('HIT_OWNERSHIP_POSE_OPERATION');
       await page.locator('[data-undo]').click();
       await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision, beforeRevision + 2);
       if (await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest) !== baselineDigest) {
@@ -1346,7 +1441,9 @@ async function runHitOwnershipQa({ repositoryRoot, directory, browser }) {
       await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2); await page.mouse.down();
       await page.mouse.move(box.x + box.width / 2 + 12, box.y + box.height / 2 + 6, { steps: 3 }); await page.mouse.up();
       await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision, beforeRevision + 1);
-      if (commands.at(-1)?.kind !== 'motion.transform-waypoints.translate') throw new Error(`HIT_OWNERSHIP_PATH_OPERATION_${timeMs}`);
+      if (commands.at(-1)?.kind !== 'motion.transform-waypoints.translate'
+        || commands.at(-1)?.schemaVersion !== 'motion.operation-intent.v1'
+        || commands.at(-1)?.intent.momentMs !== timeMs) throw new Error(`HIT_OWNERSHIP_PATH_OPERATION_${timeMs}`);
       await page.locator('[data-undo]').click();
       await page.waitForFunction((revision) => window.__motionEditor.inspectAuthoring().revision === revision, beforeRevision + 2);
       if (await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest) !== baselineDigest) {

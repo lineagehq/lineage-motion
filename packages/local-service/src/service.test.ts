@@ -106,7 +106,9 @@ describe('loopback sole-writer service', () => {
     expect(await retry.text()).toBe(first);
     const conflict = await new MotionServiceClient(service.url).dispatch({ ...command,
       command: { ...command.command, elementId: 'el_a2849ff826f3e167' } });
-    expect(conflict).toEqual({ ok: false, code: 'OPERATION_ID_CONFLICT' });
+    expect(conflict).toEqual({ ok: false, code: 'OPERATION_ID_CONFLICT', diagnostic: {
+      schemaVersion: 'motion.diagnostic.v1', code: 'OPERATION_ID_CONFLICT', category: 'protocol', retryable: false,
+    } });
     const snapshot = JSON.stringify(service.store.snapshot());
     expect(snapshot).toContain('private_payload_json');
     expect(first).not.toContain('selectorHint'); expect(first).not.toContain('presentation');
@@ -142,7 +144,7 @@ describe('loopback sole-writer service', () => {
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
     (service.store as SqliteProjectStore).database
       .prepare('INSERT INTO schema_migrations(version,checksum,applied_order) VALUES(?,?,?)')
-      .run(3, 'future-schema', 3);
+      .run(4, 'future-schema', 4);
     await service.close();
     await expect(startLocalMotionService({ databasePath: temporary.databasePath, seed }))
       .rejects.toThrow('UNSUPPORTED_SCHEMA_VERSION');

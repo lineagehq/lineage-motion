@@ -1,17 +1,21 @@
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
-import { canonicalBytes, canonicalJson, createAuthoringState, dispatchAuthoringOperation, sha256Hex,
-  validateMotionDocument, type AuthoringOperation, type AuthoringState, type MotionDocument } from '../../domain/src/index.ts';
+import { canonicalBytes, canonicalJson, createAuthoringState, dispatchAuthoringOperation, materializePreparedIntent,
+  prepareOperationIntent, projectWorkspace, sha256Hex, validateMotionDocument, type AuthoringOperation,
+  type AuthoringState, type MotionDocument, type OperationPreparation, type OperationPreparationRequest,
+  type PreparedOperationIntent } from '../../domain/src/index.ts';
+import { compileMotionDocument } from '../../css-compiler/src/index.ts';
 import { MAIN_BRANCH_ID, PROTOCOL_VERSION, canonicalResponseBytes, type CommandSuccess, type ControlReceipt,
-  type MotionCommand, type RevisionReceipt } from '../../motion-protocol/src/index.ts';
+  type ActiveClaimList, type ActivityPage, type BranchList, type CommandFailure, type MotionCommand,
+  type MotionDiagnostic, type RevisionReceipt } from '../../motion-protocol/src/index.ts';
 import type { AuthContext, CommitResult, ProjectStore } from '../../project-store/src/index.ts';
 import { MIGRATIONS } from './migrations.ts';
 
 export type FaultPoint = 'after-begin' | 'after-inserts' | 'before-commit' | 'after-commit';
 type HeadRow = { revision: number; json: string; digest: string };
 type ClaimRow = { claim_id: string; document_id: string; branch_id: string | null; token_hash: string;
-  lease_version: number; expires_at: number; active: number };
+  lease_version: number; expires_at: number; active: number; actor_id: string | null };
 
 export class SqliteProjectStore implements ProjectStore {
   readonly database: DatabaseSync; readonly path: string;
@@ -50,40 +54,125 @@ export class SqliteProjectStore implements ProjectStore {
   compareAndCommit(command: MotionCommand, auth: AuthContext = { actor: 'human', capability: 'human-editor', now: Date.now() }): CommitResult {
     return this.execute(command, auth);
   }
+  prepareOperation(request: OperationPreparationRequest): OperationPreparation | null {
+    const head = this.readHeadRow(request.documentId, request.branchId); if (!head) return null;
+    const document = JSON.parse(head.json) as MotionDocument; const compiled = compileMotionDocument(document);
+    return prepareOperationIntent(document, request.branchId, head.digest, compiled.exportDigest, request).preparation;
+  }
   execute(command: MotionCommand, auth: AuthContext): CommitResult {
     const publicDigest = sha256Hex(canonicalJson(command));
     const privateDigest = sha256Hex(`${auth.actor}\0${auth.capability}\0${auth.claimSecret ?? ''}`);
     this.database.exec('BEGIN IMMEDIATE');
     try {
       this.fault?.('after-begin');
+      const materialized = this.materialize(command);
+      if (!materialized.ok) { this.database.exec('ROLLBACK'); return { response: materialized.response }; }
+      const effective = materialized.command; const privatePayload = canonicalJson(effective.command);
       const prior = this.database.prepare('SELECT request_digest,private_context_digest,private_payload_json,sanitized_receipt_json FROM events WHERE document_id=? AND operation_id=?')
         .get(command.documentId, command.operationId) as { request_digest: string; private_context_digest: string;
           private_payload_json: string; sanitized_receipt_json: string } | undefined;
       if (prior) { this.database.exec('ROLLBACK'); return prior.request_digest === publicDigest
-        && prior.private_context_digest === privateDigest && prior.private_payload_json === canonicalJson(command.command)
+        && prior.private_context_digest === privateDigest && prior.private_payload_json === privatePayload
         ? { response: JSON.parse(prior.sanitized_receipt_json) as CommandSuccess,
           event: this.eventFor(command.documentId, command.operationId), replayed: true }
-        : { response: { ok: false, code: 'OPERATION_ID_CONFLICT' } }; }
-      const result = isAuthoringKind(command.command.kind)
-        ? this.author(command, auth, publicDigest, privateDigest)
-        : this.control(command, auth, publicDigest, privateDigest);
+        : { response: failure('OPERATION_ID_CONFLICT', 'OPERATION_ID_CONFLICT', 'protocol', false) }; }
+      const checked = this.validateMaterialized(effective, auth);
+      if (!checked.ok) { this.database.exec('ROLLBACK'); return { response: checked }; }
+      const result = isAuthoringKind(effective.command.kind)
+        ? this.author(effective, auth, publicDigest, privateDigest)
+        : this.control(effective, auth, publicDigest, privateDigest);
       if (!('event' in result)) { this.database.exec('ROLLBACK'); return result; }
       this.fault?.('before-commit'); this.database.exec('COMMIT'); this.fault?.('after-commit'); return result;
     } catch (error) { if (this.database.isTransaction) this.database.exec('ROLLBACK'); throw error; }
   }
+  validate(command: MotionCommand, auth: AuthContext): { ok: true } | CommandFailure {
+    const materialized = this.materialize(command); if (!materialized.ok) return materialized.response;
+    const prior = this.database.prepare('SELECT request_digest,private_context_digest,private_payload_json FROM events WHERE document_id=? AND operation_id=?')
+      .get(command.documentId, command.operationId) as { request_digest: string; private_context_digest: string;
+        private_payload_json: string } | undefined;
+    if (prior) { const publicDigest = sha256Hex(canonicalJson(command));
+      const privateDigest = sha256Hex(`${auth.actor}\0${auth.capability}\0${auth.claimSecret ?? ''}`);
+      return prior.request_digest === publicDigest && prior.private_context_digest === privateDigest
+        && prior.private_payload_json === canonicalJson(materialized.command.command) ? { ok: true }
+        : failure('OPERATION_ID_CONFLICT', 'OPERATION_ID_CONFLICT', 'protocol', false); }
+    return this.validateMaterialized(materialized.command, auth);
+  }
+  private validateMaterialized(command: MotionCommand, auth: AuthContext): { ok: true } | CommandFailure {
+    const head = this.readHeadRow(command.documentId, command.branchId);
+    if (!head) { const document = this.database.prepare('SELECT 1 ok FROM documents WHERE document_id=?').get(command.documentId);
+      return failure('VALIDATION', document ? 'BRANCH_NOT_FOUND' : 'DOCUMENT_NOT_FOUND', 'target', false,
+        { affectedIds: document ? [command.branchId] : [command.documentId] }); }
+    const operation = command.command;
+    if (isAuthoringKind(operation.kind)) {
+      if (head.revision !== command.expectedRevision) return stale(head.revision, head.digest);
+      const claim = this.claimDiagnostic(command.documentId, command.branchId, auth);
+      if (auth.actor === 'agent' && claim) return claim;
+      const last = this.readLastRevision(command.documentId).revision;
+      if (last >= Number.MAX_SAFE_INTEGER) return failure('VALIDATION', 'AUTHORING_REVISION_EXHAUSTED', 'domain', false);
+      const state = operation.kind === 'motion.history.undo' || operation.kind === 'motion.history.redo'
+        ? this.reconstructAuthoringState(command.documentId, head.revision) : createAuthoringState(JSON.parse(head.json));
+      const reduced = dispatchAuthoringOperation(state, operation, last + 1);
+      return reduced.ok ? { ok: true } : reducerFailure(reduced.diagnostic.code,
+        { affectedIds: affectedIds(command) });
+    }
+    if (operation.kind === 'motion.branch.create') {
+      if (auth.actor !== 'human') return forbidden();
+      if (head.revision !== command.expectedRevision) return stale(head.revision, head.digest);
+      const exists = this.database.prepare('SELECT 1 ok FROM branches WHERE document_id=? AND branch_id=?')
+        .get(command.documentId, operation.payload.branchId);
+      return exists ? failure('VALIDATION', 'BRANCH_ALREADY_EXISTS', 'target', false,
+        { affectedIds: [operation.payload.branchId] }) : { ok: true };
+    }
+    if (operation.kind === 'motion.claim.acquire') {
+      if (auth.actor !== 'agent') return forbidden();
+      const applicable = operation.payload.scope === 'document' ? this.readLastRevision(command.documentId) : head;
+      if (applicable.revision !== command.expectedRevision) return stale(applicable.revision, applicable.digest);
+      if (!auth.claimSecret || auth.claimSecret.length < 32) return claimFailure('CLAIM_SECRET_INVALID', false);
+      const targetBranch = operation.payload.scope === 'branch' ? operation.payload.branchId : null;
+      const overlap = this.database.prepare(`SELECT 1 ok FROM claims WHERE document_id=? AND active=1 AND expires_at>?
+        AND (branch_id IS NULL OR ? IS NULL OR branch_id=?) LIMIT 1`).get(command.documentId, auth.now, targetBranch, targetBranch);
+      return overlap ? claimFailure('CLAIM_OVERLAP', true) : { ok: true };
+    }
+    if (auth.actor !== (operation.kind === 'motion.claim.revoke' ? 'human' : 'agent')) return forbidden();
+    const leaseOperation = operation as Extract<MotionCommand['command'], { kind: 'motion.claim.renew' | 'motion.claim.release' | 'motion.claim.revoke' }>;
+    const claim = this.database.prepare('SELECT * FROM claims WHERE claim_id=? AND document_id=?')
+      .get(leaseOperation.payload.claimId, command.documentId) as ClaimRow | undefined;
+    if (!claim) return claimFailure('CLAIM_REQUIRED', false);
+    const applicable = claim.branch_id === null ? this.readLastRevision(command.documentId) : head;
+    if (applicable.revision !== command.expectedRevision) return stale(applicable.revision, applicable.digest);
+    if (!claim.active || claim.expires_at <= auth.now) return claimFailure('CLAIM_EXPIRED', true);
+    if (claim.branch_id !== null && claim.branch_id !== command.branchId) return claimFailure('CLAIM_SCOPE_MISMATCH', false);
+    if (claim.lease_version !== leaseOperation.payload.leaseVersion) return claimFailure('CLAIM_LEASE_STALE', true);
+    if (operation.kind !== 'motion.claim.revoke' && (!auth.claimSecret || sha256Hex(auth.claimSecret) !== claim.token_hash))
+      return claimFailure('CLAIM_SECRET_INVALID', false);
+    return { ok: true };
+  }
+  private materialize(command: MotionCommand): { ok: true; command: MotionCommand } | { ok: false; response: CommandFailure } {
+    if (command.command.schemaVersion !== 'motion.operation-intent.v1') return { ok: true, command };
+    const row = this.database.prepare('SELECT canonical_json,canonical_digest FROM revisions WHERE document_id=? AND revision=?')
+      .get(command.documentId, command.expectedRevision) as { canonical_json: string; canonical_digest: string } | undefined;
+    if (!row) return { ok: false, response: failure('VALIDATION', 'DERIVATION_STALE', 'revision', true) };
+    const document = JSON.parse(row.canonical_json) as MotionDocument; const compiled = compileMotionDocument(document);
+    const result = materializePreparedIntent(document, command.branchId, row.canonical_digest, compiled.exportDigest,
+      command.command as PreparedOperationIntent);
+    if (!result.ok) return { ok: false, response: failure('VALIDATION', result.code,
+      result.code === 'DERIVATION_STALE' ? 'revision' : 'domain', result.code === 'DERIVATION_STALE') };
+    return { ok: true, command: { ...command, command: result.operation } as MotionCommand };
+  }
   private author(command: MotionCommand, auth: AuthContext, publicDigest: string, privateDigest: string): CommitResult {
     if (!isAuthoringKind(command.command.kind)) throw new Error('AUTHOR_KIND');
-    const head = this.readHeadRow(command.documentId, command.branchId); if (!head) return { response: { ok: false, code: 'VALIDATION' } };
+    const head = this.readHeadRow(command.documentId, command.branchId); if (!head) return { response:
+      failure('VALIDATION', 'BRANCH_NOT_FOUND', 'target', false, { affectedIds: [command.branchId] }) };
     if (head.revision !== command.expectedRevision) return { response: { ok: false, code: 'STALE_REVISION',
-      currentRevision: head.revision, currentDigest: head.digest } };
+      currentRevision: head.revision, currentDigest: head.digest, diagnostic: stale(head.revision, head.digest).diagnostic } };
     if (auth.actor === 'agent' && !this.authorizedClaim(command.documentId, command.branchId, auth))
-      return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
+      return { response: this.claimDiagnostic(command.documentId, command.branchId, auth) ?? claimFailure('CLAIM_REQUIRED', false) };
     const last = (this.database.prepare('SELECT last_revision FROM documents WHERE document_id=?').get(command.documentId) as { last_revision: number }).last_revision;
-    if (last >= Number.MAX_SAFE_INTEGER) return { response: { ok: false, code: 'VALIDATION' } };
+    if (last >= Number.MAX_SAFE_INTEGER) return { response: failure('VALIDATION', 'AUTHORING_REVISION_EXHAUSTED', 'domain', false) };
     const nextRevision = last + 1; const state = command.command.kind === 'motion.history.undo' || command.command.kind === 'motion.history.redo'
       ? this.reconstructAuthoringState(command.documentId, head.revision) : createAuthoringState(JSON.parse(head.json));
     const reduced = dispatchAuthoringOperation(state, command.command, nextRevision);
-    if (!reduced.ok) return { response: { ok: false, code: 'VALIDATION' } };
+    if (!reduced.ok) return { response: reducerFailure(reduced.diagnostic.code, { affectedIds: affectedIds(command) }) };
     const next = reduced.state.document; const canonical = canonicalJson(next); const canonicalDigest = sha256Hex(canonicalBytes(next));
     const receipt: RevisionReceipt = { schemaVersion: 'motion.revision-receipt.v1', protocolVersion: PROTOCOL_VERSION,
       documentId: command.documentId, branchId: command.branchId, expectedRevision: command.expectedRevision,
@@ -93,7 +182,7 @@ export class SqliteProjectStore implements ProjectStore {
     const response: CommandSuccess = { ok: true, protocolVersion: PROTOCOL_VERSION, operationId: command.operationId,
       documentId: command.documentId, branchId: command.branchId, expectedRevision: command.expectedRevision,
       resultingRevision: nextRevision, operationDigest: publicDigest, canonicalDigest, receipt };
-    const eventId = this.eventId(command); this.insertEvent(eventId, command, nextRevision, publicDigest, privateDigest, response);
+    const eventId = this.eventId(command); this.insertEvent(eventId, command, nextRevision, publicDigest, privateDigest, response, auth);
     this.database.prepare('INSERT INTO revisions(document_id,revision,parent_revision,canonical_json,canonical_digest,creating_event_id) VALUES(?,?,?,?,?,?)')
       .run(command.documentId, nextRevision, head.revision, canonical, canonicalDigest, eventId); this.fault?.('after-inserts');
     const branch = this.database.prepare('UPDATE branches SET head_revision=? WHERE document_id=? AND branch_id=? AND head_revision=?')
@@ -125,43 +214,48 @@ export class SqliteProjectStore implements ProjectStore {
   }
   private control(command: MotionCommand, auth: AuthContext, publicDigest: string, privateDigest: string): CommitResult {
     const operation = command.command; if (isAuthoringKind(operation.kind)) throw new Error('CONTROL_KIND');
-    if (operation.kind === 'motion.branch.create' && auth.actor !== 'human') return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
+    if (operation.kind === 'motion.branch.create' && auth.actor !== 'human') return { response: forbidden() };
     if ((operation.kind === 'motion.claim.acquire' || operation.kind === 'motion.claim.renew' || operation.kind === 'motion.claim.release')
-      && auth.actor !== 'agent') return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
-    if (operation.kind === 'motion.claim.revoke' && auth.actor !== 'human') return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
-    const head = this.readHeadRow(command.documentId, command.branchId); if (!head) return { response: { ok: false, code: 'VALIDATION' } };
+      && auth.actor !== 'agent') return { response: forbidden() };
+    if (operation.kind === 'motion.claim.revoke' && auth.actor !== 'human') return { response: forbidden() };
+    const head = this.readHeadRow(command.documentId, command.branchId); if (!head) return { response:
+      failure('VALIDATION', 'BRANCH_NOT_FOUND', 'target', false, { affectedIds: [command.branchId] }) };
     let applicableRevision = head.revision; let applicableDigest = head.digest; let claim: ClaimRow | undefined;
     if (operation.kind === 'motion.claim.renew' || operation.kind === 'motion.claim.release' || operation.kind === 'motion.claim.revoke') {
       claim = this.database.prepare('SELECT * FROM claims WHERE claim_id=? AND document_id=?').get(operation.payload.claimId, command.documentId) as ClaimRow | undefined;
-      if (!claim) return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
+      if (!claim) return { response: claimFailure('CLAIM_REQUIRED', false) };
       if (claim.branch_id === null) ({ revision: applicableRevision, digest: applicableDigest } = this.readLastRevision(command.documentId));
     } else if (operation.kind === 'motion.claim.acquire' && operation.payload.scope === 'document') {
       ({ revision: applicableRevision, digest: applicableDigest } = this.readLastRevision(command.documentId));
     }
     if (applicableRevision !== command.expectedRevision) return { response: { ok: false, code: 'STALE_REVISION',
-      currentRevision: applicableRevision, currentDigest: applicableDigest } };
+      currentRevision: applicableRevision, currentDigest: applicableDigest,
+      diagnostic: stale(applicableRevision, applicableDigest).diagnostic } };
     let claimId: string | undefined; let leaseVersion: number | undefined; let expiresAt: number | undefined;
     if (operation.kind === 'motion.branch.create') {
       const exists = this.database.prepare('SELECT 1 ok FROM branches WHERE document_id=? AND branch_id=?')
-        .get(command.documentId, operation.payload.branchId); if (exists) return { response: { ok: false, code: 'VALIDATION' } };
+        .get(command.documentId, operation.payload.branchId); if (exists) return { response:
+          failure('VALIDATION', 'BRANCH_ALREADY_EXISTS', 'target', false, { affectedIds: [operation.payload.branchId] }) };
       this.database.prepare('INSERT INTO branches(document_id,branch_id,head_revision,base_revision) VALUES(?,?,?,?)')
         .run(command.documentId, operation.payload.branchId, head.revision, head.revision);
     } else if (operation.kind === 'motion.claim.acquire') {
-      if (!auth.claimSecret || auth.claimSecret.length < 32) return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
+      if (!auth.claimSecret || auth.claimSecret.length < 32) return { response: claimFailure('CLAIM_SECRET_INVALID', false) };
       const targetBranch = operation.payload.scope === 'branch' ? operation.payload.branchId : null;
       const overlap = this.database.prepare(`SELECT 1 ok FROM claims WHERE document_id=? AND active=1 AND expires_at>?
         AND (branch_id IS NULL OR ? IS NULL OR branch_id=?) LIMIT 1`).get(command.documentId, auth.now, targetBranch, targetBranch);
-      if (overlap) return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
+      if (overlap) return { response: claimFailure('CLAIM_OVERLAP', true) };
       claimId = `claim_${sha256Hex(`${command.documentId}\0${command.operationId}\0${privateDigest}`).slice(0, 24)}`;
       leaseVersion = 1; expiresAt = auth.now + 60_000;
-      this.database.prepare('INSERT INTO claims(claim_id,document_id,branch_id,token_hash,holder_kind,lease_version,expires_at,active) VALUES(?,?,?,?,?,?,?,1)')
-        .run(claimId, command.documentId, targetBranch, sha256Hex(auth.claimSecret), 'agent', leaseVersion, expiresAt);
+      this.database.prepare('INSERT INTO claims(claim_id,document_id,branch_id,token_hash,holder_kind,lease_version,expires_at,active,actor_id) VALUES(?,?,?,?,?,?,?,1,?)')
+        .run(claimId, command.documentId, targetBranch, sha256Hex(auth.claimSecret), 'agent', leaseVersion, expiresAt, actorId(auth));
     } else {
-      if (!claim || !claim.active || claim.expires_at <= auth.now || claim.lease_version !== (operation as { payload: { leaseVersion: number } }).payload.leaseVersion)
-        return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
-      if (claim.branch_id !== null && claim.branch_id !== command.branchId) return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
+      if (!claim) return { response: claimFailure('CLAIM_REQUIRED', false) };
+      if (!claim.active || claim.expires_at <= auth.now) return { response: claimFailure('CLAIM_EXPIRED', true) };
+      if (claim.lease_version !== (operation as { payload: { leaseVersion: number } }).payload.leaseVersion)
+        return { response: claimFailure('CLAIM_LEASE_STALE', true) };
+      if (claim.branch_id !== null && claim.branch_id !== command.branchId) return { response: claimFailure('CLAIM_SCOPE_MISMATCH', false) };
       if (operation.kind !== 'motion.claim.revoke' && (!auth.claimSecret || sha256Hex(auth.claimSecret) !== claim.token_hash))
-        return { response: { ok: false, code: 'UNAUTHORIZED_CLAIM' } };
+        return { response: claimFailure('CLAIM_SECRET_INVALID', false) };
       claimId = claim.claim_id; leaseVersion = claim.lease_version + 1;
       if (operation.kind === 'motion.claim.renew') { expiresAt = auth.now + 60_000;
         this.database.prepare('UPDATE claims SET lease_version=?,expires_at=? WHERE claim_id=? AND lease_version=?')
@@ -177,7 +271,7 @@ export class SqliteProjectStore implements ProjectStore {
       documentId: command.documentId, branchId: command.branchId, expectedRevision: command.expectedRevision,
       resultingRevision, operationDigest: publicDigest, ...(claimId ? { claimId } : {}),
       ...(leaseVersion ? { leaseVersion } : {}), ...(expiresAt ? { expiresAt } : {}), receipt };
-    this.insertEvent(this.eventId(command), command, resultingRevision, publicDigest, privateDigest, response); this.fault?.('after-inserts');
+    this.insertEvent(this.eventId(command), command, resultingRevision, publicDigest, privateDigest, response, auth); this.fault?.('after-inserts');
     return { response, event: this.eventFor(command.documentId, command.operationId), replayed: false };
   }
   private authorizedClaim(documentId: string, branchId: string, auth: AuthContext): boolean {
@@ -185,12 +279,23 @@ export class SqliteProjectStore implements ProjectStore {
     return Boolean(this.database.prepare(`SELECT 1 ok FROM claims WHERE document_id=? AND active=1 AND expires_at>?
       AND token_hash=? AND (branch_id IS NULL OR branch_id=?) LIMIT 1`).get(documentId, auth.now, tokenHash, branchId));
   }
+  private claimDiagnostic(documentId: string, branchId: string, auth: AuthContext): CommandFailure | null {
+    if (!auth.claimSecret) return claimFailure('CLAIM_REQUIRED', false);
+    const tokenHash = sha256Hex(auth.claimSecret);
+    const claim = this.database.prepare(`SELECT * FROM claims WHERE document_id=? AND token_hash=?
+      ORDER BY active DESC,expires_at DESC LIMIT 1`).get(documentId, tokenHash) as ClaimRow | undefined;
+    if (!claim) return claimFailure('CLAIM_SECRET_INVALID', false);
+    if (!claim.active || claim.expires_at <= auth.now) return claimFailure('CLAIM_EXPIRED', true);
+    if (claim.branch_id !== null && claim.branch_id !== branchId) return claimFailure('CLAIM_SCOPE_MISMATCH', false);
+    return null;
+  }
   private insertEvent(eventId: string, command: MotionCommand, resultingRevision: number, requestDigest: string,
-    privateDigest: string, response: CommandSuccess): void {
+    privateDigest: string, response: CommandSuccess, auth?: AuthContext): void {
     this.database.prepare(`INSERT INTO events(event_id,document_id,branch_id,kind,operation_id,expected_revision,resulting_revision,
-      request_digest,private_context_digest,private_payload_json,sanitized_receipt_json) VALUES(?,?,?,?,?,?,?,?,?,?,?)`)
+      request_digest,private_context_digest,private_payload_json,sanitized_receipt_json,actor_kind,actor_id,affected_ids_json) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)`)
       .run(eventId, command.documentId, command.branchId, command.command.kind, command.operationId, command.expectedRevision,
-        resultingRevision, requestDigest, privateDigest, canonicalJson(command.command), canonicalResponseBytes(response));
+        resultingRevision, requestDigest, privateDigest, canonicalJson(command.command), canonicalResponseBytes(response),
+        auth?.actor ?? null, auth ? actorId(auth) : null, canonicalJson(affectedIds(command)));
   }
   private eventId(command: MotionCommand): string { return `event_${sha256Hex(`${command.documentId}\0${command.operationId}`).slice(0, 24)}`; }
   readHead(documentId: string, branchId: string = MAIN_BRANCH_ID) { const row = this.readHeadRow(documentId, branchId);
@@ -200,15 +305,45 @@ export class SqliteProjectStore implements ProjectStore {
     { canonical_json: string; canonical_digest: string } | undefined;
     return row ? { document: JSON.parse(row.canonical_json), canonicalDigest: row.canonical_digest } : null; }
   readEvents(documentId: string, afterCommitSeq: number) {
-    const rows = this.database.prepare(`SELECT commit_seq,branch_id,resulting_revision,kind FROM events
+    const rows = this.database.prepare(`SELECT commit_seq,branch_id,resulting_revision,kind,request_digest,actor_kind,actor_id,affected_ids_json FROM events
       WHERE document_id=? AND commit_seq>? ORDER BY commit_seq`).all(documentId, afterCommitSeq) as Array<{
-        commit_seq: number; branch_id: string; resulting_revision: number; kind: MotionCommand['command']['kind'] }>;
+        commit_seq: number; branch_id: string; resulting_revision: number; kind: MotionCommand['command']['kind'];
+        request_digest: string; actor_kind: 'human' | 'agent' | null; actor_id: string | null; affected_ids_json: string | null }>;
     return rows.map((row) => {
       const revision = this.readRevision(documentId, row.resulting_revision) ?? this.readHead(documentId, row.branch_id);
       if (!revision) throw new Error('EVENT_REVISION_MISSING');
       return { documentId, branchId: row.branch_id, revision: row.resulting_revision,
-        digest: revision.canonicalDigest, kind: row.kind, commitSeq: row.commit_seq };
+        digest: revision.canonicalDigest, kind: row.kind, commitSeq: row.commit_seq, operationDigest: row.request_digest,
+        actor: row.actor_kind ? { kind: row.actor_kind, actorId: row.actor_id } : { kind: 'legacy-unknown' as const, actorId: null },
+        affectedIds: row.affected_ids_json ? JSON.parse(row.affected_ids_json) as string[] : [] };
     });
+  }
+  readWorkspace(documentId: string, branchId: string) { const head = this.readHeadRow(documentId, branchId); if (!head) return null;
+    const state = this.reconstructAuthoringState(documentId, head.revision);
+    return projectWorkspace(state.document, branchId, { undoAvailable: state.undo.length > 0, redoAvailable: state.redo.length > 0 }); }
+  listBranches(documentId: string): BranchList | null { const exists = this.database.prepare('SELECT 1 ok FROM documents WHERE document_id=?').get(documentId);
+    if (!exists) return null; const rows = this.database.prepare(`SELECT b.branch_id,b.base_revision,b.head_revision,r.canonical_digest
+      FROM branches b JOIN revisions r ON r.document_id=b.document_id AND r.revision=b.head_revision
+      WHERE b.document_id=? ORDER BY b.branch_id`).all(documentId) as Array<{ branch_id: string; base_revision: number;
+        head_revision: number; canonical_digest: string }>;
+    return { schemaVersion: 'motion.branch-list.v1', documentId, branches: rows.map((row) => ({ branchId: row.branch_id,
+      baseRevision: row.base_revision, headRevision: row.head_revision, headDigest: row.canonical_digest })) }; }
+  listActiveClaims(documentId: string, now: number): ActiveClaimList | null { const exists = this.database.prepare('SELECT 1 ok FROM documents WHERE document_id=?').get(documentId);
+    if (!exists) return null; const rows = this.database.prepare(`SELECT claim_id,branch_id,lease_version,expires_at,actor_id FROM claims
+      WHERE document_id=? AND active=1 AND expires_at>? ORDER BY claim_id`).all(documentId, now) as Array<{ claim_id: string;
+        branch_id: string | null; lease_version: number; expires_at: number; actor_id: string | null }>;
+    return { schemaVersion: 'motion.active-claim-list.v1', documentId, claims: rows.map((row) => ({ claimId: row.claim_id,
+      scope: row.branch_id === null ? 'document' : 'branch', branchId: row.branch_id,
+      holder: row.actor_id ? { kind: 'agent' as const, actorId: row.actor_id }
+        : { kind: 'legacy-unknown' as const, actorId: null },
+      leaseVersion: row.lease_version, expiresAt: row.expires_at })) }; }
+  listActivity(documentId: string, afterCommitSeq: number, limit: number): ActivityPage | null {
+    if (!this.database.prepare('SELECT 1 ok FROM documents WHERE document_id=?').get(documentId)) return null;
+    const events = this.readEvents(documentId, afterCommitSeq).slice(0, limit);
+    const more = events.length === limit && Boolean(this.database.prepare('SELECT 1 ok FROM events WHERE document_id=? AND commit_seq>?')
+      .get(documentId, events.at(-1)?.commitSeq ?? afterCommitSeq));
+    return { schemaVersion: 'motion.activity-page.v1', documentId, afterCommitSeq, events,
+      nextAfterCommitSeq: more ? events.at(-1)!.commitSeq : null };
   }
   readDocumentRevision(documentId: string): { revision: number; canonicalDigest: string } | null {
     try { const row = this.readLastRevision(documentId); return { revision: row.revision, canonicalDigest: row.digest }; }
@@ -241,11 +376,14 @@ export class SqliteProjectStore implements ProjectStore {
     WHERE d.document_id=?`).get(documentId) as Pick<HeadRow, 'revision' | 'digest'> | undefined;
     if (!row) throw new Error('DOCUMENT_REVISION_MISSING'); return row; }
   private eventFor(documentId: string, operationId: string) { const row = this.database.prepare(
-    'SELECT commit_seq,branch_id,resulting_revision,kind FROM events WHERE document_id=? AND operation_id=?').get(documentId, operationId) as
-    { commit_seq: number; branch_id: string; resulting_revision: number; kind: MotionCommand['command']['kind'] };
+    'SELECT commit_seq,branch_id,resulting_revision,kind,request_digest,actor_kind,actor_id,affected_ids_json FROM events WHERE document_id=? AND operation_id=?').get(documentId, operationId) as
+    { commit_seq: number; branch_id: string; resulting_revision: number; kind: MotionCommand['command']['kind']; request_digest: string;
+      actor_kind: 'human' | 'agent' | null; actor_id: string | null; affected_ids_json: string | null };
     const revision = this.readRevision(documentId, row.resulting_revision) ?? this.readHead(documentId, row.branch_id)!;
     return { documentId, branchId: row.branch_id, revision: row.resulting_revision, digest: revision.canonicalDigest,
-      kind: row.kind, commitSeq: row.commit_seq }; }
+      kind: row.kind, commitSeq: row.commit_seq, operationDigest: row.request_digest,
+      actor: row.actor_kind ? { kind: row.actor_kind, actorId: row.actor_id } : { kind: 'legacy-unknown' as const, actorId: null },
+      affectedIds: row.affected_ids_json ? JSON.parse(row.affected_ids_json) as string[] : [] }; }
   private verifyPreMigration(): void {
     const integrity = this.database.prepare('PRAGMA integrity_check').get() as { integrity_check: string };
     const foreign = this.database.prepare('PRAGMA foreign_key_check').all(); if (integrity.integrity_check !== 'ok' || foreign.length)
@@ -274,10 +412,40 @@ export class SqliteProjectStore implements ProjectStore {
 }
 
 function isAuthoringKind(kind: string): kind is AuthoringOperation['kind'] {
-  return ['motion.track.create', 'motion.transform-pose.set', 'motion.transform-waypoints.translate',
+  return ['motion.track.create', 'motion.keyframe-value.set', 'motion.keyframe-time.set', 'motion.keyframe.add',
+    'motion.keyframe.remove', 'motion.slot-duration.set', 'motion.binding-delay.set', 'motion.slot-easing.set',
+    'motion.hold.insert', 'motion.transform-pose.set', 'motion.transform-waypoints.translate',
+    'motion.transform-waypoint.add', 'motion.transform-waypoint.remove',
     'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set',
     'motion.cue.create', 'motion.cue.update', 'motion.cue.delete', 'motion.cue.detach',
     'motion.history.undo', 'motion.history.redo'].includes(kind);
+}
+
+function actorId(auth: Pick<AuthContext, 'actor' | 'capability'>): string {
+  return `actor_${sha256Hex(`${auth.actor}\0${auth.capability}`).slice(0, 24)}`;
+}
+function affectedIds(command: MotionCommand): string[] {
+  const operation = command.command as MotionCommand['command'] & { elementId?: string; trackId?: string; keyframeId?: string;
+    payload?: { cueId?: string; claimId?: string; branchId?: string; targets?: Array<{ elementId: string; trackId: string; keyframeId: string }> } };
+  const ids = [operation.elementId, operation.trackId, operation.keyframeId, operation.payload?.cueId,
+    operation.payload?.claimId, operation.payload?.branchId,
+    ...(operation.payload?.targets ?? []).flatMap((target) => [target.elementId, target.trackId, target.keyframeId])]
+    .filter((value): value is string => Boolean(value));
+  return [...new Set(ids)].sort();
+}
+function failure(code: CommandFailure['code'], diagnosticCode: string, category: MotionDiagnostic['category'], retryable: boolean,
+  extra: Pick<MotionDiagnostic, 'affectedIds' | 'currentRevision' | 'currentDigest'> = {}): CommandFailure {
+  return { ok: false, code, diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: diagnosticCode, category, retryable, ...extra } };
+}
+function stale(currentRevision: number, currentDigest: string): CommandFailure { return { ...failure('STALE_REVISION',
+  'STALE_REVISION', 'revision', true, { currentRevision, currentDigest }), currentRevision, currentDigest }; }
+function forbidden(): CommandFailure { return failure('UNAUTHORIZED_CLAIM', 'ACTOR_FORBIDDEN', 'authorization', false); }
+function claimFailure(code: string, retryable: boolean): CommandFailure {
+  return failure('UNAUTHORIZED_CLAIM', code, 'authorization', retryable);
+}
+function reducerFailure(code: string, extra: Pick<MotionDiagnostic, 'affectedIds'> = {}): CommandFailure {
+  const category: MotionDiagnostic['category'] = /(?:NOT_FOUND|TARGET_MISSING|TARGET_INVALID)$/.test(code) ? 'target' : 'domain';
+  return failure('VALIDATION', code, category, false, extra);
 }
 
 /** Synthetic migration fixture creation stays inside the sole SQLite adapter. */

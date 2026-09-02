@@ -5,13 +5,11 @@ import {
   canonicalContentBytes,
   createAuthoringState,
   cueTargetSnapshots,
-  deriveCueId,
   dispatchAuthoringOperation,
   projectShotWorkspace,
   projectTrajectorySelection,
   projectTransformTrajectory,
   projectTrackCreationEligibility,
-  projectCueReplacement,
   sha256Hex,
   type AuthoringOperation,
   type AuthoringCue,
@@ -19,6 +17,8 @@ import {
   type CueSemantic,
   type StructuralAuthoringElementId,
   type TimingFunction,
+  type OperationIntentPayload,
+  type PreparedOperationIntent,
 } from '../../../packages/domain/src/index.js';
 import {
   buildTimeline,
@@ -31,8 +31,9 @@ import {
   type ProjectionRect,
   type TimelineRow,
 } from '../../../packages/preview-runtime/src/index.js';
-import { MotionServiceClient, makeBranchCreateCommand, makeClaimControlCommand, makeCueCommand, makeTrackCreateCommand, makeTrajectoryCommand,
-  type CommitMetadata } from '../../../packages/motion-protocol/src/index.ts';
+import { MotionPreparationError, MotionServiceClient, commandSchema, makeBranchCreateCommand, makeClaimControlCommand,
+  makeOperationIntentCommand, makeTrajectoryCommand,
+  type CommitMetadata, type MotionCommand, type MotionDiagnostic } from '../../../packages/motion-protocol/src/index.ts';
 import './styles.css';
 
 let authoring = createAuthoringState(payload.document);
@@ -43,9 +44,22 @@ const serviceClient = payload.serviceBacked && payload.humanCapability
 let lastCommit: CommitMetadata | null = null;
 let immutableRefetchCount = 0;
 let pendingRevision: number | null = null;
-let durableTrajectoryUndoCount = 0;
-let durableTrajectoryRedoCount = 0;
+type PublicationState = 'settled' | 'pending' | 'failed';
+let publicationState: PublicationState = 'settled';
+let publicationFailureCode: string | null = null;
 let activeBranchId = 'main';
+type DurableWorkspace = Awaited<ReturnType<MotionServiceClient['workspace']>>;
+type DurableBranches = Awaited<ReturnType<MotionServiceClient['branches']>>;
+type DurableClaims = Awaited<ReturnType<MotionServiceClient['activeClaims']>>;
+type DurableActivity = Awaited<ReturnType<MotionServiceClient['activity']>>;
+type DurableContextSnapshot = { workspace: DurableWorkspace; branches: DurableBranches; claims: DurableClaims; activity: DurableActivity };
+let durableWorkspace: DurableWorkspace | null = null;
+let durableBranches: DurableBranches | null = null;
+let durableClaims: DurableClaims | null = null;
+let durableActivity: DurableActivity | null = null;
+let lastServiceDiagnostic: MotionDiagnostic | null = null;
+let publicationTestGate: { promise: Promise<void>; release: () => void } | null = null;
+let failNextPublicationForTest = false;
 if (serviceClient) {
   const head = await serviceClient.head(payload.document.documentId);
   authoring = createAuthoringState(head.document);
@@ -81,10 +95,23 @@ document.body.innerHTML = `
   <main class="editor-shell">
     <header class="topbar">
       <div><p class="eyebrow">Motion Editor</p><h1>Bring one element into motion</h1><p class="purpose">Choose what moves, shape its opacity, set its timing, then preview the compiled CSS.</p></div>
-      ${serviceClient ? `<section class="branch-controls" aria-label="Branches and claims">
-        <label>Active branch <select data-active-branch><option value="main">main</option></select></label>
-        <form data-branch-form><label>New branch <input data-new-branch value="feature" pattern="[A-Za-z0-9_]+"></label><button type="submit">Create branch</button></form>
-        <form data-revoke-form><label>Claim ID <input data-claim-id placeholder="claim_…"></label><label>Lease version <input data-lease-version type="number" min="1" value="1"></label><button type="submit">Revoke claim</button></form>
+      ${serviceClient ? `<section class="branch-controls collaboration-bar" aria-label="Durable collaboration status">
+        <div class="collaboration-summary" aria-label="Current durable context">
+          <span><small>Branch</small><strong data-collaboration-branch>main</strong></span>
+          <span><small>Revision</small><strong data-collaboration-revision>0</strong></span>
+          <span><small>Latest actor</small><strong data-collaboration-actor>Awaiting activity</strong></span>
+          <span><small>Active claim</small><strong data-collaboration-claim>None</strong></span>
+        </div>
+        <label class="branch-switch">Switch branch<select data-active-branch><option value="main">main</option></select></label>
+        <details class="collaboration-details"><summary>Activity &amp; access</summary><div class="collaboration-details-body">
+          <div class="collaboration-actions">
+            <form data-branch-form><label>New branch <input data-new-branch value="feature" pattern="[A-Za-z0-9_]+"></label><button type="submit">Create branch</button></form>
+            <form data-revoke-form><label>Claim ID <input data-claim-id placeholder="claim_…"></label><label>Lease version <input data-lease-version type="number" min="1" value="1"></label><button type="submit">Revoke claim</button></form>
+          </div>
+          <section aria-labelledby="activity-heading"><h2 id="activity-heading">Recent activity</h2><ol data-collaboration-activity></ol></section>
+          <section aria-labelledby="eligibility-heading"><h2 id="eligibility-heading">Operation eligibility</h2><ul data-collaboration-eligibility></ul></section>
+        </div></details>
+        <output data-service-diagnostic role="alert" hidden></output>
       </section>` : ''}
     </header>
     ${payload.cueWorkspace ? `<section class="cue-workspace" data-cue-workspace aria-labelledby="cue-workspace-heading">
@@ -112,13 +139,21 @@ document.body.innerHTML = `
       <details class="cue-advanced"><summary>Edit completed beats</summary><div data-authored-cues class="authored-cues"></div></details>
     </section>` : ''}
     <section class="shot-workspace" data-shot-workspace hidden aria-labelledby="shot-workspace-heading">
-      <header><div><p class="eyebrow">Shot 1 · 0–2100 ms</p><h2 id="shot-workspace-heading">Animate on one canvas</h2><p>Select an object and moment, then drag it directly. Use the two handles for scale and rotation.</p></div></header>
-      <div class="shot-grid"><fieldset data-shot-targets><legend>Object</legend></fieldset><button class="path-toggle" type="button" data-shot-mode="path" aria-pressed="true">Path</button><label class="move-together"><input type="checkbox" data-move-together><span><strong>Move together</strong><small>Translation only; scale and rotation stay on the selected object.</small></span></label></div>
+      <header><div><p class="eyebrow">Shot 1 · 0–2100 ms</p><h2 id="shot-workspace-heading">Choose an object, then shape each moment</h2><p>The canvas is the editor: drag to move, use the corners to scale, and use the handle above to rotate.</p></div></header>
+      <div class="shot-grid"><fieldset data-shot-targets><legend>Object</legend></fieldset><button class="path-toggle" type="button" data-shot-mode="path" aria-label="Path" aria-pressed="true">Hide path</button><label class="move-together"><input type="checkbox" data-move-together aria-label="Move together"><span><strong>Edit together</strong><small>Position changes apply to both selected objects.</small></span></label></div>
       <p class="shot-guidance" data-shot-guidance role="note"></p>
-      <fieldset class="shot-moments" data-shot-moments><legend>Moment</legend></fieldset>
-      <details class="shot-advanced" data-shot-advanced><summary>Advanced</summary><div class="advanced-content">
+      <section class="moment-editor" aria-labelledby="moment-editor-heading">
+        <div class="moment-heading"><div><strong id="moment-editor-heading">Moments</strong><span>Select a moment. Use + to add a point.</span></div><button type="button" data-shot-remove-moment disabled>Remove point</button></div>
+        <fieldset class="shot-moments" data-shot-moments><legend>Animation moments</legend><div data-shot-moment-sequence></div></fieldset>
+        <div class="moment-transition" data-shot-moment-transition>
+          <label><span>When this moment happens</span><input data-shot-moment-time type="range" min="1" max="2099" step="1"><output data-shot-moment-time-output></output></label>
+          <label><span>Movement after this moment</span><select data-shot-easing><option value="custom" disabled>Custom</option><option value="ease">Smooth</option><option value="ease-out">Glide in</option><option value="ease-in">Build speed</option><option value="ease-in-out">Soft in &amp; out</option><option value="linear">Constant speed</option></select></label>
+          <button type="button" data-shot-apply-easing>Apply movement</button>
+        </div>
+      </section>
+      <details class="shot-advanced" data-shot-advanced><summary>Inspect &amp; fine-tune</summary><div class="advanced-content">
         <form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form>
-        <div class="shot-timing"><label>Landing (ms)<input data-shot-landing type="number" min="1" max="2099" value="700"></label><button type="button" data-shot-apply-time>Apply times</button><label>Incoming easing<select data-shot-easing><option value="custom" disabled>Custom (source)</option><option>ease</option><option>ease-out</option><option>ease-in</option><option>ease-in-out</option><option>linear</option></select></label><button type="button" data-shot-apply-easing>Apply easing</button><label>Settled (ms)<input data-shot-settled type="number" min="2" max="2100" value="2100"></label><button type="button" data-shot-hold>Create settled hold</button></div>
+        <div class="shot-timing"><label>Hold begins (ms)<input data-shot-settled type="number" min="2" max="2099" value="1820"></label><button type="button" data-shot-hold>Hold final pose through Settle</button></div>
       </div></details>
       <div class="shot-history-slot" data-shot-history-slot></div>
       <output data-shot-status role="status" aria-live="polite"></output>
@@ -269,6 +304,7 @@ let committedShotGeometryKey: string | null = null;
 let mountedPreviewGeneration = 0;
 let activeWaypointDraft: {
   operation: AuthoringOperation;
+  intent: OperationIntentPayload;
   commandBytes: string;
   compiledHtml: string;
   compiledCss: string;
@@ -296,14 +332,20 @@ required<HTMLInputElement>('[data-move-together]').addEventListener('change', (e
   renderShotWorkspace();
 });
 shotPoseForm.addEventListener('submit', (event) => { event.preventDefault(); void applyShotPose(); });
-required<HTMLButtonElement>('[data-shot-apply-time]').addEventListener('click', () => void applyShotTimes());
 required<HTMLButtonElement>('[data-shot-apply-easing]').addEventListener('click', () => void applyShotEasing());
+required<HTMLButtonElement>('[data-shot-remove-moment]').addEventListener('click', () => void removeShotMoment());
 required<HTMLButtonElement>('[data-shot-hold]').addEventListener('click', () => void applyShotHold());
 required<HTMLButtonElement>('[data-shot-retry]').addEventListener('click', () => initializeSeedWorkspace());
 required<HTMLButtonElement>('[data-shot-inspect]').addEventListener('click', () => {
   const inspector = required<HTMLDetailsElement>('.inspect-panel'); inspector.open = true; inspector.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
-for (const input of document.querySelectorAll<HTMLInputElement>('[data-shot-landing], [data-shot-settled]')) {
+const shotMomentTime = required<HTMLInputElement>('[data-shot-moment-time]');
+shotMomentTime.addEventListener('input', () => {
+  required<HTMLOutputElement>('[data-shot-moment-time-output]').value = `${shotMomentTime.value} ms`;
+  scrub(Number(shotMomentTime.value));
+});
+shotMomentTime.addEventListener('change', () => void applyShotMomentTime(Number(shotMomentTime.value)));
+for (const input of document.querySelectorAll<HTMLInputElement>('[data-shot-settled]')) {
   input.addEventListener('input', () => {
     for (const timingInput of document.querySelectorAll<HTMLInputElement>('[data-shot-landing], [data-shot-settled]')) {
       timingInput.setCustomValidity(''); timingInput.removeAttribute('aria-invalid');
@@ -382,13 +424,13 @@ timeInput.addEventListener('input', () => clearValidationFeedback(timeInput));
 valueInput.addEventListener('input', () => { valueInput.dataset.draft = 'true'; });
 timeInput.addEventListener('input', () => { timeInput.dataset.draft = 'true'; });
 undoButton.addEventListener('click', () => {
-  if ((serviceClient ? durableTrajectoryUndoCount : authoring.undo.length) === 0) return;
+  if (serviceClient ? !durableUndoAvailable() : authoring.undo.length === 0) return;
   void dispatch(makeHistory('motion.history.undo'), '[data-undo]', {
     viewportTop: undoButton.getBoundingClientRect().top, scrollY,
   });
 });
 redoButton.addEventListener('click', () => {
-  if ((serviceClient ? durableTrajectoryRedoCount : authoring.redo.length) === 0) return;
+  if (serviceClient ? !durableRedoAvailable() : authoring.redo.length === 0) return;
   void dispatch(makeHistory('motion.history.redo'), '[data-redo]', {
     viewportTop: redoButton.getBoundingClientRect().top, scrollY,
   });
@@ -405,14 +447,20 @@ addMidpointButton.addEventListener('click', () => void withCreatedTrack((track) 
   ...operationEnvelope(), kind: 'motion.keyframe.add', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   payload: { timeMs: 1110, value: 0.5 },
 }), '[data-value]'));
-setDurationButton.addEventListener('click', () => void withCreatedTrack((track) => ({
-  ...operationEnvelope(), kind: 'motion.slot-duration.set', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
-  payload: { durationMs: Number(required<HTMLInputElement>('[data-duration]').value) },
-})));
-setDelayButton.addEventListener('click', () => void withCreatedTrack((track) => ({
-  ...operationEnvelope(), kind: 'motion.binding-delay.set', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
-  payload: { delayMs: Number(required<HTMLInputElement>('[data-delay]').value) },
-})));
+setDurationButton.addEventListener('click', () => {
+  const durationMs = Number(durationInput.value);
+  if (!Number.isSafeInteger(durationMs) || durationMs <= 0) return rejectAuthoringInput(durationInput,
+    'AUTHORING_DURATION_INVALID');
+  void withCreatedTrack((track) => ({ ...operationEnvelope(), kind: 'motion.slot-duration.set',
+    elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId, payload: { durationMs } }));
+});
+setDelayButton.addEventListener('click', () => {
+  const delayMs = Number(delayInput.value);
+  if (!Number.isSafeInteger(delayMs) || delayMs < 0) return rejectAuthoringInput(delayInput,
+    'AUTHORING_DELAY_INVALID');
+  void withCreatedTrack((track) => ({ ...operationEnvelope(), kind: 'motion.binding-delay.set',
+    elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId, payload: { delayMs } }));
+});
 setEasingButton.addEventListener('click', () => void withCreatedTrack((track) => ({
   ...operationEnvelope(), kind: 'motion.slot-easing.set', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
   payload: { easing: required<HTMLSelectElement>('[data-easing]').value as 'linear' | 'ease-in-out' },
@@ -447,7 +495,9 @@ renderProjection();
 await mountPreview(compiled.html, compiled.css);
 activateCueLayout();
 initializeSeedWorkspace();
+if (serviceClient) await refreshDurableContext();
 schedulePreviewSelection();
+setPublicationState('settled');
 document.querySelector('main')!.setAttribute('data-editor-ready', 'true');
 window.addEventListener('resize', () => { configurePreviewCanvas(); schedulePreviewSelection(); scheduleCueCanvas(); if (shotConfig) renderShotWorkspace(); });
 
@@ -484,8 +534,8 @@ window.__motionEditor = {
     contentDigest: sha256Hex(canonicalContentBytes(authoring.document)),
     exportDigest: compiled.exportDigest,
     compiledHtml: compiled.html,
-    undoCount: serviceClient ? durableTrajectoryUndoCount : authoring.undo.length,
-    redoCount: serviceClient ? durableTrajectoryRedoCount : authoring.redo.length,
+    undoCount: serviceClient ? Number(durableWorkspace?.history.undoAvailable ?? false) : authoring.undo.length,
+    redoCount: serviceClient ? Number(durableWorkspace?.history.redoAvailable ?? false) : authoring.redo.length,
     consumedOperationIds: [...authoring.consumedOperationIds],
     selectedTrackId: selectedTrackId as string,
     selectedKeyframeId: selectedKeyframeId as string,
@@ -498,11 +548,17 @@ window.__motionEditor = {
     draftValues: captureDraft().values,
     lastCommitSeq,
     pendingRevision,
+    publicationPending: publicationState === 'pending',
+    publicationState,
+    publicationFailureCode,
     serviceBacked: Boolean(serviceClient),
     activeBranchId,
     immutableRefetchCount,
     lastCommit,
   }),
+  inspectCollaboration: () => ({ workspace: durableWorkspace && structuredClone(durableWorkspace),
+    branches: durableBranches && structuredClone(durableBranches), claims: durableClaims && structuredClone(durableClaims),
+    activity: durableActivity && structuredClone(durableActivity), diagnostic: lastServiceDiagnostic && structuredClone(lastServiceDiagnostic) }),
   dispatch,
   openShotWorkspace,
   inspectShotWorkspace,
@@ -517,50 +573,73 @@ window.__motionEditor = {
   switchBranch,
   disconnectEvents: () => { eventSubscription?.close(); eventSubscriptionGeneration += 1; },
   reconnectEvents: connectEvents,
+  delayNextPublication: () => {
+    if (publicationTestGate) return;
+    let release: () => void = () => undefined;
+    const promise = new Promise<void>((resolve) => { release = resolve; });
+    publicationTestGate = { promise, release };
+  },
+  releasePublication: () => { publicationTestGate?.release(); publicationTestGate = null; },
+  failNextPublication: () => { failNextPublicationForTest = true; },
+  retryPublication: async () => {
+    if (!serviceClient || publicationState !== 'failed') return false;
+    const immutable = await serviceClient.head(authoring.document.documentId, activeBranchId);
+    await applyImmutable(immutable, true);
+    return true;
+  },
 };
 
+type EditorPersistentOperation = AuthoringOperation | PreparedOperationIntent;
+
+function rejectUnavailablePublication(): 'PUBLICATION_PENDING' | 'PUBLICATION_FAILED' | null {
+  if (publicationState === 'settled') return null;
+  const code = publicationState === 'pending' ? 'PUBLICATION_PENDING' : 'PUBLICATION_FAILED';
+  publishClientDiagnostic(code, 'storage', true);
+  return code;
+}
+
 async function dispatch(
-  operation: AuthoringOperation,
+  operation: EditorPersistentOperation,
   focusSelector?: string,
   historyAnchor?: { viewportTop: number; scrollY: number },
   previewPromotion?: PreviewCssCommitPromotion,
 ): Promise<{ ok: boolean; code?: string }> {
+  const publicationRejection = rejectUnavailablePublication();
+  if (publicationRejection) return { ok: false, code: publicationRejection };
   const beforeCreated = findCreatedTrack(buildTimeline(authoring.document).rows);
-  const beforeHasMidpoint = beforeCreated?.keyframes.some((keyframe) => keyframe.offset === 0.5) ?? false;
   let authoritativePreviewAlreadyMounted = false;
-  const durableKind = operation.kind === 'motion.track.create' || operation.kind.startsWith('motion.transform-')
-    || operation.kind.startsWith('motion.keyframe-group-') || operation.kind === 'motion.settled-hold.set'
-    || operation.kind.startsWith('motion.cue.')
-    || operation.kind === 'motion.history.undo' || operation.kind === 'motion.history.redo';
-  if (serviceClient && !durableKind) {
-    const code = 'SERVICE_OPERATION_UNSUPPORTED';
-    status.value = `This durable editor currently supports track creation only. (${code}) Revision ${authoring.document.revision} unchanged.`;
-    status.dataset.kind = 'error'; return { ok: false, code };
-  }
-  let result = dispatchAuthoringOperation(authoring, operation);
-  if (serviceClient && durableKind) {
-    const command = operation.kind === 'motion.track.create' ? makeTrackCreateCommand({ operationId: operation.operationId,
-      documentId: operation.documentId, branchId: activeBranchId, expectedRevision: operation.expectedRevision, elementId: operation.elementId })
-      : operation.kind.startsWith('motion.cue.') ? makeCueCommand(operation as CueAuthoringOperation, activeBranchId)
-      : makeTrajectoryCommand(operation as Parameters<typeof makeTrajectoryCommand>[0], activeBranchId);
+  let result: ReturnType<typeof dispatchAuthoringOperation>;
+  if (serviceClient) {
+    const command = serviceCommandForOperation(operation);
     const commandTask = reconciliation.then(async () => {
+      const queuedPublicationRejection = rejectUnavailablePublication();
+      if (queuedPublicationRejection) return { response: null, applied: false,
+        authoritativePreviewAlreadyMounted: false, publicationRejection: queuedPublicationRejection };
       let response;
       try { response = await serviceClient.dispatch(command); }
-      catch { response = { ok: false, code: 'STORAGE_FAILURE' } as const; }
-      if (response.ok) {
-        if (operation.kind === 'motion.history.undo') {
-          durableTrajectoryUndoCount = Math.max(0, durableTrajectoryUndoCount - 1);
-          durableTrajectoryRedoCount += 1;
-        } else if (operation.kind === 'motion.history.redo') {
-          durableTrajectoryRedoCount = Math.max(0, durableTrajectoryRedoCount - 1);
-          durableTrajectoryUndoCount += 1;
-        } else if (operation.kind !== 'motion.track.create') {
-          durableTrajectoryUndoCount += 1;
-          durableTrajectoryRedoCount = 0;
+      catch {
+        try { response = await serviceClient.dispatch(command); }
+        catch {
+          const operationDigest = sha256Hex(canonicalJson(command));
+          try {
+            const committed = await findCommittedOperation(operation.documentId, operationDigest);
+            if (!committed) return { response: null, applied: false, authoritativePreviewAlreadyMounted: false };
+            pendingRevision = committed.revision;
+            const immutable = await serviceClient.revision(operation.documentId, committed.revision);
+            resolveAcceptedOperationDraft(operation);
+            await applyImmutable(immutable, false, previewPromotion);
+            resolveAcceptedCreationDraft(); pendingRevision = null;
+            return { response: null, applied: true, authoritativePreviewAlreadyMounted: true };
+          } catch { pendingRevision = null;
+            return { response: null, applied: false, authoritativePreviewAlreadyMounted: false }; }
         }
+      }
+      if (response.ok) {
         pendingRevision = response.resultingRevision;
         try {
-          await applyImmutable(await serviceClient.revision(response.documentId, response.resultingRevision), false, previewPromotion);
+          const immutable = await serviceClient.revision(response.documentId, response.resultingRevision);
+          resolveAcceptedOperationDraft(operation);
+          await applyImmutable(immutable, false, previewPromotion);
           resolveAcceptedCreationDraft();
         }
         finally { pendingRevision = null; }
@@ -568,43 +647,30 @@ async function dispatch(
       }
       pendingRevision = null;
       if (response.code === 'STALE_REVISION') {
-        await applyImmutable(await serviceClient.head(operation.documentId, activeBranchId), true);
-      } else if (response.code === 'STORAGE_FAILURE') {
-        try {
-          const immutable = await serviceClient.head(operation.documentId, activeBranchId);
-          const committed = operation.kind === 'motion.track.create' && immutable.document.revision !== operation.expectedRevision
-            && buildTimeline(immutable.document).rows.some((row) => row.elementId === operation.elementId && row.property === 'opacity');
-          if (committed) {
-            await applyImmutable(immutable, false);
-            resolveAcceptedCreationDraft();
-            return { response, applied: true, authoritativePreviewAlreadyMounted: true };
-          }
-        } catch { /* The unacknowledged SSE event remains the recovery path. */ }
+        const immutable = await serviceClient.head(operation.documentId, activeBranchId);
+        await applyImmutable(immutable, true);
       }
       return { response, applied: false, authoritativePreviewAlreadyMounted: false };
     });
     reconciliation = commandTask.then(() => undefined, () => undefined);
     const outcome = await commandTask; const response = outcome.response;
-    if (!response.ok && !outcome.applied) {
-      const code = response.code === 'STALE_REVISION' ? 'AUTHORING_STALE_REVISION' : `SERVICE_${response.code}`;
-      status.value = response.code === 'STALE_REVISION'
-        ? `${diagnosticMessage(code)} (${code}) Local operation not applied; refreshed to revision ${authoring.document.revision}.`
-        : `${diagnosticMessage(code)} (${code}) Revision ${authoring.document.revision} unchanged.`;
-      status.dataset.kind = 'error'; return { ok: false, code };
+    if ('publicationRejection' in outcome && outcome.publicationRejection) {
+      return { ok: false, code: outcome.publicationRejection };
+    }
+    if (!response && !outcome.applied) {
+      publishClientDiagnostic('SERVICE_UNAVAILABLE', 'storage', true);
+      return { ok: false, code: 'SERVICE_UNAVAILABLE' };
+    }
+    if (response && !response.ok && !outcome.applied) {
+      publishServiceDiagnostic(response.diagnostic);
+      return { ok: false, code: response.diagnostic.code };
     } else {
       result = { ok: true, state: authoring };
       authoritativePreviewAlreadyMounted = outcome.authoritativePreviewAlreadyMounted;
     }
-  }
-  if (!result.ok) {
-    if (operation.kind === 'motion.slot-duration.set') {
-      required<HTMLInputElement>('[data-duration]').setAttribute('aria-invalid', 'true');
-    } else if (operation.kind === 'motion.binding-delay.set') {
-      required<HTMLInputElement>('[data-delay]').setAttribute('aria-invalid', 'true');
-    }
-    status.value = `${diagnosticMessage(result.diagnostic.code)} (${result.diagnostic.code}) Revision ${authoring.document.revision} unchanged.`;
-    status.dataset.kind = 'error';
-    return { ok: false, code: result.diagnostic.code };
+  } else {
+    publishClientDiagnostic('SERVICE_REQUIRED', 'protocol', false);
+    return { ok: false, code: 'SERVICE_REQUIRED' };
   }
   authoring = result.state;
   if (!authoritativePreviewAlreadyMounted) {
@@ -625,7 +691,7 @@ async function dispatch(
   }
   const rows = buildTimeline(authoring.document).rows;
   const created = findCreatedTrack(rows);
-  const hasMidpoint = created?.keyframes.some((keyframe) => keyframe.offset === 0.5) ?? false;
+  const createdKeyframeCount = created?.keyframes.length ?? 0;
   if (created) {
     selectedTrackId = created.trackId;
     if (operation.kind === 'motion.keyframe.add') {
@@ -647,13 +713,13 @@ async function dispatch(
     }
   }
   if (operation.kind === 'motion.history.undo'
-    && ((beforeHasMidpoint && !hasMidpoint) || (beforeCreated && !created))) {
+    && (!created || createdKeyframeCount === 2)) {
     clearKeyframeSelection();
   } else if (operation.kind === 'motion.history.redo' && !beforeCreated && created) {
     selectedTrackId = created.trackId;
     selectedKeyframeId = created.keyframes[0]!.id;
     hasExplicitKeyframeSelection = true;
-  } else if (operation.kind === 'motion.history.redo' && !beforeHasMidpoint && hasMidpoint && created) {
+  } else if (operation.kind === 'motion.history.redo' && createdKeyframeCount === 3 && created) {
     selectedTrackId = created.trackId;
     selectedKeyframeId = created.keyframes.find((keyframe) => keyframe.offset === 0.5)!.id;
     hasExplicitKeyframeSelection = true;
@@ -688,6 +754,130 @@ async function dispatch(
   return { ok: true };
 }
 
+function serviceCommandForOperation(operation: EditorPersistentOperation): MotionCommand {
+  if (operation.schemaVersion === 'motion.operation-intent.v1') return makeOperationIntentCommand(operation, activeBranchId);
+  return commandSchema.parse({ protocolVersion: 'motion.protocol.v1', operationId: operation.operationId,
+    documentId: operation.documentId, branchId: activeBranchId, expectedRevision: operation.expectedRevision,
+    command: operation });
+}
+
+async function prepareAndDispatchIntent(
+  intent: OperationIntentPayload,
+  focusSelector?: string,
+  historyAnchor?: { viewportTop: number; scrollY: number },
+  previewPromotion?: PreviewCssCommitPromotion,
+): Promise<{ ok: boolean; code?: string }> {
+  const publicationRejection = rejectUnavailablePublication();
+  if (publicationRejection) return { ok: false, code: publicationRejection };
+  if (!serviceClient) {
+    publishClientDiagnostic('SERVICE_REQUIRED', 'protocol', false);
+    return { ok: false, code: 'SERVICE_REQUIRED' };
+  }
+  const expectedRevision = authoring.document.revision;
+  try {
+    const preparation = await serviceClient.prepareOperation({ schemaVersion: 'motion.operation-preparation-request.v1',
+      documentId: authoring.document.documentId, branchId: activeBranchId, expectedRevision, kind: intent.kind, intent });
+    if (!preparation.eligibility || !preparation.normalizedIntent || !preparation.derivationDigest) {
+      const code = preparation.reasonCode ?? 'DERIVATION_INVALID';
+      publishClientDiagnostic(code, code === 'DERIVATION_STALE' ? 'revision' : 'domain', false);
+      return { ok: false, code };
+    }
+    const prepared: PreparedOperationIntent = { schemaVersion: 'motion.operation-intent.v1', operationId: nextOperationId(),
+      documentId: preparation.documentId, expectedRevision: preparation.revision, kind: preparation.kind,
+      derivationDigest: preparation.derivationDigest, intent: preparation.normalizedIntent };
+    return dispatch(prepared, focusSelector, historyAnchor, previewPromotion);
+  } catch (error) {
+    if (error instanceof MotionPreparationError) {
+      publishServiceDiagnostic(error.response.diagnostic);
+      return { ok: false, code: error.response.diagnostic.code };
+    }
+    publishClientDiagnostic('SERVICE_PREPARATION_FAILED', 'storage', true);
+    return { ok: false, code: 'SERVICE_PREPARATION_FAILED' };
+  }
+}
+
+function durableUndoAvailable(): boolean { return durableWorkspace?.history.undoAvailable === true; }
+function durableRedoAvailable(): boolean { return durableWorkspace?.history.redoAvailable === true; }
+
+async function findCommittedOperation(documentId: string, operationDigest: string): Promise<CommitMetadata | null> {
+  if (!serviceClient) return null;
+  let cursor = lastCommitSeq; const visited = new Set<number>();
+  while (!visited.has(cursor)) {
+    visited.add(cursor); const page = await serviceClient.activity(documentId, cursor, 100);
+    const match = page.events.find((event) => event.operationDigest === operationDigest); if (match) return match;
+    if (page.nextAfterCommitSeq === null) return null; cursor = page.nextAfterCommitSeq;
+  }
+  return null;
+}
+
+async function fetchDurableContext(documentId: string, branchId = activeBranchId): Promise<DurableContextSnapshot> {
+  if (!serviceClient) throw new Error('SERVICE_REQUIRED');
+  const [workspace, branches, claims, activity] = await Promise.all([
+    serviceClient.workspace(documentId, branchId), serviceClient.branches(documentId),
+    serviceClient.activeClaims(documentId), serviceClient.activity(documentId, 0, 25),
+  ]);
+  return { workspace, branches, claims, activity };
+}
+
+function publishDurableContext(snapshot: DurableContextSnapshot): void {
+  const { workspace, branches, claims, activity } = snapshot;
+  durableWorkspace = workspace; durableBranches = branches; durableClaims = claims; durableActivity = activity;
+  required('[data-collaboration-branch]').textContent = activeBranchId;
+  required('[data-collaboration-revision]').textContent = String(workspace.revision);
+  const latest = activity.events.at(-1);
+  required('[data-collaboration-actor]').textContent = latest?.actor
+    ? `${latest.actor.kind} · ${latest.actor.actorId ?? 'legacy'}` : 'Awaiting activity';
+  const activeClaim = claims.claims[0];
+  required('[data-collaboration-claim]').textContent = activeClaim
+    ? `${activeClaim.scope} · ${activeClaim.holder.actorId ?? 'legacy'}` : 'None';
+  if (branchSelect) {
+    const selected = activeBranchId; branchSelect.replaceChildren(...branches.branches.map((branch) => new Option(
+      `${branch.branchId} · r${branch.headRevision}`, branch.branchId, false, branch.branchId === selected)));
+  }
+  const activityList = required<HTMLOListElement>('[data-collaboration-activity]'); activityList.replaceChildren();
+  for (const event of activity.events.slice(-8).reverse()) {
+    const item = document.createElement('li');
+    item.textContent = `r${event.revision} · ${event.kind} · ${event.actor?.kind ?? 'legacy'} · ${event.actor?.actorId ?? 'legacy'}`;
+    activityList.append(item);
+  }
+  const eligibilityList = required<HTMLUListElement>('[data-collaboration-eligibility]'); eligibilityList.replaceChildren();
+  for (const entry of workspace.eligibility) {
+    const item = document.createElement('li'); item.dataset.eligible = String(entry.eligible);
+    item.textContent = `${entry.kind}: ${entry.eligible ? 'available' : entry.reasonCode}`; eligibilityList.append(item);
+  }
+  undoButton.disabled = !workspace.history.undoAvailable;
+  redoButton.disabled = !workspace.history.redoAvailable;
+  if (cueWorkspace) required<HTMLElement>('[data-cue-history-slot]').hidden = undoButton.disabled && redoButton.disabled;
+}
+
+async function refreshDurableContext(): Promise<void> {
+  if (!serviceClient) return;
+  publishDurableContext(await fetchDurableContext(authoring.document.documentId));
+}
+
+function setPublicationState(state: PublicationState, failureCode: string | null = null): void {
+  publicationState = state;
+  publicationFailureCode = failureCode;
+  const main = document.querySelector('main')!;
+  main.dataset.publicationPending = String(state === 'pending');
+  main.dataset.publicationState = state;
+}
+
+function publishServiceDiagnostic(diagnostic: MotionDiagnostic): void {
+  lastServiceDiagnostic = diagnostic;
+  const output = document.querySelector<HTMLOutputElement>('[data-service-diagnostic]');
+  if (output) { output.hidden = false;
+    output.value = `${diagnostic.code} · ${diagnostic.category} · ${diagnostic.retryable ? 'retryable' : 'not retryable'}`; }
+  status.value = diagnostic.code === 'STALE_REVISION'
+    ? `${diagnostic.code}: local change not applied; refreshed to revision ${authoring.document.revision}.`
+    : `${diagnostic.code}: revision ${authoring.document.revision} unchanged.`;
+  status.dataset.kind = 'error';
+}
+
+function publishClientDiagnostic(code: string, category: MotionDiagnostic['category'], retryable: boolean): void {
+  publishServiceDiagnostic({ schemaVersion: 'motion.diagnostic.v1', code, category, retryable });
+}
+
 if (serviceClient) connectEvents();
 
 function connectEvents(): void {
@@ -716,7 +906,7 @@ async function reconcileCommit(event: CommitMetadata, subscriptionGeneration: nu
   if (!serviceClient || subscriptionGeneration !== eventSubscriptionGeneration || event.commitSeq <= lastCommitSeq) return;
   const acknowledge = () => { lastCommitSeq = event.commitSeq; lastCommit = event; reconciliationFailures.delete(event.commitSeq); };
   const gap = event.commitSeq !== lastCommitSeq + 1;
-  if (event.branchId !== activeBranchId) { acknowledge(); return; }
+  if (event.branchId !== activeBranchId) { acknowledge(); await refreshDurableContext(); return; }
   if (event.kind === 'motion.track.create' && event.revision < authoring.document.revision) { acknowledge(); return; }
   const branchAtStart = branchGeneration;
   const immutable = gap ? await serviceClient.head(event.documentId, event.branchId)
@@ -733,6 +923,7 @@ async function reconcileCommit(event: CommitMetadata, subscriptionGeneration: nu
       : `Revision ${authoring.document.revision} refreshed from committed service state.`;
     status.dataset.kind = 'success';
   }
+  if (!applied) await refreshDurableContext();
 }
 
 async function switchBranch(branchId: string): Promise<void> {
@@ -748,30 +939,36 @@ async function switchBranch(branchId: string): Promise<void> {
 
 async function createBranch(branchId: string): Promise<void> {
   if (!serviceClient) return;
+  if (rejectUnavailablePublication()) return;
   try {
     const response = await serializeServiceCommand(() => serviceClient.dispatch(makeBranchCreateCommand({ operationId: nextOperationId(),
       documentId: authoring.document.documentId, sourceBranchId: activeBranchId,
       expectedRevision: authoring.document.revision, branchId })));
-    if (!response.ok) { status.value = `Branch creation rejected (${response.code}).`; status.dataset.kind = 'error'; return; }
+    if (!response) return;
+    if (!response.ok) { publishServiceDiagnostic(response.diagnostic); return; }
     if (branchSelect && ![...branchSelect.options].some((option) => option.value === branchId)) branchSelect.add(new Option(branchId, branchId));
     if (branchSelect) branchSelect.value = branchId; await switchBranch(branchId); status.dataset.kind = 'success';
-  } catch { status.value = 'Branch creation rejected (VALIDATION).'; status.dataset.kind = 'error'; }
+  } catch { publishClientDiagnostic('SERVICE_UNAVAILABLE', 'storage', true); }
 }
 
 async function revokeClaim(claimId: string, leaseVersion: number): Promise<void> {
   if (!serviceClient) return;
+  if (rejectUnavailablePublication()) return;
   try {
     const documentRevision = await serviceClient.documentRevision(authoring.document.documentId);
     const response = await serializeServiceCommand(() => serviceClient.dispatch(makeClaimControlCommand({ kind: 'motion.claim.revoke', operationId: nextOperationId(),
       documentId: authoring.document.documentId, branchId: activeBranchId, expectedRevision: documentRevision.revision,
       claimId, leaseVersion })));
-    status.value = response.ok ? `Claim ${response.claimId} revoked at lease version ${response.leaseVersion}.`
-      : `Claim revocation rejected (${response.code}).`; status.dataset.kind = response.ok ? 'success' : 'error';
-  } catch { status.value = 'Claim revocation rejected (VALIDATION).'; status.dataset.kind = 'error'; }
+    if (!response) return;
+    if (!response.ok) { publishServiceDiagnostic(response.diagnostic); return; }
+    status.value = `Claim ${response.claimId} revoked at lease version ${response.leaseVersion}.`; status.dataset.kind = 'success';
+    await refreshDurableContext();
+  } catch { publishClientDiagnostic('SERVICE_UNAVAILABLE', 'storage', true); }
 }
 
-async function serializeServiceCommand<T>(command: () => Promise<T>): Promise<T> {
-  const task = reconciliation.then(command); reconciliation = task.then(() => undefined, () => undefined); return task;
+async function serializeServiceCommand<T>(command: () => Promise<T>): Promise<T | null> {
+  const task = reconciliation.then(() => rejectUnavailablePublication() ? null : command());
+  reconciliation = task.then(() => undefined, () => undefined); return task;
 }
 
 function clearKeyframeSelection(): void {
@@ -783,31 +980,51 @@ function clearKeyframeSelection(): void {
 type ImmutableHead = Awaited<ReturnType<MotionServiceClient['head']>>;
 async function applyImmutable(immutable: ImmutableHead, remote: boolean, previewPromotion?: PreviewCssCommitPromotion): Promise<void> {
   const draft = captureDraft();
-  authoring = createAuthoringState(immutable.document); const nextCompiled = compileMotionDocument(authoring.document);
+  const nextAuthoring = createAuthoringState(immutable.document); const nextCompiled = compileMotionDocument(nextAuthoring.document);
+  const previousCompiled = compiled;
+  setPublicationState('pending');
   let promoted = false;
-  if (previewPromotion) {
-    try {
-      await controller.promoteCompilerCssCommit({ ...previewPromotion, newCommittedHtml: nextCompiled.html, newCompilerCss: nextCompiled.css });
-      promoted = true; lastPreviewCommitPromotion = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: true,
-        promoted: true, fallbackCode: null };
-    } catch (error) {
-      lastPreviewCommitPromotion = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: true, promoted: false,
-        fallbackCode: error instanceof Error ? error.message : 'PREVIEW_CSS_COMMIT_PROMOTION_INVALID' };
+  try {
+    const nextDurableContext = serviceClient
+      ? await fetchDurableContext(nextAuthoring.document.documentId, activeBranchId)
+      : null;
+    if (publicationTestGate) await publicationTestGate.promise;
+    if (previewPromotion) {
+      try {
+        await controller.promoteCompilerCssCommit({ ...previewPromotion, newCommittedHtml: nextCompiled.html, newCompilerCss: nextCompiled.css });
+        promoted = true; lastPreviewCommitPromotion = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: true,
+          promoted: true, fallbackCode: null };
+      } catch (error) {
+        lastPreviewCommitPromotion = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: true, promoted: false,
+          fallbackCode: error instanceof Error ? error.message : 'PREVIEW_CSS_COMMIT_PROMOTION_INVALID' };
+      }
+    } else {
+      lastPreviewCommitPromotion = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: false,
+        promoted: false, fallbackCode: null };
     }
-  } else {
-    lastPreviewCommitPromotion = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: false,
-      promoted: false, fallbackCode: null };
-  }
-  compiled = nextCompiled; immutableRefetchCount += 1;
-  if (!promoted) await mountPreview(compiled.html, compiled.css);
-  renderProjection();
-  if (shotConfig) renderShotWorkspace();
-  if (draft.dirty) {
-    restoreDraft(draft);
-    if (remote) { draftConflictRevision = authoring.document.revision;
-      draftConflict.hidden = false; draftConflict.dataset.revision = String(draftConflictRevision); }
-  } else {
-    draftStaleBaseRevision = null;
+    if (!promoted) await mountPreview(nextCompiled.html, nextCompiled.css);
+    if (failNextPublicationForTest) {
+      failNextPublicationForTest = false;
+      throw new Error('PREVIEW_PUBLICATION_TEST_FAILURE');
+    }
+    authoring = nextAuthoring; compiled = nextCompiled; immutableRefetchCount += 1;
+    if (nextDurableContext) publishDurableContext(nextDurableContext);
+    renderProjection();
+    if (shotConfig) renderShotWorkspace();
+    if (draft.dirty) {
+      restoreDraft(draft);
+      if (remote) { draftConflictRevision = authoring.document.revision;
+        draftConflict.hidden = false; draftConflict.dataset.revision = String(draftConflictRevision); }
+    } else {
+      draftStaleBaseRevision = null;
+    }
+    setPublicationState('settled');
+  } catch (error) {
+    if (controller.readCompilerCommitState().committedHtml !== previousCompiled.html) {
+      try { await mountPreview(previousCompiled.html, previousCompiled.css); } catch { /* preserve explicit failed state */ }
+    }
+    setPublicationState('failed', error instanceof Error ? error.message : 'PUBLICATION_FAILED');
+    throw error;
   }
 }
 
@@ -828,7 +1045,8 @@ function captureDraft(): DraftSnapshot {
 }
 function restoreDraft(draft: DraftSnapshot): void {
   for (const [selector, value] of Object.entries(draft.values)) {
-    const control = document.querySelector<HTMLInputElement | HTMLSelectElement>(selector); if (control) control.value = value;
+    const control = document.querySelector<HTMLInputElement | HTMLSelectElement>(selector);
+    if (control && draft.dirtyFields[selector]) control.value = value;
   }
   selectedCreationElementId = draft.creationElementId;
   creationDraftDirty = draft.creationDirty; draftStaleBaseRevision = draft.staleBaseRevision;
@@ -869,6 +1087,29 @@ function resolveAcceptedCreationDraft(): void {
   draftConflictRevision = null;
   draftConflict.hidden = true;
   delete draftConflict.dataset.revision;
+}
+
+function resolveAcceptedOperationDraft(operation: Pick<EditorPersistentOperation, 'kind'>): void {
+  if (operation.kind === 'motion.track.create') resolveAcceptedCreationDraft();
+  const timingControl = operation.kind === 'motion.slot-duration.set' ? durationInput
+    : operation.kind === 'motion.binding-delay.set' ? delayInput
+      : operation.kind === 'motion.slot-easing.set' ? easingInput : null;
+  if (timingControl) {
+    const container = timingControl.closest<HTMLElement>('.timing-control')!;
+    container.dataset.draft = 'false'; required<HTMLElement>('em', container).hidden = true;
+    timingControl.setAttribute('aria-invalid', 'false');
+  }
+  if (operation.kind === 'motion.keyframe-value.set') valueInput.dataset.draft = 'false';
+  if (operation.kind === 'motion.keyframe-time.set') timeInput.dataset.draft = 'false';
+  if (operation.kind === 'motion.history.undo' || operation.kind === 'motion.history.redo') {
+    for (const control of [durationInput, delayInput, easingInput]) {
+      const container = control.closest<HTMLElement>('.timing-control')!;
+      container.dataset.draft = 'false'; required<HTMLElement>('em', container).hidden = true;
+      control.setAttribute('aria-invalid', 'false');
+    }
+    valueInput.dataset.draft = 'false'; timeInput.dataset.draft = 'false';
+    valueInput.setAttribute('aria-invalid', 'false'); timeInput.setAttribute('aria-invalid', 'false');
+  }
 }
 
 function operationEnvelope() {
@@ -938,8 +1179,8 @@ function renderProjection(): void {
     ? `600 ms hold inserted · Pair crosses at ${hold.sourceTimeMs + hold.durationMs} ms · duration ${timeline.durationMs} ms`
     : 'No hold inserted · Pair crosses at 2870 ms';
   required<HTMLElement>('[data-hold-control]').dataset.active = String(Boolean(hold));
-  for (const [button, unavailable] of [[undoButton, serviceClient ? durableTrajectoryUndoCount === 0 : authoring.undo.length === 0],
-    [redoButton, serviceClient ? durableTrajectoryRedoCount === 0 : authoring.redo.length === 0]] as const) {
+  for (const [button, unavailable] of [[undoButton, serviceClient ? !durableUndoAvailable() : authoring.undo.length === 0],
+    [redoButton, serviceClient ? !durableRedoAvailable() : authoring.redo.length === 0]] as const) {
     button.removeAttribute('aria-disabled');
     button.disabled = unavailable;
   }
@@ -974,19 +1215,10 @@ async function submitCueForm(form: HTMLFormElement): Promise<void> {
       pulseRadiusPpm: Math.round(number('radius') * 1_000_000), pulseOpacityPpm: 700_000,
       ...(reveal ? { revealCueId: reveal.id } : {}) };
   }
-  let operation: CueAuthoringOperation;
-  if (existing) {
-    operation = { ...operationEnvelope(), kind: 'motion.cue.update', payload: { cueId: existing.id,
-      expectedExpansionDigest: existing.expansionDigest, semantic, targetSnapshots: cueTargetSnapshots(authoring.document, semantic) } };
-  } else {
-    const cueId = deriveCueId(authoring.document.documentId, `editor-${kind}`);
-    const replacement = projectCueReplacement(authoring.document, cueId, semantic);
-    if (!replacement.ok) { announceCueStatus(cueDiagnosticMessage(replacement.code, kind), true, replacement.code); return; }
-    operation = { ...operationEnvelope(), kind: 'motion.cue.create', payload: { cueId, semantic,
-      targetSnapshots: cueTargetSnapshots(authoring.document, semantic), replacementTrackIds: replacement.trackIds,
-      replacementInputDigest: replacement.inputDigest } };
-  }
-  const result = await dispatch(operation);
+  const intent: OperationIntentPayload = existing
+    ? { kind: 'motion.cue.update', cueId: existing.id, semantic }
+    : { kind: 'motion.cue.create', creationKey: `editor-${kind}`, semantic };
+  const result = await prepareAndDispatchIntent(intent);
   if (result.ok) { cueEditingKind = null; renderCueCanvas(); }
   announceCueStatus(result.ok ? `${kind === 'cursor-path' ? 'Cursor path' : kind === 'click' ? 'Click' : 'Reveal'} ${existing ? 'updated' : 'created'} at revision ${authoring.document.revision}.`
     : cueDiagnosticMessage(result.code ?? 'UNKNOWN', kind), !result.ok, result.ok ? undefined : result.code);
@@ -1056,8 +1288,8 @@ function hydrateCueForm(form: HTMLFormElement, semantic: CueSemantic): void {
 }
 
 async function terminateCue(cue: AuthoringCue, kind: 'motion.cue.delete' | 'motion.cue.detach'): Promise<void> {
-  const result = await dispatch({ ...operationEnvelope(), kind, payload: { cueId: cue.id,
-    expectedExpansionDigest: cue.expansionDigest, expectedReplacementInputDigest: cue.replacement?.inputDigest ?? null } });
+  const intent: OperationIntentPayload = { kind, cueId: cue.id };
+  const result = await prepareAndDispatchIntent(intent);
   if (result.ok && kind === 'motion.cue.detach') detachedCueKinds.add(cue.semantic.kind);
   announceCueStatus(result.ok ? `${cue.label} ${kind.endsWith('detach')
     ? 'detached to ordinary tracks. The compiled result is unchanged; use Undo to restore guided editing' : 'deleted'}.`
@@ -1348,7 +1580,8 @@ function beginCuePathDrag(event: PointerEvent, cue: CursorPathAuthoringCue, wayp
   const surface = event.currentTarget as HTMLButtonElement; const start = { clientX: event.clientX, clientY: event.clientY };
   const base = cue.semantic.waypoints[waypointIndex]; if (!base) return;
   const envelope = operationEnvelope(); const gesture = ++cuePathGestureGeneration;
-  const committed = { html: compiled.html, css: compiled.css }; let latest: { operation: CueAuthoringOperation; html: string; css: string } | null = null;
+  const committed = { html: compiled.html, css: compiled.css }; let latest: { operation: CueAuthoringOperation;
+    intent: OperationIntentPayload; html: string; css: string } | null = null;
   let draftTask = Promise.resolve(); let moved = false; event.preventDefault(); surface.setPointerCapture(event.pointerId);
   const move = (next: PointerEvent) => {
     let delta; try { delta = previewPointerDeltaToPpm(projection, start, { clientX: next.clientX, clientY: next.clientY }); }
@@ -1360,7 +1593,8 @@ function beginCuePathDrag(event: PointerEvent, cue: CursorPathAuthoringCue, wayp
       expectedExpansionDigest: cue.expansionDigest, semantic, targetSnapshots: cueTargetSnapshots(authoring.document, semantic) } };
     const reduced = dispatchAuthoringOperation(authoring, operation); if (!reduced.ok) return;
     let draftCompiled; try { draftCompiled = compileMotionDocument(reduced.state.document); } catch { return; }
-    latest = { operation, html: draftCompiled.html, css: draftCompiled.css };
+    latest = { operation, intent: { kind: 'motion.cue.update', cueId: cue.id, semantic },
+      html: draftCompiled.html, css: draftCompiled.css };
     const localDeltaX = delta.deltaXPpm * projection.sourceWidthCssPixels / 1_000_000;
     const localDeltaY = delta.deltaYPpm * projection.sourceHeightCssPixels / 1_000_000;
     surface.style.translate = `${localDeltaX}px ${localDeltaY}px`; refreshCuePathSegments();
@@ -1378,7 +1612,7 @@ function beginCuePathDrag(event: PointerEvent, cue: CursorPathAuthoringCue, wayp
   const finish = () => { cleanup(); const accepted = latest; if (!moved || !accepted) { restore(); return; }
     void draftTask.then(async () => {
       if (gesture !== cuePathGestureGeneration) return;
-      const result = await dispatch(accepted.operation, undefined, undefined, { schemaVersion: 'motion.preview-css-commit-promotion.v1',
+      const result = await prepareAndDispatchIntent(accepted.intent, undefined, undefined, { schemaVersion: 'motion.preview-css-commit-promotion.v1',
         oldCommittedHtml: committed.html, oldCompilerCss: committed.css, newCommittedHtml: accepted.html, newCompilerCss: accepted.css });
       if (!result.ok) surface.style.translate = '';
       scheduleCueCanvas();
@@ -1491,6 +1725,12 @@ function diagnosticMessage(code: string): string {
     AUTHORING_HOLD_LOCKED: 'Undo the hold before making another edit.',
   };
   return messages[code] ?? 'That change could not be applied.';
+}
+
+function rejectAuthoringInput(input: HTMLInputElement, code: 'AUTHORING_DURATION_INVALID' | 'AUTHORING_DELAY_INVALID'): void {
+  input.setAttribute('aria-invalid', 'true'); input.focus({ preventScroll: true });
+  status.value = `${diagnosticMessage(code)} (${code}) Revision ${authoring.document.revision} unchanged.`;
+  status.dataset.kind = 'error'; status.dataset.source = 'validation';
 }
 
 function successMessage(kind: AuthoringOperation['kind']): string {
@@ -1876,8 +2116,8 @@ function activateShotLayout(): void {
   layout.insertBefore(shotWorkspace, workflow);
   required<HTMLElement>('[data-shot-history-slot]').append(required<HTMLElement>('.workflow-footer'));
   shell.classList.add('shot-active');
-  required<HTMLElement>('.topbar h1').textContent = 'Shape the shot against the native preview';
-  required<HTMLElement>('.purpose').textContent = 'Choose the primary object, set the edit scope, and adjust canonical moments beside the compiled CSS.';
+  required<HTMLElement>('.topbar h1').textContent = 'Shape motion directly on the canvas';
+  required<HTMLElement>('.purpose').textContent = 'Choose an object and a moment. Add points when the path needs another beat.';
 }
 
 function initializeSeedWorkspace(): void {
@@ -1949,7 +2189,8 @@ function selectShotMode(nextMode: 'pose' | 'path'): void {
   if (nextMode === 'path' && !alignShotPreviewToMoment(shotMomentMs)) return;
   shotMode = nextMode;
   shotWorkspace.querySelectorAll<HTMLButtonElement>('[data-shot-mode]').forEach((item) =>
-    item.setAttribute('aria-pressed', String(nextMode === 'path')));
+    { item.setAttribute('aria-pressed', String(nextMode === 'path'));
+      item.textContent = nextMode === 'path' ? 'Hide path' : 'Show path'; });
   renderShotWorkspace();
 }
 
@@ -1959,7 +2200,13 @@ function selectShotMoment(timeMs: number): void {
 }
 
 function shotMomentLabel(timeMs: number): string {
-  return timeMs === shotConfig?.startMs ? 'Start' : timeMs === shotConfig?.settledMs ? 'Settled' : `${timeMs} ms`;
+  if (timeMs === shotConfig?.startMs) return 'Start';
+  if (timeMs === shotConfig?.settledMs) return 'Settle';
+  const trajectory = shotPrimaryElementId ? projectTransformTrajectory(authoring.document, shotPrimaryElementId) : null;
+  const intermediate = trajectory?.eligible ? trajectory.waypoints
+    .filter((point) => point.timeMs > (shotConfig?.startMs ?? 0) && point.timeMs < (shotConfig?.settledMs ?? 2100)) : [];
+  const index = intermediate.findIndex((point) => point.timeMs === timeMs);
+  return index >= 0 ? `Point ${index + 1}` : `${timeMs} ms`;
 }
 
 function updatePreviewPlaybackState(timeMs?: number, paused = false): void {
@@ -2036,12 +2283,20 @@ function renderShotWorkspace(): void {
   const displayedPaths = inventories.map((inventory, objectIndex) => ({ elementId: inventory.elementId, objectIndex,
     waypoints: inventory.waypoints.map(({ keyframeId, timeMs }) => ({ keyframeId, timeMs })) }));
   const geometryTimes = [...new Set(displayedPaths.flatMap((path) => path.waypoints.map((waypoint) => waypoint.timeMs)))].sort((a, b) => a - b);
-  shotMoments.querySelectorAll('label').forEach((item) => item.remove());
-  for (const timeMs of requestedTimes) {
+  const momentSequence = required<HTMLElement>('[data-shot-moment-sequence]', shotMoments);
+  momentSequence.replaceChildren();
+  for (const [index, timeMs] of requestedTimes.entries()) {
+    if (index > 0 && timeMs - requestedTimes[index - 1]! > 1) {
+      const beforeMs = requestedTimes[index - 1]!; const add = document.createElement('button'); add.type = 'button';
+      add.className = 'moment-add'; add.textContent = '+'; add.setAttribute('aria-label',
+        `Add a point between ${shotMomentLabel(beforeMs)} and ${shotMomentLabel(timeMs)}`);
+      add.addEventListener('click', () => void addShotMoment(beforeMs, timeMs)); momentSequence.append(add);
+    }
     const label = document.createElement('label'); const input = document.createElement('input'); input.type = 'radio'; input.name = 'shot-moment';
     input.value = String(timeMs); input.checked = timeMs === shotMomentMs;
     input.addEventListener('change', () => { if (input.checked) selectShotMoment(timeMs); });
-    label.append(input, document.createTextNode(timeMs === 0 ? 'Start' : timeMs === 2100 ? 'Settled' : `${timeMs} ms`)); shotMoments.append(label);
+    const copy = document.createElement('span'); copy.innerHTML = `<strong>${shotMomentLabel(timeMs)}</strong><small>${timeMs} ms</small>`;
+    label.append(input, copy); momentSequence.append(label);
   }
   const projection = readShotProjection();
   if (!projection) { shotGeometry = []; committedShotGeometryKey = null; shotOverlay.replaceChildren();
@@ -2082,28 +2337,39 @@ function renderShotWorkspace(): void {
   }
   const currentGeometry = committedShotGeometryKey === geometryKey;
   shotOverlay.setAttribute('aria-busy', String(!currentGeometry));
-  shotStatus.value = currentGeometry
-    ? `Revision ${authoring.document.revision} · ${shotSelection.length} selected · ${shotMomentMs} ms editable against native bounds.`
-    : `Revision ${authoring.document.revision} · measuring compiler-native geometry.`;
+  shotStatus.value = currentGeometry ? `${primaryLabel} · ${momentLabel} ready.` : 'Updating canvas…';
   schedulePreviewSelection();
 }
 
 function syncShotTimingControls(inventories: NonNullable<ReturnType<typeof canonicalShotInventory>>): void {
   if (!shotConfig) return;
+  const editTogether = required<HTMLInputElement>('[data-move-together]').checked;
   const sharedTimes = inventories[0]!.waypoints.map((waypoint) => waypoint.timeMs)
-    .filter((timeMs) => inventories.every((inventory) => inventory.waypoints.some((waypoint) => waypoint.timeMs === timeMs)));
-  const landing = sharedTimes.find((timeMs) => timeMs > shotConfig!.startMs && timeMs < shotConfig!.settledMs) ?? shotConfig.landedMs;
-  const settled = sharedTimes.length > 3 ? sharedTimes.at(-2)! : shotConfig.settledMs;
-  shotConfig.landedMs = landing;
-  required<HTMLInputElement>('[data-shot-landing]').value = String(landing);
-  required<HTMLInputElement>('[data-shot-settled]').value = String(settled);
-  const selected = projectTrajectorySelection(authoring.document, shotConfig.targetElementIds, landing);
+    .filter((timeMs) => inventories.every((inventory) => inventory.waypoints.some((waypoint) => waypoint.timeMs === timeMs)))
+    .sort((left, right) => left - right);
+  const primaryTimes = inventories.find((inventory) => inventory.elementId === shotPrimaryElementId)?.waypoints
+    .map((waypoint) => waypoint.timeMs).sort((left, right) => left - right) ?? [];
+  const editableTimes = editTogether ? sharedTimes : primaryTimes;
+  const selectedIndex = editableTimes.indexOf(shotMomentMs);
+  const protectedMoment = shotMomentMs === shotConfig.startMs || shotMomentMs === shotConfig.settledMs;
+  const timeInput = required<HTMLInputElement>('[data-shot-moment-time]');
+  const timeOutput = required<HTMLOutputElement>('[data-shot-moment-time-output]');
+  timeInput.min = String((editableTimes[selectedIndex - 1] ?? shotMomentMs - 1) + 1);
+  timeInput.max = String((editableTimes[selectedIndex + 1] ?? shotMomentMs + 1) - 1);
+  timeInput.value = String(shotMomentMs); timeOutput.value = `${shotMomentMs} ms`;
+  timeInput.disabled = protectedMoment || selectedIndex < 0;
+  required<HTMLButtonElement>('[data-shot-remove-moment]').disabled = protectedMoment || editableTimes.length <= 3;
+  const editingElementIds = editTogether ? shotConfig.targetElementIds : shotPrimaryElementId ? [shotPrimaryElementId] : [];
+  const selected = projectTrajectorySelection(authoring.document, editingElementIds, shotMomentMs);
+  const easing = required<HTMLSelectElement>('[data-shot-easing]');
+  const applyEasing = required<HTMLButtonElement>('[data-shot-apply-easing]');
+  easing.disabled = !selected.eligible || shotMomentMs === shotConfig.settledMs;
+  applyEasing.disabled = easing.disabled;
   if (!selected.eligible) return;
   const timings = effectiveShotTimings(selected.targets);
   if (timings && timings.every((timing) => canonicalJson(timing) === canonicalJson(timings[0]))) {
     const timing = timings[0]!;
-    required<HTMLSelectElement>('[data-shot-easing]').value = timing.kind === 'keyword'
-      ? timing.value : 'custom';
+    easing.value = timing.kind === 'keyword' ? timing.value : 'custom';
   }
 }
 
@@ -2114,7 +2380,7 @@ function publishShotGeometry(request: Omit<ShotGeometryRequest, 'requestId'>): v
     requestedTimes: [...request.requestedTimes] };
   latestShotGeometryRequest = published; pendingShotGeometryRequest = published;
   shotOverlay.setAttribute('aria-busy', 'true');
-  shotStatus.value = `Revision ${authoring.document.revision} · measuring compiler-native geometry.`;
+  shotStatus.value = 'Updating canvas…';
   if (!shotGeometryPumpRunning) shotGeometryPumpCompletion = pumpShotGeometry();
 }
 
@@ -2257,6 +2523,10 @@ async function processShotGeometryRequest(request: ShotGeometryRequest): Promise
       let handle = handlesByKeyframeId.get(waypoint.keyframeId);
       if (!handle) {
         handle = document.createElement('button'); handle.type = 'button'; handle.className = 'trajectory-waypoint';
+        const label = document.createElement('span'); label.className = 'trajectory-waypoint-label';
+        const name = document.createElement('strong'); name.className = 'trajectory-waypoint-name';
+        const time = document.createElement('small'); time.className = 'trajectory-waypoint-time';
+        label.append(name, time); handle.append(label);
         handle.addEventListener('click', () => { if (handle!.dataset.dragged === 'true') return;
           const timeMs = Number(handle!.dataset.timeMs);
           if (alignShotPreviewToMoment(timeMs)) { shotMomentMs = timeMs; renderShotWorkspace(); } });
@@ -2264,8 +2534,10 @@ async function processShotGeometryRequest(request: ShotGeometryRequest): Promise
       }
       handle.dataset.keyframeId = waypoint.keyframeId; handle.dataset.timeMs = String(waypoint.timeMs);
       handle.dataset.elementId = request.primaryElementId;
-      handle.dataset.label = waypoint.timeMs === 0 ? 'Start' : waypoint.timeMs === 2100 ? 'Settled' : `${waypoint.timeMs} ms`;
-      handle.setAttribute('aria-label', `${handle.dataset.label} compiler-native target bounds`);
+      handle.dataset.label = shotMomentLabel(waypoint.timeMs);
+      handle.querySelector<HTMLElement>('.trajectory-waypoint-name')!.textContent = handle.dataset.label;
+      handle.querySelector<HTMLElement>('.trajectory-waypoint-time')!.textContent = `${waypoint.timeMs} ms`;
+      handle.setAttribute('aria-label', `${handle.dataset.label}, ${waypoint.timeMs} ms, compiler-native target bounds`);
       handle.setAttribute('aria-pressed', String(waypoint.timeMs === shotMomentMs));
       Object.assign(handle.style, { left: `${sample.bounds.left}px`, top: `${sample.bounds.top}px`, width: `${sample.bounds.width}px`,
         height: `${sample.bounds.height}px`, translate: '' });
@@ -2277,6 +2549,20 @@ async function processShotGeometryRequest(request: ShotGeometryRequest): Promise
     for (const [index, handle] of orderedHandles.entries()) {
       const current = shotOverlay.querySelectorAll<HTMLButtonElement>('[data-keyframe-id]').item(index);
       if (current !== handle) shotOverlay.insertBefore(handle, current);
+    }
+    const placedLabels: Array<{ left: number; right: number; top: number; bottom: number }> = [];
+    for (const handle of orderedHandles) {
+      const label = handle.querySelector<HTMLElement>('.trajectory-waypoint-label')!;
+      label.style.translate = '';
+      const left = handle.offsetLeft - 1;
+      const width = label.offsetWidth;
+      const height = label.offsetHeight;
+      const baseTop = handle.offsetTop + handle.offsetHeight + 4;
+      let shift = 0;
+      while (placedLabels.some((placed) => left < placed.right && left + width > placed.left
+        && baseTop + shift < placed.bottom && baseTop + shift + height > placed.top)) shift += height + 4;
+      label.style.translate = shift ? `0 ${shift}px` : '';
+      placedLabels.push({ left, right: left + width, top: baseTop + shift, bottom: baseTop + shift + height });
     }
     refreshTrajectorySegments();
     const nextGeometry: typeof shotGeometry = [];
@@ -2298,7 +2584,8 @@ async function processShotGeometryRequest(request: ShotGeometryRequest): Promise
     shotProjection = projection; shotGeometry = nextGeometry; lastCommittedShotGeometryRequestId = request.requestId;
     committedShotGeometryKey = request.geometryKey;
     shotOverlay.setAttribute('aria-busy', 'false');
-    shotStatus.value = `Revision ${authoring.document.revision} · ${shotSelection.length} selected · ${shotMomentMs} ms editable against native bounds.`;
+    const objectLabel = `Object ${shotConfig!.targetElementIds.indexOf(request.primaryElementId) + 1}`;
+    shotStatus.value = `${objectLabel} · ${shotMomentLabel(shotMomentMs)} ready.`;
   } catch (error) {
     if (!isCurrentShotGeometryRequest(request)) return;
     shotProjection = null; shotGeometry = []; shotOverlay.replaceChildren(); shotOverlay.setAttribute('aria-busy', 'false');
@@ -2314,6 +2601,29 @@ function shotStageProjection() {
   const widthMicrounits = widthCssPixels * 1_000_000; const heightMicrounits = heightCssPixels * 1_000_000;
   if (!Number.isSafeInteger(widthMicrounits) || !Number.isSafeInteger(heightMicrounits)) return null;
   return { stageDigest: sha256Hex(`${compiled.exportDigest}\0${widthMicrounits}\0${heightMicrounits}`), widthMicrounits, heightMicrounits };
+}
+
+function shotViewportIntent(): { widthCssPixels: number; heightCssPixels: number } | null {
+  const { widthCssPixels, heightCssPixels } = controller.sourceSize();
+  if (!Number.isSafeInteger(widthCssPixels) || widthCssPixels <= 0
+    || !Number.isSafeInteger(heightCssPixels) || heightCssPixels <= 0) return null;
+  return { widthCssPixels, heightCssPixels };
+}
+
+function directPoseIntent(nextPose: ShotPose, kind: DirectPoseKind): OperationIntentPayload | null {
+  if (!shotPrimaryElementId) return null;
+  if (kind === 'move' && required<HTMLInputElement>('[data-move-together]').checked && shotSelection.length > 1) {
+    const primary = projectTransformTrajectory(authoring.document, shotPrimaryElementId);
+    const current = primary.eligible ? primary.waypoints.find((point) => point.timeMs === shotMomentMs) : null;
+    const viewport = shotViewportIntent();
+    if (!current || !viewport) return null;
+    return { kind: 'motion.transform-waypoints.translate', elementIds: [...shotSelection], momentMs: shotMomentMs,
+      deltaXPpm: Math.round((nextPose.translateXMicrounits - current.pose.translateXMicrounits) / viewport.widthCssPixels),
+      deltaYPpm: Math.round((nextPose.translateYMicrounits - current.pose.translateYMicrounits) / viewport.heightCssPixels), viewport };
+  }
+  const viewport = shotViewportIntent(); if (!viewport) return null;
+  return { kind: 'motion.transform-pose.set', elementId: shotPrimaryElementId, momentMs: shotMomentMs,
+    pose: nextPose, viewport };
 }
 
 type DirectPoseKind = 'move' | 'scale' | 'rotate';
@@ -2356,7 +2666,7 @@ function beginDirectPoseGesture(event: PointerEvent, kind: DirectPoseKind): void
   const startAngle = Math.atan2(event.clientY - center.y, event.clientX - center.x);
   const startRadius = Math.max(1, Math.hypot(event.clientX - center.x, event.clientY - center.y));
   const committedAtGestureStart = { html: compiled.html, css: compiled.css }; let latest: { operation: AuthoringOperation;
-    html: string; css: string } | null = null; let moved = false; let frame: number | null = null; let cancelled = false;
+    intent: OperationIntentPayload; html: string; css: string } | null = null; let moved = false; let frame: number | null = null; let cancelled = false;
   const preview = () => { frame = null; const draft = latest; if (!draft || cancelled) return;
     void controller.applyCompilerCssDraft(draft.css).then(() => schedulePreviewSelection()).catch(() => undefined); };
   const move = (next: PointerEvent) => {
@@ -2370,9 +2680,9 @@ function beginDirectPoseGesture(event: PointerEvent, kind: DirectPoseKind): void
       * Math.hypot(next.clientX - center.x, next.clientY - center.y) / startRadius)) * 1_000_000) };
     if (kind === 'rotate') pose = { ...pose, rotateMicrodegrees: Math.round(normalizeRotation(startPose.rotateMicrodegrees / 1_000_000
       + (Math.atan2(next.clientY - center.y, next.clientX - center.x) - startAngle) * 180 / Math.PI) * 1_000_000) };
-    const operation = directPoseOperation(pose, kind); if (!operation) return;
+    const operation = directPoseOperation(pose, kind); const intent = directPoseIntent(pose, kind); if (!operation || !intent) return;
     const reduced = dispatchAuthoringOperation(authoring, operation); if (!reduced.ok) return;
-    const draft = compileMotionDocument(reduced.state.document); latest = { operation, html: draft.html, css: draft.css };
+    const draft = compileMotionDocument(reduced.state.document); latest = { operation, intent, html: draft.html, css: draft.css };
     if (frame === null) frame = requestAnimationFrame(preview);
     shotStatus.value = `${kind} draft · release to commit or press Escape to cancel.`;
   };
@@ -2383,7 +2693,7 @@ function beginDirectPoseGesture(event: PointerEvent, kind: DirectPoseKind): void
     shotStatus.value = `Draft cancelled · revision ${authoring.document.revision} unchanged.`; schedulePreviewSelection(); }); };
   const escape = (keyboard: KeyboardEvent) => { if (keyboard.key !== 'Escape') return; keyboard.preventDefault(); cancel(); };
   const finish = () => { cleanup(); const draft = latest; if (!moved || !draft) { latest = null; return; }
-    void controller.applyCompilerCssDraft(draft.css).then(() => dispatch(draft.operation, undefined, undefined, {
+    void controller.applyCompilerCssDraft(draft.css).then(() => prepareAndDispatchIntent(draft.intent, undefined, undefined, {
       schemaVersion: 'motion.preview-css-commit-promotion.v1', oldCommittedHtml: committedAtGestureStart.html,
       oldCompilerCss: committedAtGestureStart.css, newCommittedHtml: draft.html, newCompilerCss: draft.css,
     })).then((result) => { shotStatus.value = result.ok ? `${kind} applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`;
@@ -2410,8 +2720,8 @@ async function handleDirectPoseKeyboard(event: KeyboardEvent, kind: 'body' | 'sc
   if (operationKind === 'rotate') { const step = event.shiftKey ? 15 : 1; const current = pose.rotateMicrodegrees / 1_000_000;
     const next = event.key === 'Home' ? -180 : event.key === 'End' ? 180 : normalizeRotation(current + (event.key === 'ArrowRight' || event.key === 'ArrowUp' ? step : -step));
     pose.rotateMicrodegrees = Math.round(next * 1_000_000); }
-  const operation = directPoseOperation(pose, operationKind); if (!operation) return;
-  const result = await dispatch(operation); shotStatus.value = result.ok ? `${operationKind} applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`;
+  const intent = directPoseIntent(pose, operationKind); if (!intent) return;
+  const result = await prepareAndDispatchIntent(intent); shotStatus.value = result.ok ? `${operationKind} applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`;
   renderShotWorkspace(); (event.currentTarget as HTMLElement).focus({ preventScroll: true });
 }
 
@@ -2424,14 +2734,8 @@ async function applyShotPose(): Promise<void> {
     translateYMicrounits: Math.round(Number(controls.y!.value) * 1_000_000),
     scalePpm: Math.round(Number(controls.scale!.value) * 1_000_000),
     rotateMicrodegrees: Math.round(Number(controls.rotate!.value) * 1_000_000) };
-  const moveTogether = required<HTMLInputElement>('[data-move-together]').checked && shotSelection.length > 1;
-  const stage = shotStageProjection();
-  if (!stage) { shotStatus.value = 'TRAJECTORY_STAGE_INVALID · unchanged.'; return; }
-  const operation = moveTogether
-    ? buildWaypointTranslateOperation(shotMomentMs, nextPose.translateXMicrounits, nextPose.translateYMicrounits)
-    : { ...operationEnvelope(), kind: 'motion.transform-pose.set' as const, ...selected.targets[0]!, payload: { pose: nextPose, stage } };
-  if (!operation) { shotStatus.value = `${shotStatus.value} · unchanged.`; return; }
-  const result = await dispatch(operation); shotStatus.value = result.ok ? `Pose applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`; renderShotWorkspace();
+  const intent = directPoseIntent(nextPose, 'move'); if (!intent) { shotStatus.value = 'TRAJECTORY_SELECTION_INVALID · unchanged.'; return; }
+  const result = await prepareAndDispatchIntent(intent); shotStatus.value = result.ok ? `Pose applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`; renderShotWorkspace();
 }
 
 function buildWaypointTranslateOperation(momentMs: number, nextXMicrounits: number, nextYMicrounits: number): AuthoringOperation | null {
@@ -2487,7 +2791,10 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
     const reduced = dispatchAuthoringOperation(authoring, candidate); if (!reduced.ok) return;
     let draftCompiled;
     try { draftCompiled = compileMotionDocument(reduced.state.document); } catch { return; }
-    const nextDraft = { operation: candidate, commandBytes: canonicalJson(makeTrajectoryCommand(candidate as Parameters<typeof makeTrajectoryCommand>[0], activeBranchId)),
+    const intent: OperationIntentPayload = { kind: 'motion.transform-waypoints.translate',
+      elementIds: (editTogether ? [...shotSelection] : [primaryElementId]), momentMs, deltaXPpm, deltaYPpm,
+      viewport: { widthCssPixels: projection.sourceWidthCssPixels, heightCssPixels: projection.sourceHeightCssPixels } };
+    const nextDraft = { operation: candidate, intent, commandBytes: canonicalJson(makeTrajectoryCommand(candidate as Parameters<typeof makeTrajectoryCommand>[0], activeBranchId)),
       compiledHtml: draftCompiled.html, compiledCss: draftCompiled.css, exportDigest: draftCompiled.exportDigest };
     activeWaypointDraft = nextDraft; waypointDraftMoveCount += 1;
     if (waypointDraftFrame === null) waypointDraftFrame = requestAnimationFrame(() => {
@@ -2527,7 +2834,7 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
       void waypointDraftApply.then(async () => {
         if (releaseGeneration !== waypointGestureGeneration || waypointDraftFailure) return;
         waypointReleasePhase = 'committing';
-        const result = await dispatch(releasedDraft.operation, undefined, undefined, {
+        const result = await prepareAndDispatchIntent(releasedDraft.intent, undefined, undefined, {
           schemaVersion: 'motion.preview-css-commit-promotion.v1', oldCommittedHtml: committedAtGestureStart.html,
           oldCompilerCss: committedAtGestureStart.css, newCommittedHtml: releasedDraft.compiledHtml,
           newCompilerCss: releasedDraft.compiledCss,
@@ -2548,39 +2855,51 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', finish, { once: true }); window.addEventListener('pointercancel', cancelPointer, { once: true }); window.addEventListener('keydown', cancelKeyboard);
 }
 
-function readShotTimingDrafts(): { landing: number; settled: number } | null {
-  const landingInput = required<HTMLInputElement>('[data-shot-landing]');
-  const settledInput = required<HTMLInputElement>('[data-shot-settled]');
-  landingInput.setCustomValidity(''); landingInput.removeAttribute('aria-invalid');
-  settledInput.setCustomValidity(''); settledInput.removeAttribute('aria-invalid');
-  const landing = Number(landingInput.value); const settled = Number(settledInput.value);
-  const reject = (input: HTMLInputElement, message: string): null => {
-    input.setCustomValidity(message); input.setAttribute('aria-invalid', 'true'); input.focus();
-    shotStatus.value = `${message} Revision ${authoring.document.revision} unchanged.`;
-    return null;
-  };
-  if (!Number.isSafeInteger(landing) || landing < 1 || landing > 2099) {
-    return reject(landingInput, 'Landing must be a whole number from 1 to 2099 ms.');
-  }
-  if (!Number.isSafeInteger(settled) || settled < 2 || settled > 2100) {
-    return reject(settledInput, 'Settled must be a whole number from 2 to 2100 ms.');
-  }
-  if (landing >= settled) {
-    landingInput.setAttribute('aria-invalid', 'true');
-    return reject(settledInput, 'Settled must be later than landing.');
-  }
-  return { landing, settled };
+async function addShotMoment(beforeMs: number, afterMs: number): Promise<void> {
+  if (!shotConfig || !shotPrimaryElementId) return;
+  const timeMs = Math.floor((beforeMs + afterMs) / 2);
+  if (!(beforeMs < timeMs && timeMs < afterMs)) return;
+  const editTogether = required<HTMLInputElement>('[data-move-together]').checked;
+  const intent: OperationIntentPayload = { kind: 'motion.transform-waypoint.add',
+    elementIds: editTogether ? [...shotConfig.targetElementIds] : [shotPrimaryElementId], timeMs };
+  const result = await prepareAndDispatchIntent(intent);
+  if (result.ok) { shotMomentMs = timeMs; alignShotPreviewToMoment(timeMs); }
+  shotStatus.value = result.ok ? `Point added at ${timeMs} ms · revision ${authoring.document.revision}.`
+    : `${result.code} · no point added.`;
+  renderShotWorkspace();
 }
 
-async function applyShotTimes(): Promise<void> {
-  if (!shotConfig) return; const timing = readShotTimingDrafts(); if (!timing) return; const { landing, settled } = timing;
-  let selected = projectTrajectorySelection(authoring.document, shotConfig.targetElementIds, shotConfig.landedMs);
-  if (!selected.eligible) { shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; return; }
-  if (landing === shotConfig.landedMs) { shotStatus.value = `Times already applied at revision ${authoring.document.revision}.`; return; }
-  const result = await dispatch({ ...operationEnvelope(), kind: 'motion.keyframe-group-time.set', payload: { targets: selected.targets,
-    sourceTimeMs: shotConfig.landedMs, targetTimeMs: landing, landingTimeMs: landing,
-    settledTimeMs: settled } });
-  shotStatus.value = result.ok ? `Times applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`;
+async function removeShotMoment(): Promise<void> {
+  if (!shotConfig || !shotPrimaryElementId || shotMomentMs === shotConfig.startMs || shotMomentMs === shotConfig.settledMs) return;
+  const inventory = canonicalShotInventory()?.find((candidate) => candidate.elementId === shotPrimaryElementId);
+  const previous = inventory?.waypoints.filter((point) => point.timeMs < shotMomentMs).at(-1)?.timeMs ?? shotConfig.startMs;
+  const removing = shotMomentMs;
+  const editTogether = required<HTMLInputElement>('[data-move-together]').checked;
+  const intent: OperationIntentPayload = { kind: 'motion.transform-waypoint.remove',
+    elementIds: editTogether ? [...shotConfig.targetElementIds] : [shotPrimaryElementId], timeMs: removing };
+  const result = await prepareAndDispatchIntent(intent);
+  if (result.ok) { shotMomentMs = previous; alignShotPreviewToMoment(previous); }
+  shotStatus.value = result.ok ? `Point removed · revision ${authoring.document.revision}.` : `${result.code} · unchanged.`;
+  renderShotWorkspace();
+}
+
+async function applyShotMomentTime(targetTimeMs: number): Promise<void> {
+  const config = shotConfig;
+  if (!config || shotMomentMs === config.startMs || shotMomentMs === config.settledMs
+    || !Number.isSafeInteger(targetTimeMs) || targetTimeMs === shotMomentMs) return;
+  const sourceTimeMs = shotMomentMs;
+  const inventory = canonicalShotInventory()?.find((candidate) => candidate.elementId === shotPrimaryElementId);
+  const intermediate = inventory?.waypoints.map((point) => point.timeMs)
+    .filter((timeMs) => timeMs > config.startMs && timeMs < config.settledMs) ?? [];
+  const landingTimeMs = Math.min(targetTimeMs, ...intermediate.filter((timeMs) => timeMs !== sourceTimeMs));
+  const editTogether = required<HTMLInputElement>('[data-move-together]').checked;
+  const intent: OperationIntentPayload = { kind: 'motion.keyframe-group-time.set',
+    elementIds: editTogether ? [...config.targetElementIds] : shotPrimaryElementId ? [shotPrimaryElementId] : [],
+    sourceTimeMs, targetTimeMs, landingTimeMs, settledTimeMs: config.settledMs };
+  const result = await prepareAndDispatchIntent(intent);
+  if (result.ok) { shotMomentMs = targetTimeMs; alignShotPreviewToMoment(targetTimeMs); }
+  shotStatus.value = result.ok ? `Point moved to ${targetTimeMs} ms · revision ${authoring.document.revision}.`
+    : `${result.code} · timing unchanged.`;
   renderShotWorkspace();
 }
 
@@ -2601,8 +2920,10 @@ function effectiveShotTimings(targets: Array<{ trackId: string; elementId: strin
 }
 
 async function applyShotEasing(): Promise<void> {
-  if (!shotConfig) return;
-  const selected = projectTrajectorySelection(authoring.document, shotConfig.targetElementIds, shotConfig.landedMs);
+  if (!shotConfig || shotMomentMs === shotConfig.settledMs) return;
+  const editTogether = required<HTMLInputElement>('[data-move-together]').checked;
+  const elementIds = editTogether ? shotConfig.targetElementIds : shotPrimaryElementId ? [shotPrimaryElementId] : [];
+  const selected = projectTrajectorySelection(authoring.document, elementIds, shotMomentMs);
   if (!selected.eligible) { shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; return; }
   const effectiveTimings = effectiveShotTimings(selected.targets);
   if (!effectiveTimings) { shotStatus.value = 'AUTHORING_TRAJECTORY_EASING_MISSING · unchanged.'; return; }
@@ -2613,14 +2934,29 @@ async function applyShotEasing(): Promise<void> {
   const draft = required<HTMLSelectElement>('[data-shot-easing]').value;
   if (draft === 'custom') { shotStatus.value = 'Choose an easing preset to replace the source curve.'; return; }
   const value = draft as 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out';
-  const result = await dispatch({ ...operationEnvelope(), kind: 'motion.keyframe-group-easing.set', payload: { targets: selected.targets, expectedEasing, easing: { kind: 'keyword', value } } });
-  shotStatus.value = result.ok ? `Easing applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`; renderShotWorkspace();
+  const intent: OperationIntentPayload = { kind: 'motion.keyframe-group-easing.set', elementIds: [...elementIds],
+    momentMs: shotMomentMs, expectedEasing, easing: { kind: 'keyword', value } };
+  const result = await prepareAndDispatchIntent(intent);
+  shotStatus.value = result.ok ? `Movement after ${shotMomentLabel(shotMomentMs)} updated · revision ${authoring.document.revision}.`
+    : `${result.code} · unchanged.`; renderShotWorkspace();
 }
 
 async function applyShotHold(): Promise<void> {
-  if (!shotConfig) return; const timing = readShotTimingDrafts(); if (!timing) return; const { landing, settled } = timing;
-  const selected = projectTrajectorySelection(authoring.document, shotConfig.targetElementIds, 2100); if (!selected.eligible) { shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; return; }
-  const result = await dispatch({ ...operationEnvelope(), kind: 'motion.settled-hold.set', payload: { targets: selected.targets, sourceTimeMs: 2100, settledTimeMs: settled, landingTimeMs: landing, boundaryTimeMs: 2100 } });
+  const config = shotConfig;
+  if (!config) return;
+  const settledInput = required<HTMLInputElement>('[data-shot-settled]');
+  const settled = Number(settledInput.value);
+  if (!Number.isSafeInteger(settled) || settled <= 1 || settled >= config.settledMs) {
+    settledInput.setAttribute('aria-invalid', 'true'); settledInput.focus();
+    shotStatus.value = `Hold must begin between 2 and ${config.settledMs - 1} ms · unchanged.`; return;
+  }
+  const inventory = canonicalShotInventory()?.[0];
+  const landing = inventory?.waypoints.map((point) => point.timeMs)
+    .filter((timeMs) => timeMs > config.startMs && timeMs < settled).at(-1) ?? config.landedMs;
+  const selected = projectTrajectorySelection(authoring.document, config.targetElementIds, 2100); if (!selected.eligible) { shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; return; }
+  const intent: OperationIntentPayload = { kind: 'motion.settled-hold.set', elementIds: [...config.targetElementIds],
+    sourceTimeMs: 2100, settledTimeMs: settled, landingTimeMs: landing, boundaryTimeMs: 2100 };
+  const result = await prepareAndDispatchIntent(intent);
   shotStatus.value = result.ok ? `Settled hold applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`; renderShotWorkspace();
 }
 

@@ -24,7 +24,7 @@ import { compareRgba, deriveSamplePlan } from './index.js';
 const runtimeDirectory = resolve('.motion/private/landing-shot1-canonical-editing');
 const canonicalPath = resolve(runtimeDirectory, 'canonical-document.json');
 const admittedPackagePath = resolve('.motion/private/shot1-purpose-built-v1/admission-package.json');
-const importReceiptPath = resolve('.motion/receipts/t002-private.json');
+const importReceiptPath = resolve('.motion/receipts/landing-shot1-private-import.json');
 const visualReceiptPath = resolve('.motion/receipts/landing-shot1-private-visual.json');
 const viewport = { width: 1440, height: 900 };
 const stage = {
@@ -34,7 +34,7 @@ const stage = {
 };
 
 test('authenticated real seed completes aggregate-only five-operation visual proof', async () => {
-  const admission = JSON.parse(await readFile(importReceiptPath, 'utf8')) as {
+  const admission = JSON.parse(await readGeneratedImportReceipt()) as {
     passed: boolean;
     admission: { authenticated: boolean; integrityValid: boolean; diagnosticCodes: string[] };
     import: { diagnosticCodes: string[] };
@@ -45,7 +45,19 @@ test('authenticated real seed completes aggregate-only five-operation visual pro
     admission: { authenticated: true, integrityValid: true, diagnosticCodes: [] },
     import: { diagnosticCodes: [] },
     privacy: { aggregateOnly: true, liveValueCount: 0 },
-  });
+});
+
+async function readGeneratedImportReceipt(): Promise<string> {
+  const deadline = Date.now() + 5_000;
+  while (true) {
+    try {
+      return await readFile(importReceiptPath, 'utf8');
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT' || Date.now() >= deadline) throw error;
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 25));
+    }
+  }
+}
 
   const base = JSON.parse(await readFile(canonicalPath, 'utf8')) as MotionDocument;
   const admittedPackage = JSON.parse(await readFile(admittedPackagePath, 'utf8')) as {

@@ -2,8 +2,9 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, test } from 'vitest';
 import { importMotionHtml } from '../../css-import/src/index.js';
-import { canonicalContentBytes, createAuthoringState, dispatchAuthoringOperation, projectTrajectorySelection,
-  projectTransformTrajectory, sha256Hex, type AuthoringOperation, type MotionDocument } from './index.js';
+import { canonicalBytes, canonicalContentBytes, createAuthoringState, dispatchAuthoringOperation, projectTrajectorySelection,
+  prepareOperationIntent, projectTransformTrajectory, sha256Hex, type AuthoringOperation, type MotionDocument } from './index.js';
+import { compileMotionDocument } from '../../css-compiler/src/index.js';
 
 const source = readFileSync(resolve(import.meta.dirname, '../../../fixtures/public-synthetic/landing-shot1.html'), 'utf8');
 const imported = importMotionHtml(source); if (!imported.document) throw new Error(imported.diagnostics[0]?.code);
@@ -31,6 +32,64 @@ function addWaypointAt(document: MotionDocument, timeMs: number) {
 }
 
 describe('trajectory authoring', () => {
+  test('adds a point to one independently-authored object without changing its peer', () => {
+    const compiled = compileMotionDocument(base);
+    const prepared = prepareOperationIntent(base, 'main', sha256Hex(canonicalBytes(base)), compiled.exportDigest, {
+      schemaVersion: 'motion.operation-preparation-request.v1', documentId: base.documentId, branchId: 'main',
+      expectedRevision: 0, kind: 'motion.transform-waypoint.add', intent: {
+        kind: 'motion.transform-waypoint.add', elementIds: [ids[0]!], timeMs: 350,
+      },
+    });
+    expect(prepared.preparation).toMatchObject({ eligibility: true, resolvedElementIds: [ids[0]] });
+    const added = dispatchAuthoringOperation(createAuthoringState(base), prepared.operation!);
+    expect(added.ok).toBe(true); if (!added.ok) return;
+    const first = projectTransformTrajectory(added.state.document, ids[0]!);
+    const second = projectTransformTrajectory(added.state.document, ids[1]!);
+    expect(first.eligible && first.waypoints.some((point) => point.timeMs === 350)).toBe(true);
+    expect(second.eligible && second.waypoints.some((point) => point.timeMs === 350)).toBe(false);
+  });
+
+  test('adds and removes a shared intermediate waypoint atomically with exact history', () => {
+    const compiled = compileMotionDocument(base);
+    const preparedAdd = prepareOperationIntent(base, 'main', sha256Hex(canonicalBytes(base)), compiled.exportDigest, {
+      schemaVersion: 'motion.operation-preparation-request.v1', documentId: base.documentId, branchId: 'main',
+      expectedRevision: 0, kind: 'motion.transform-waypoint.add', intent: {
+        kind: 'motion.transform-waypoint.add', elementIds: [...ids].reverse(), timeMs: 350,
+      },
+    });
+    expect(preparedAdd.operation?.kind).toBe('motion.transform-waypoint.add');
+    if (preparedAdd.operation?.kind !== 'motion.transform-waypoint.add') return;
+    const added = dispatchAuthoringOperation(createAuthoringState(base), {
+      ...preparedAdd.operation, operationId: 'waypoint-add',
+    });
+    expect(added.ok).toBe(true); if (!added.ok) return;
+    expect(ids.every((id) => {
+      const trajectory = projectTransformTrajectory(added.state.document, id);
+      return trajectory.eligible && trajectory.waypoints.some((point) => point.timeMs === 350);
+    })).toBe(true);
+    const repeatedExports = Array.from({ length: 3 }, () => compileMotionDocument(added.state.document));
+    expect(new Set(repeatedExports.map((output) => output.exportDigest))).toHaveLength(1);
+    expect(new Set(repeatedExports.map((output) => output.html))).toHaveLength(1);
+    expect(new Set(repeatedExports.map((output) => output.css))).toHaveLength(1);
+    const addedDigest = sha256Hex(canonicalContentBytes(added.state.document));
+    const preparedRemove = prepareOperationIntent(added.state.document, 'main', sha256Hex(canonicalBytes(added.state.document)),
+      compileMotionDocument(added.state.document).exportDigest, {
+        schemaVersion: 'motion.operation-preparation-request.v1', documentId: base.documentId, branchId: 'main',
+        expectedRevision: 1, kind: 'motion.transform-waypoint.remove', intent: {
+          kind: 'motion.transform-waypoint.remove', elementIds: ids, timeMs: 350,
+        },
+      });
+    expect(preparedRemove.operation?.kind).toBe('motion.transform-waypoint.remove');
+    if (preparedRemove.operation?.kind !== 'motion.transform-waypoint.remove') return;
+    const removed = dispatchAuthoringOperation(added.state, {
+      ...preparedRemove.operation, operationId: 'waypoint-remove',
+    });
+    expect(removed.ok).toBe(true); if (!removed.ok) return;
+    expect(sha256Hex(canonicalContentBytes(removed.state.document))).toBe(sha256Hex(canonicalContentBytes(base)));
+    const undone = dispatchAuthoringOperation(removed.state, envelope('motion.history.undo', 2, 'waypoint-remove-undo'));
+    expect(undone.ok).toBe(true); if (!undone.ok) return;
+    expect(sha256Hex(canonicalContentBytes(undone.state.document))).toBe(addedDigest);
+  });
   test('canonicalizes reverse asymmetric selection while retaining each target identity and exact atomic history', () => {
     const asymmetric = structuredClone(base); const firstId = ids[0]!;
     const expanded = asymmetric.tracks.find((track) => track.elementId === firstId && track.property === 'transform')!;

@@ -10,10 +10,10 @@
   },
   "digests": {
     "source": "6b820d179a6ee83a4a24442b057b99a0380e28859a71a374718000f0058ada00",
-    "canonicalBefore": "6ec1366bc536040e10aab570ed9343433eacac9e8ac3bff2691deedb11606b73",
-    "canonicalAfter": "dfaa567c7283cd0efc485595a183c4707bcde3cf9ce2012f6e6029183a7500c4",
+    "canonicalBefore": "76fc15718840fbfaa940393b3f3543db01cabdebe618d21843a75c58c0d507bc",
+    "canonicalAfter": "7df7156bb743505ddafd53c25b48dce138593e2466a9d24527def01de4a7be19",
     "exportBefore": "b5b058f62ad9bdcb0ddc4fb606a33ded6300e3a696c4e7cf4c892d8901131e82",
-    "exportAfter": "5fe924e66adf1622c73e874ad1f7766bc19dd21eb8b6652ddebe639da99649e5"
+    "exportAfter": "97cc5bb5c76b2b29c90929a6eed902c277d0a079c908b3403d75100a5c1fd37e"
   },
   "inventory": {
     "sourceDigest": "6b820d179a6ee83a4a24442b057b99a0380e28859a71a374718000f0058ada00",
@@ -44,11 +44,11 @@
       }
     ],
     "stableTrackIds": [
-      "track_197d3524846118b7",
-      "track_6ed2736b6793f4fc",
-      "track_ba0f74d370f59fe0",
-      "track_c0a6ef0c86fc582a",
-      "track_f0c8f982cf3e5a00"
+      "track_ee412679bf0722d5",
+      "track_99b1da97034bfcab",
+      "track_59b7d952ab165907",
+      "track_ed6ddb89a1b3c027",
+      "track_77ae0228fbffe768"
     ]
   },
   "nativeCss": {

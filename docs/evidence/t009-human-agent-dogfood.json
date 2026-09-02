@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "motion.human-agent-dogfood-proof.v1",
+  "passed": true,
+  "clients": {
+    "browserHuman": true,
+    "independentCliAgent": true,
+    "sharedDurableDocument": true
+  },
+  "workflow": {
+    "namedSubdomain": true,
+    "claimVisible": true,
+    "claimLifecycleComplete": true,
+    "disconnectCatchup": true,
+    "browserReload": true,
+    "undoRedoExact": true
+  },
+  "diagnostics": {
+    "exactCount": 4,
+    "unauthorized": "CLAIM_REQUIRED",
+    "locked": "CLAIM_REQUIRED",
+    "chronology": "PROTOCOL_PREPARATION_REQUEST_INVALID",
+    "stalePreflight": "CLI_DISCOVERED_REVISION_MISMATCH",
+    "rejectedRevisionAllocations": 0
+  },
+  "preview": {
+    "compilerExact": true,
+    "browserNativeAnimations": true,
+    "reducedMotionInspectable": true
+  },
+  "export": {
+    "sampleCount": 3,
+    "byteIdentical": true,
+    "revision": 4,
+    "canonicalDigest": "ecdb44de4bda8f3484f618b920fd0257f822d36126bdb561d6bfb0589b120006",
+    "htmlDigest": "b6807897762a2c72cfc4dd93177909541f2a6506a6ceac8a24d6b925546341af",
+    "cssDigest": "e921d3014649ab4cea479a80a7c0868ae8cf93d39d791bf1e465c3628106ee31",
+    "exportDigest": "416de14ff57f21531ee581a185ee7a7fed6c65de37f68f00704288df90c0b08b",
+    "reducedMotionDigest": "93e50f10642eb083b2783a37330f52b6da25e7747937110515af47d1866709aa",
+    "counts": {
+      "applicationCount": 4,
+      "ruleCount": 5,
+      "slotCount": 5,
+      "trackCount": 6
+    }
+  },
+  "exclusions": {
+    "sensitiveFindings": 0,
+    "trackedPrivateTargets": 0,
+    "privatePayloads": 0,
+    "localArtifacts": 0
+  }
+}

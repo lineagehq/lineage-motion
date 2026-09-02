@@ -10,7 +10,7 @@ import { importMotionHtml } from './index.js';
 const root = resolve(import.meta.dirname, '../../..');
 const fixedDirectory = resolve(root, '.motion/private/shot1-purpose-built-v1');
 const outputDirectory = resolve(root, '.motion/private/landing-shot1-canonical-editing');
-const receiptPath = resolve(root, '.motion/receipts/t002-private.json');
+const receiptPath = resolve(root, '.motion/receipts/landing-shot1-private-import.json');
 const RECEIPT_SCHEMA_VERSION = 'motion.private-import-receipt.v2';
 
 test('owner-approved purpose-built authority imports completely into the exact Shot 1 workspace', async () => {
