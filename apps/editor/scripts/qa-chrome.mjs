@@ -75,6 +75,51 @@ if (process.argv[2] === '--landing-shot1') {
 if (process.argv[2] === '--canvas-first-ux') {
   process.exit(await runCanvasFirstUxQa(resolve(import.meta.dirname, '../../..')));
 }
+if (process.argv[2] === '--phase4-reusable-cues') {
+  const qaRoot = resolve(import.meta.dirname, '../../..');
+  const proof = spawn('npm', ['exec', 'playwright', 'test', '--',
+    'apps/editor/tests/phase4-reusable-cues.spec.ts', '--config', 'apps/editor/playwright.config.ts', '--workers=1'], {
+    cwd: qaRoot,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = '';
+  let stderr = '';
+  proof.stdout.on('data', (chunk) => { stdout += chunk.toString(); process.stderr.write(chunk); });
+  proof.stderr.on('data', (chunk) => { stderr += chunk.toString(); process.stderr.write(chunk); });
+  const browserExitCode = await new Promise((resolveExit, reject) => {
+    proof.once('error', reject);
+    proof.once('exit', (code) => resolveExit(code ?? 1));
+  });
+  const visualProof = spawn('npm', ['exec', 'vitest', 'run', '--',
+    'packages/visual-proof/src/reusable-cues.visual.test.ts', '--sequence.concurrent', 'false'], {
+    cwd: qaRoot, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  visualProof.stdout.on('data', (chunk) => process.stderr.write(chunk));
+  visualProof.stderr.on('data', (chunk) => process.stderr.write(chunk));
+  const visualExitCode = browserExitCode === 0 ? await new Promise((resolveExit, reject) => {
+    visualProof.once('error', reject); visualProof.once('exit', (code) => resolveExit(code ?? 1));
+  }) : (visualProof.kill(), 1);
+  const exitCode = browserExitCode || visualExitCode;
+  const passed = exitCode === 0;
+  const browserProof = passed ? JSON.parse(await readFile(resolve(qaRoot,
+    '.motion/receipts/phase4-reusable-browser-proof.json'), 'utf8')) : null;
+  const visualReceipt = passed ? JSON.parse(await readFile(resolve(qaRoot,
+    '.motion/receipts/phase4-reusable-visual-proof.json'), 'utf8')) : null;
+  const receipt = {
+    schemaVersion: 'motion.phase4-reusable-installed-chrome-receipt.v1',
+    passed,
+    browserChannel: 'chrome',
+    namedSubdomain: 'lineage-motion.localhost',
+    cueKinds: ['hold', 'type', 'select', 'drag'],
+    proof: { browser: browserProof, visual: visualReceipt },
+    commandExitCode: exitCode,
+  };
+  await mkdir(resolve(qaRoot, '.motion/receipts'), { recursive: true });
+  await writeFile(resolve(qaRoot, '.motion/receipts/phase4-reusable-installed-chrome.json'),
+    `${JSON.stringify(receipt, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(receipt)}\n`);
+  process.exit(exitCode);
+}
 if (process.argv[2] === '--phase4-cursor-click-reveal') {
   const qaRoot = resolve(import.meta.dirname, '../../..');
   const qaServer = spawn('npm', ['exec', 'vite-node', '--', resolve(qaRoot, 'apps/editor/scripts/qa-chrome.mjs'),

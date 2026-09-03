@@ -1,0 +1,1094 @@
+version: 2
+
+goal:
+  title: "Phase 4 reusable cue breadth"
+  slug: "phase4-reusable-cue-breadth"
+  kind: existing_plan
+  tranche: "Implement and prove reusable Type, Select, Drag, and Hold cues as one end-to-end Phase 4 Slice 2."
+  status: done
+  oracle:
+    signal: "Named-subdomain installed-Chrome walkthrough authors all four cues from the unified canvas, persists/reloads them, reproduces them through CLI parity, and plays compiler-native CSS with clean boundary proof."
+    cadence: "after each Worker package and at final audit"
+    final_proof: "Judge maps durable editor/CLI parity, exact detach/undo, deterministic digests, native-animation Chrome traces, stable/discrete visual samples, reduced motion, responsive/keyboard QA, and privacy scans to all four cue families with full_outcome_complete: true."
+  intake:
+    original_request: "Proceed with the recommended next Phase 4 slice in a fresh worktree."
+    interpreted_outcome: "Deliver simple canvas-first and agent-controllable Type, Select, Drag, and Hold cues through the existing durable compiler-native architecture."
+    input_shape: existing_plan
+    audience: "motion editor owner and agent collaborators"
+    authority: approved
+    proof_type: demo
+    completion_proof: "One installed-Chrome durable walkthrough plus exact editor/CLI, history, determinism, visual-boundary, and privacy receipts proves all four cues without raw CSS editing."
+    likely_misfire: "Ship schema, helpers, or another technical panel without a simple end-to-end authoring workflow, or accidentally broaden into later Phase 4/5 scope."
+    blind_spots_considered:
+      - "cue-owned tracks versus dual authority"
+      - "plain-language semantics for Type and Select"
+      - "drag geometry and intermediate arrivals"
+      - "hold ripple ownership and timing"
+      - "revision, claim, rejection, detach, undo, and reload integrity"
+      - "native preview and discrete-boundary equivalence"
+      - "reduced motion, responsiveness, keyboard order, console, and network health"
+      - "private corpus and receipt leakage"
+      - "premature five-scene, benchmark, or landing scope"
+    existing_plan_facts:
+      - "Phase 4 architecture orders reusable type-select-drag-hold immediately after the merged cursor-click-reveal slice."
+      - "Cue-owned generated tracks are locked until explicit undoable detach-to-tracks."
+      - "Editor and CLI use shared typed operations through the sole-writer service."
+      - "Preview and scrubbing consume compiled CSS and browser-created animations."
+      - "The merged canvas-first UX keeps technical controls under Advanced."
+      - "Five-scene closure is Slice 3; review/handoff is Slice 4; aggregate benchmark is Slice 5; landing stress test is Phase 5."
+
+rules:
+  pm_owns_state: true
+  one_active_task: true
+  max_write_workers: 1
+  no_implementation_without_worker_or_pm_task: true
+  no_completion_without_judge_or_pm_audit: true
+  planning_is_not_completion: true
+  queued_required_worker_blocks_completion: true
+  continuous_until_full_outcome: true
+  missing_input_or_credentials_do_not_stop_goal: true
+  exact_human_approval_can_terminal_wait: true
+  preserve_and_validate_existing_plan: true
+  intake_misfire_must_be_audited: true
+  goal_pressure_requires_oracle: true
+  no_completion_on_weak_proof: true
+  slice_policy:
+    max_consecutive_tiny_tasks: 2
+    prefer_vertical_slices: true
+    judge_picks_largest_safe_slice: true
+    worker_completes_whole_slice: true
+
+agents:
+  scout: installed
+  worker: installed
+  judge: installed
+
+visual_board:
+  selected: local
+  local:
+    status: live
+    url: "http://goalbuddy.localhost:41737/phase4-reusable-cue-breadth-2/"
+    command: "node <goalbuddy-skill-root>/surfaces/local-goal-board/scripts/local-goal-board.mjs --goal docs/goals/phase4-reusable-cue-breadth"
+
+active_task: null
+
+tasks:
+  - id: T001
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Validate the approved Phase 4 Slice 2 plan against current origin/main and define the largest safe exact implementation package without changing files."
+    inputs:
+      - "docs/incubation-plan.md"
+      - "docs/architecture/phase4-coach-mark-breadth.md"
+      - "merged PRs #9, #10, and #11"
+      - "current package verification scripts"
+      - "external private corpus availability, inspected only through sanitized facts"
+    constraints:
+      - "Read-only; do not edit product or board files."
+      - "Confirm current merged behavior rather than trusting old receipts."
+      - "Keep searches inside the repository and private inspection narrowly scoped."
+      - "Do not expose private names, copy, selectors, paths, screenshots, or digest fragments."
+      - "Reject schema-only, helper-only, alternate-runtime, or later-phase plans."
+    expected_output:
+      - "Current capability and gap matrix for Type, Select, Drag, and Hold"
+      - "Explicit semantics and ambiguity decisions required before writing"
+      - "Largest safe Worker objective with exact allowed_files, verify commands, and stop_if"
+      - "Worktree base and ignored-private-input prerequisites"
+      - "Named-subdomain Chrome and visual-proof scenarios"
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      rationale: "The merged baseline already provides cue ownership, atomic lifecycle/history, shared editor/CLI dispatch, compiler-native preview, trajectory controls, and canvas-first disclosure. Type, Select, Drag, and reusable Hold are absent; the existing hold is fixture-locked. The architecture fully orders this as the next vertical slice. One end-to-end Worker package is the largest safe unit, provided it preserves existing cue bytes, introduces no alternate runtime, and uses synthetic fixtures until ignored private locks are available. Parallel writing is unsafe because all four cues intersect the same domain, protocol, service, CLI, and editor dispatch surfaces."
+      evidence:
+        - "Baseline: local origin/main resolves to df0075b4932455118a094993c6c9401b6a02fff0; merged PRs #9, #10, and #11 are present as fdea49a, 55ed967, and df0075b."
+        - "Capability matrix — Type: no canonical semantic, protocol schema, CLI parser, editor workflow, generator bundle, or browser proof exists. Existing step-timed CSS support is reusable infrastructure only."
+        - "Capability matrix — Select: no canonical semantic or workflow exists. Existing cursor/click primitives provide target identity and press feedback but do not model approach/choose/settle or optional highlight ownership."
+        - "Capability matrix — Drag: stable trajectory/moment operations and canvas handles exist, but there is no cue-owned coordinated cursor-plus-dragged-target semantic, endpoint contract, CLI parity, or cue proof."
+        - "Capability matrix — Hold: motion.hold.insert and motion.settled-hold.set are fixed to one synthetic cue/boundary and 600 ms. Generic cue replacement, detach, and exact inverse machinery exists, but reusable scoped hold expansion does not."
+        - "Semantic decision: preserve motion.cursor-click-reveal generator version 1 and its existing derived IDs/bytes. Dispatch the four new kinds through a separately versioned generator; never reinterpret or migrate existing attached cues implicitly."
+        - "Semantic decision: Type targets one existing text element and materializes width reveal from 0% to 100% with steps(stepCount,end), fill both, and no copy or DOM creation. Every step boundary is proof-addressable."
+        - "Semantic decision: Select uses approach < choose < settle. The generator gives the existing cursor a deterministic press response; an optional existing highlight gains visibility/opacity at choose and remains selected. Without a highlight, the selected element receives a deterministic visual pulse. Constants belong to the generator version, not hidden document state."
+        - "Semantic decision: Drag stores explicit stage-normalized dragged-object waypoints plus a fixed cursor grab offset. The cursor approaches the first grip point, cursor and object move together from move-start through arrive, and both retain the endpoint through release. Ordering is approach < press <= move-start < arrive < release."
+        - "Semantic decision: Hold requires exitMs = enterMs + durationMs, an ordered stable target/track scope, and a digest-checked replacement bundle. Each affected track must have an explicit value boundary at enter or creation fails closed; expansion duplicates that boundary at exit and shifts later affected timing. Delete restores source; detach preserves generated bytes."
+        - "Private availability: five HTML scene inputs are locally available. No adjacent stylesheet or font assets were observed, and this checkout has no ignored private-acceptance directory. Private proof therefore requires out-of-band digest-locked font/materialization inputs in the new worktree; public synthetic implementation may proceed without them."
+        - "Worktree prerequisite: create the isolated branch from df0075b4932455118a094993c6c9401b6a02fff0, not the behind/dirty main checkout; transfer only this goal's control files and never private corpus bytes."
+        - "Chrome proof: on a named localhost subdomain, author all four cues from the canvas, edit their principal moments/geometry, persist and reload, reproduce equivalent operations through CLI/service, and observe only compiler-created browser animations with zero console, page, request, or unexpected-network errors."
+        - "Boundary proof: sample Type at every step boundary t-1/t/t+1; Select at choose and settle; Drag at press, move-start, arrive, and release; Hold at enter and exit. Repeat export/proof runs, verify equal digests, inspect reduced motion, and exercise keyboard order plus narrow/wide layouts."
+        - "Adversarial failures to falsify: cue/track authority or detach/history drift; editor/CLI divergence or partial durable writes; preview/proof using a second runtime or leaking private material."
+        - "Current verification entry points on origin/main include test:unit, test:phase3:service, test:phase3:recovery, test:phase3:parity, test:phase3:browser, test:browser, qa:chrome, test:visual, test:visual:authoring, test:visual:trajectory, verify:determinism, typecheck, build, check:sensitive, check:private-ignore, and git diff --check."
+      subgoal_contract: null
+      parallel_safety:
+        safe: false
+        reason: "All four cue kinds share the cue union, generator dispatch, validation, operation preparation, protocol schema, CLI parser, durable service path, and unified editor workflow; disjoint write ownership cannot be proven."
+      blocked_tasks: []
+      missing_evidence:
+        - "No implementation or post-change verification exists yet; T003 must produce focused red/green tests and aggregate receipts."
+        - "Installed-Chrome and visual-boundary evidence for the four new cue families does not yet exist."
+        - "Ignored digest-locked private font/materialization inputs are absent from this checkout; private-corpus acceptance cannot run until supplied out of band."
+      required_board_updates:
+        - "Set T002 to create the worktree from exact base df0075b4932455118a094993c6c9401b6a02fff0 and record the missing ignored-private lock as an acceptance prerequisite, not an implementation blocker."
+        - "Replace T003 allowed_files with: packages/domain/**; packages/motion-protocol/**; packages/local-service/**; packages/motion-cli/**; packages/css-compiler/**; packages/preview-runtime/**; packages/visual-proof/**; packages/phase3-proof/**; apps/editor/**; fixtures/public-synthetic/**; package.json. Do not allow privacy-checker scripts, package-lock.json, private inputs, or board state."
+        - "Set T003 objective to implement the complete four-cue domain→protocol→sole-writer service→CLI/editor→compiler-native preview→Chrome/visual-proof slice while preserving existing cursor/click/reveal v1 bytes and IDs."
+        - "Add T003 stop_if: any existing cue export/digest changes; Hold lacks an explicit enter boundary; compiler or preview must interpret cues; a production JS interpolator or runtime DOM is proposed; package-lock/private/privacy-checker files change; or later Phase 4/Phase 5 scope is required."
+        - "Set T003 verify exactly to focused cue tests plus npm run test:unit; npm run test:phase3:service; npm run test:phase3:recovery; npm run test:phase3:parity; npm run test:phase3:browser; npm run test:browser; npm run qa:chrome on a named localhost subdomain; npm run test:visual; npm run test:visual:authoring; npm run test:visual:trajectory; npm run verify:determinism; npm run typecheck; npm run build; npm run check:sensitive; npm run check:private-ignore; git diff --check; and git diff --exit-code -- package-lock.json scripts/check-sensitive.mjs scripts/check-private-ignore.mjs."
+  - id: T002
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: default
+    objective: "Create the approved isolated worktree from current origin/main, transfer only this goal's control files, install dependencies, and establish a clean public baseline without disturbing the existing checkout."
+    inputs:
+      - "T001 receipt"
+      - "origin/main"
+      - ".worktrees ignore rule"
+    constraints:
+      - "Use branch codex/phase4-reusable-cue-breadth unless it already exists."
+      - "Preserve all existing worktrees and dirty or untracked files."
+      - "Do not copy private acceptance content into the repository."
+      - "A missing ignored private input is a recorded acceptance prerequisite, not permission to fabricate or commit it."
+    expected_output:
+      - "Absolute isolated worktree path and exact base commit"
+      - "Dependency setup result"
+      - "Clean public baseline test counts and any pre-existing failures"
+      - "Transferred board fingerprint"
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      rationale: "Created the isolated branch and worktree from the exact merged baseline, transferred only this goal's control files, installed locked dependencies without changing the lockfile, and established a green public baseline. The first sensitive scan correctly rejected two absolute GoalBuddy tool paths in the new untracked board; those paths were replaced with portable placeholders and the complete 349-test unit baseline plus service, recovery, parity, typecheck, build, privacy, and 32-test browser baseline passed. Ignored private materialization inputs remain absent and are recorded as a later acceptance prerequisite, not an implementation blocker."
+      evidence:
+        - "Worktree: .worktrees/phase4-reusable-cue-breadth on codex/phase4-reusable-cue-breadth."
+        - "Base commit: df0075b4932455118a094993c6c9401b6a02fff0."
+        - "Dependency install: 78 packages, zero vulnerabilities, package-lock.json unchanged."
+        - "Public baseline: 349/349 unit tests, 18/18 service tests, 35/35 recovery tests, 27/27 parity tests, and 32/32 editor/moments/service-backed browser tests passed."
+        - "Typecheck and production build passed; build retained the pre-existing chunk-size warning only."
+        - "Sensitive scan passed with findingCount=0 after portable board-path correction; private-ignore passed with targetCount=3, ignoredCount=3, trackedPrivateCount=0; git diff check passed."
+        - "Transferred charter digest: b395de9cf1cc41ac9665d41fc3779c46149f5f115df2448f4693d444be7cbf93. Pre-transition board digest: c1f20cd8b7d15a77026a71428979609e940f04bbdea59bad90d7e717baedba16."
+        - "No private corpus bytes, screenshots, local corpus paths, package-lock changes, or product implementation changes were transferred."
+      subgoal_contract: null
+      parallel_safety:
+        safe: false
+        reason: "T003 owns one intersecting domain/protocol/service/CLI/editor/compiler/proof spine and must use a single Worker."
+      blocked_tasks: []
+      missing_evidence:
+        - "The four cue families are not implemented yet."
+        - "Ignored digest-locked private font/materialization inputs remain unavailable for the later private acceptance run."
+      required_board_updates:
+        - "Activate T003 in the isolated worktree and dispatch exactly one goal_worker."
+        - "Use the T001-updated allowlist, verification matrix, and stop conditions."
+  - id: T003
+    type: worker
+    assignee: Worker
+    status: blocked
+    reasoning_hint: medium
+    objective: "Implement the complete Type, Select, Drag, and reusable Hold cue path from domain through protocol, sole-writer service, CLI/editor, compiler-native preview, Chrome, and visual proof while preserving existing cursor-click-reveal v1 bytes and IDs."
+    allowed_files:
+      - "packages/domain/**"
+      - "packages/motion-protocol/**"
+      - "packages/local-service/**"
+      - "packages/motion-cli/**"
+      - "packages/css-compiler/**"
+      - "packages/preview-runtime/**"
+      - "packages/visual-proof/**"
+      - "packages/phase3-proof/**"
+      - "apps/editor/**"
+      - "fixtures/public-synthetic/**"
+      - "package.json"
+    verify:
+      - "Run focused red tests before each semantic implementation and focused green tests afterward."
+      - "npm run test:unit"
+      - "npm run test:phase3:service"
+      - "npm run test:phase3:recovery"
+      - "npm run test:phase3:parity"
+      - "npm run test:phase3:browser"
+      - "npm run test:browser"
+      - "npm run qa:chrome on a named localhost subdomain"
+      - "npm run test:visual"
+      - "npm run test:visual:authoring"
+      - "npm run test:visual:trajectory"
+      - "npm run verify:determinism"
+      - "npm run typecheck"
+      - "npm run build"
+      - "npm run check:sensitive"
+      - "npm run check:private-ignore"
+      - "git diff --check"
+      - "git diff --exit-code -- package-lock.json scripts/check-sensitive.mjs scripts/check-private-ignore.mjs"
+    stop_if:
+      - "T001 identifies an unresolved semantic decision that materially changes canonical output."
+      - "Implementation needs files outside the final T001 allowlist."
+      - "A cue would require dual authority, direct low-level editing without detach, or a separate interpolation runtime."
+      - "The UX requires exposing raw CSS percentages or always-visible technical controls."
+      - "Private content would enter tracked files or receipts."
+      - "Five-scene, review/handoff, aggregate benchmark, landing, MCP, Lineage, publication, or release scope is required."
+      - "The same relevant verification fails twice without a grounded diagnosis."
+      - "Any existing cursor-click-reveal cue export, derived ID, or digest changes."
+      - "A Hold target lacks an explicit value boundary at its enter moment."
+      - "The compiler or preview would need to interpret cue semantics."
+      - "A production JavaScript interpolator or runtime DOM is proposed."
+      - "package-lock.json, a private input, or either privacy-checker script changes."
+    receipt:
+      result: blocked
+      changed_files:
+        - apps/editor/scripts/serve-editor.mjs
+        - apps/editor/src/global.d.ts
+        - apps/editor/src/main.ts
+        - apps/editor/src/virtual.d.ts
+        - apps/editor/tests/phase4-reusable-cues.spec.ts
+        - apps/editor/vite.config.ts
+        - fixtures/public-synthetic/reusable-cues.html
+        - package.json
+        - packages/domain/src/cue-authoring.test.ts
+        - packages/domain/src/cue-authoring.ts
+        - packages/domain/src/index.ts
+        - packages/local-service/src/seed.ts
+        - packages/motion-cli/src/cli.test.ts
+        - packages/motion-cli/src/cli.ts
+        - packages/motion-protocol/src/index.test.ts
+        - packages/motion-protocol/src/index.ts
+        - packages/visual-proof/src/reusable-cues.visual.test.ts
+      commands:
+        - "npx vitest run packages/domain/src/cue-authoring.test.ts --sequence.concurrent false"
+        - "npx vitest run packages/motion-protocol/src/index.test.ts --sequence.concurrent false"
+        - "npx vitest run packages/motion-cli/src/cli.test.ts -t \"dispatches Type, Select, Drag, and reusable Hold\" --sequence.concurrent false"
+        - "npx playwright test apps/editor/tests/phase4-reusable-cues.spec.ts --config apps/editor/playwright.config.ts --workers=1"
+        - "npx vitest run packages/visual-proof/src/reusable-cues.visual.test.ts --sequence.concurrent false"
+        - "npm run typecheck"
+        - "npm run test:unit"
+        - "npm run test:phase3:service"
+        - "npm run test:phase3:recovery"
+        - "npm run test:phase3:parity"
+        - "npm run test:phase3:browser"
+        - "npm run qa:chrome"
+        - "git diff --check"
+        - "git diff --exit-code -- package-lock.json scripts/check-sensitive.mjs scripts/check-private-ignore.mjs"
+      summary: "Implemented the four-cue domain, protocol, service, CLI, editor, native-preview, durable reload/CLI parity, detach/undo, deterministic legacy-digest guard, and Chrome boundary proof slice. Unit (356), service (18), recovery (35), parity (29), phase-3 browser (22), focused browser, and focused visual tests passed. QA’s first two installed-Chrome legs passed cleanly. The mandated aggregate QA stopped when its existing private landing reference manifest was absent, so remaining verification was not run."
+      remaining_blockers:
+        - "Provide the ignored `.private-corpus/landing-shot1-approved-reference-v3-r2-manifest.json` prerequisite, then rerun `npm run qa:chrome` and the remaining listed verification commands."
+      verification_attempts: 1
+      stopped_because: "Required QA evidence is unavailable: npm run qa:chrome failed with ENOENT for the board-recorded missing ignored private manifest."
+  - id: T006
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Adopt T003's in-scope implementation, close any public-proof defects, and produce a complete installed-Chrome and repository receipt without requiring the unavailable private landing artifact."
+    allowed_files:
+      - "packages/domain/**"
+      - "packages/motion-protocol/**"
+      - "packages/local-service/**"
+      - "packages/motion-cli/**"
+      - "packages/css-compiler/**"
+      - "packages/preview-runtime/**"
+      - "packages/visual-proof/**"
+      - "packages/phase3-proof/**"
+      - "apps/editor/**"
+      - "fixtures/public-synthetic/**"
+      - "package.json"
+    verify:
+      - "Rerun every focused four-cue domain, protocol, CLI, browser, and visual test."
+      - "Run every public browser test explicitly, excluding only tests whose contract requires an ignored private artifact."
+      - "Run the public installed-Chrome QA legs directly on a named localhost subdomain, including the four-cue receipt."
+      - "npm run test:unit"
+      - "npm run test:phase3:service"
+      - "npm run test:phase3:recovery"
+      - "npm run test:phase3:parity"
+      - "npm run test:phase3:browser"
+      - "npm run test:visual"
+      - "npm run test:visual:authoring"
+      - "npm run test:visual:trajectory"
+      - "npm run verify:determinism"
+      - "npm run typecheck"
+      - "npm run build"
+      - "npm run check:sensitive"
+      - "npm run check:private-ignore"
+      - "git diff --check"
+      - "git diff --exit-code -- package-lock.json scripts/check-sensitive.mjs scripts/check-private-ignore.mjs"
+    stop_if:
+      - "Any correction needs a file outside the allowlist."
+      - "Any existing cue export, derived ID, or digest changes."
+      - "The compiler or preview must interpret cues or a second runtime is proposed."
+      - "A private input would need to be copied, generated, committed, or exposed."
+      - "A public proof failure repeats twice without a grounded diagnosis."
+      - "Later Phase 4 or Phase 5 scope is required."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/scripts/qa-chrome.mjs
+        - apps/editor/scripts/serve-editor.mjs
+        - apps/editor/src/global.d.ts
+        - apps/editor/src/main.ts
+        - apps/editor/src/virtual.d.ts
+        - apps/editor/tests/phase4-reusable-cues.spec.ts
+        - apps/editor/vite.config.ts
+        - fixtures/public-synthetic/reusable-cues.html
+        - package.json
+        - packages/domain/src/cue-authoring.test.ts
+        - packages/domain/src/cue-authoring.ts
+        - packages/domain/src/index.ts
+        - packages/local-service/src/seed.ts
+        - packages/motion-cli/src/cli.test.ts
+        - packages/motion-cli/src/cli.ts
+        - packages/motion-protocol/src/index.test.ts
+        - packages/motion-protocol/src/index.ts
+        - packages/visual-proof/src/reusable-cues.visual.test.ts
+      commands:
+        - cmd: "focused domain/protocol/CLI/visual: 29 tests"
+          status: pass
+        - cmd: "public browser specs explicitly: 34 tests"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --shot1-spatial-parity-public"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues"
+          status: pass
+        - cmd: "npm run test:unit: 356 tests"
+          status: pass
+        - cmd: "npm run test:phase3:service: 18 tests"
+          status: pass
+        - cmd: "npm run test:phase3:recovery: 35 tests"
+          status: pass
+        - cmd: "npm run test:phase3:parity: 29 tests"
+          status: pass
+        - cmd: "npm run test:phase3:browser: 22 tests"
+          status: pass
+        - cmd: "npm run test:visual: 3 tests"
+          status: pass
+        - cmd: "npm run test:visual:authoring"
+          status: pass
+        - cmd: "npm run test:visual:trajectory"
+          status: pass
+        - cmd: "npm run verify:determinism: 34 tests"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "git diff --exit-code -- package-lock.json scripts/check-sensitive.mjs scripts/check-private-ignore.mjs"
+          status: pass
+      summary: "Type, Select, Drag, and reusable Hold now pass end-to-end through domain, protocol, CLI, durable editor, compiler-native Chrome preview, persistence, visual boundaries, detach, and undo. The top risks—stale post-CLI publication bytes, legacy generator drift, and private-data leakage—were directly covered by the settled-publication fix, literal legacy digest guards/determinism tests, and repository privacy scans. Added a public installed-Chrome four-cue receipt. The ignored private Scene D proof was the sole intrinsic-private exclusion."
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
+  - id: T004
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Adversarially review the implemented four-cue slice for semantic authority, durable editor/CLI parity, canvas simplicity, native-preview truth, proof completeness, privacy, and phase containment."
+    inputs:
+      - "T001 through T003 receipts"
+      - "complete worktree diff"
+      - "focused and aggregate verification output"
+      - "Chrome traces and visual-proof receipt"
+    constraints:
+      - "Read-only; do not fix findings."
+      - "State the user-facing claim and test the three charter failure modes."
+      - "Reject tests that bypass the service or preview/compiler boundary."
+      - "Reject completion for hidden technical UX, incomplete cue families, weak boundary sampling, or private leakage."
+    expected_output:
+      - "pass | needs_correction | blocked"
+      - "Evidence map for every cue and failure mode"
+      - "Ranked actionable findings with exact file and scenario evidence"
+      - "One bounded corrective Worker package if needed"
+    receipt:
+      result: done
+      decision: rejected
+      full_outcome_complete: false
+      rationale: "User-facing claim: a human can author Type, Select, Drag, and Hold simply on the unified canvas while an agent uses the same durable operations, with native deterministic CSS and safe history. The shared service/compiler spine exists, but the claim fails materially: reusable authoring is dropdown/form-driven rather than canvas-first; Drag coordinates do not account for element origins; Hold discards source playback semantics; reduced motion and boundary proof are incomplete; and the Chrome receipt is nondeterministic and path-bearing. One corrective vertical slice is required before final QA."
+      evidence:
+        - "Positive — all four semantics reach domain expansion, strict protocol parsing, service preparation, CLI creation, durable editor persistence, compilation, and installed Chrome. Independent focused rerun passed 9/9 domain and visual tests."
+        - "Positive — the preview test compares iframe srcdoc to compiledHtml and checks browser animation constructors; css-compiler and preview-runtime production sources are unchanged, so no second cue interpreter was added."
+        - "Positive — legacy cursor-path input and expansion digests are pinned in packages/domain/src/cue-authoring.test.ts:48-72; cue-owned direct edits still reject through the shared CUE_TRACK_LOCKED path; Drag detach preserves compiler HTML and Undo restores the attached cue in apps/editor/tests/phase4-reusable-cues.spec.ts:96-103."
+        - "Positive — independent git diff --check, sensitive scan, private-ignore scan, and protected-file diff all passed. The sensitive scan covered tracked, diff, index, worktree, and untracked content with findingCount=0; trackedPrivateCount=0."
+        - "P1 canvas failure — apps/editor/src/main.ts:1490-1492 explicitly hides the role step, hides cueTargetOverlay, and clears cuePathOverlay for the reusable workspace. Forms at lines 139-142 expose dropdowns and numeric geometry; the browser proof at apps/editor/tests/phase4-reusable-cues.spec.ts:54-68 authors every cue with selectOption. It never selects targets or shapes Drag on the canvas."
+        - "P1 Drag correctness failure — packages/domain/src/cue-authoring.ts:234-250 emits only transform tracks and treats stage coordinates as translate displacements. The fixture gives cursor and dragged objects different nonzero left/top origins at fixtures/public-synthetic/reusable-cues.html:11-14, so their rendered grip delta is not the stored grab offset. The visual test checks only that transform strings vary, not endpoint or grip geometry."
+        - "P1 Hold authority failure — packages/domain/src/cue-authoring.ts:151-164 hard-codes generated slots to iterationCount=1, direction=normal, fillMode=both, and playState=running; expandHold routes every source track through that helper at lines 370-392. A Hold over infinite, reverse/alternate, paused, or other fill-mode source motion changes behavior instead of preserving source semantics and shifting only later timing."
+        - "P1 Type target failure — reusableTargetOptions in apps/editor/src/main.ts:93-95 includes every element, and validation at packages/domain/src/cue-authoring.ts:317-320 checks timing only. A Type cue can therefore animate width on a non-text element, contrary to the existing-text contract; the browser test does not identify or assert a text target."
+        - "P1 reduced-motion failure — packages/local-service/src/seed.ts:58-63 reduces only the original .hold animation. Type, Select, and Drag remain animated, and no reusable-cue test runs with prefers-reduced-motion or asserts intentional output."
+        - "P1 proof failure — packages/visual-proof/src/reusable-cues.visual.test.ts:64 omits both sides of several Type step boundaries and parts of Drag press/move/release boundaries. Assertions at lines 65-70 require only more than two computed values plus one Hold equality; there are no exact expected frame hashes, pixel diffs, endpoint geometry checks, repeated frame hashes, or per-boundary aggregates."
+        - "P1 receipt failure — apps/editor/scripts/qa-chrome.mjs:80,98-102 emits wall-clock timestamps and a repository fixture path, making equal-input receipts byte-different and violating the path-free receipt contract. Lines 104-112 mostly record hard-coded assertion booleans and test-run text rather than canonical/compiler/export/proof digests, animation counts, diagnostics, or aggregate visual-diff results."
+        - "P2 Chrome diagnostics gap — apps/editor/tests/phase4-reusable-cues.spec.ts:38-39 collects page errors and failed requests only. It does not fail on console errors, HTTP errors, or unexpected network origins. Its native check at lines 73-76 is vacuously true for zero animations because no positive animation count is asserted."
+        - "P2 parity/history gap — CLI creation of all four cues is service-backed in packages/motion-cli/src/cli.test.ts:170-209, but the installed-Chrome workflow updates only Type with a human capability and detaches/undoes only Drag. It does not demonstrate agent claim authorization, rejected stale/unauthorized writes, or exact detach/delete/undo/redo for Hold, Type, and Select."
+        - "Failure mode 1, cue/track authority: failed because Hold changes source slot semantics; generic ownership and one Drag detach are insufficient."
+        - "Failure mode 2, editor/CLI durable parity: partial pass for create/reload and Type update, but failed as complete evidence because canvas authoring, agent claim use, and per-family history/rejection cases are absent."
+        - "Failure mode 3, native preview/proof/privacy: runtime boundary and repository privacy pass, but deterministic sanitized receipts, reduced motion, complete visual boundaries, spatial equivalence, and full Chrome diagnostics fail."
+        - "Phase containment passes: no five-scene closure, review/handoff, aggregate benchmark, landing implementation, MCP, Lineage, publication, or release work was added."
+      subgoal_contract: null
+      parallel_safety:
+        safe: false
+        reason: "Corrections intersect the same cue generator, semantic validation, editor canvas state, durable browser workflow, and proof receipt. Splitting writers risks mismatched semantics and tests."
+      blocked_tasks:
+        - T005
+        - T999
+      missing_evidence:
+        - "True canvas target selection and direct Drag path/endpoint manipulation for all reusable roles."
+        - "Rendered Drag endpoint and constant-grip geometry against stage-normalized coordinates."
+        - "Hold preservation of iteration count, direction, fill mode, play state, timing function, delay, and unaffected source behavior."
+        - "Type rejection for non-text targets and proof that final reveal does not corrupt authored layout."
+        - "Intentional reduced-motion behavior for all four cue families."
+        - "Exact t-1/t/t+1 samples for every Type step and each Select, Drag, and Hold boundary, with repeated frame hashes or pixel-diff aggregates."
+        - "Path-free, copy-free, timestamp-free deterministic receipt containing canonical/compiler/export/proof digests, counts, diagnostics, and boundary aggregates."
+        - "Installed-Chrome console, page, HTTP, failed-request, unexpected-network, responsive, keyboard, positive-animation-count, agent-claim, and complete history evidence."
+      required_board_updates:
+        - "Insert one corrective Worker task before T005; do not create a helper-only task or child board."
+        - "Corrective objective: make all four cues genuinely canvas-first and semantically faithful, preserve source playback behavior through Hold, make Drag rendered geometry match stored stage coordinates and grab offset, restrict Type to existing text, add intentional reduced motion, and replace weak proof/receipt assertions with exact deterministic evidence."
+        - "Corrective allowed_files: packages/domain/src/cue-authoring.ts; packages/domain/src/cue-authoring.test.ts; packages/domain/src/index.ts; packages/domain/src/index.test.ts; packages/motion-protocol/src/index.ts; packages/motion-protocol/src/index.test.ts; packages/motion-cli/src/cli.ts; packages/motion-cli/src/cli.test.ts; packages/local-service/src/seed.ts; apps/editor/src/main.ts; apps/editor/src/styles.css; apps/editor/src/global.d.ts; apps/editor/tests/phase4-reusable-cues.spec.ts; apps/editor/scripts/qa-chrome.mjs; fixtures/public-synthetic/reusable-cues.html; packages/visual-proof/src/reusable-cues.visual.test.ts; package.json."
+        - "Corrective verify: focused domain tests for metadata-preserving Hold, text-only Type, distinct role targets, exact Drag geometry, lock/rejection, detach/delete/undo/redo, and unchanged legacy digests; installed-Chrome canvas authoring with mouse and keyboard at wide/narrow viewports; agent CLI under an active claim; reload and stale/unauthorized atomic rejection; reduced-motion inspection; exact compiler srcdoc plus positive CSSAnimation inventory; complete console/page/HTTP/network checks; every boundary t-1/t/t+1 with repeated visual hashes/diffs; deterministic receipt equality; then all public commands recorded by T006 plus privacy/protected-file checks."
+        - "Corrective stop_if: fixing Drag requires ambient layout lookup during expansion instead of explicit versioned target state or deterministic zero-origin tracks; Hold cannot preserve every source slot field; existing cursor/click/reveal bytes or IDs change; a second runtime/interpolator is proposed; private material or later-phase scope is required; or files outside the corrective allowlist are needed."
+        - "After correction, rerun T004 adversarial review before activating T005."
+  - id: T007
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Make all four cues genuinely canvas-first and semantically faithful; preserve source playback through Hold, align Drag rendered geometry with stored stage coordinates and grab offset, restrict Type to text, add intentional reduced motion, and replace weak proof and receipts with exact deterministic evidence."
+    allowed_files:
+      - "packages/domain/src/cue-authoring.ts"
+      - "packages/domain/src/cue-authoring.test.ts"
+      - "packages/domain/src/index.ts"
+      - "packages/domain/src/index.test.ts"
+      - "packages/motion-protocol/src/index.ts"
+      - "packages/motion-protocol/src/index.test.ts"
+      - "packages/motion-cli/src/cli.ts"
+      - "packages/motion-cli/src/cli.test.ts"
+      - "packages/local-service/src/seed.ts"
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/src/global.d.ts"
+      - "apps/editor/tests/phase4-reusable-cues.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "fixtures/public-synthetic/reusable-cues.html"
+      - "packages/visual-proof/src/reusable-cues.visual.test.ts"
+      - "package.json"
+    verify:
+      - "Focused domain tests prove metadata-preserving Hold, text-only Type, distinct role targets, exact Drag geometry, locks/rejections, detach/delete/undo/redo, and unchanged legacy digests."
+      - "Installed Chrome proves canvas authoring with mouse and keyboard at wide and narrow viewports."
+      - "Prove agent CLI under an active claim, reload, stale and unauthorized atomic rejection, and intentional reduced motion."
+      - "Prove exact compiler srcdoc, a positive CSSAnimation inventory, and complete console/page/HTTP/network checks."
+      - "Sample every Type, Select, Drag, and Hold boundary at t-1/t/t+1 with repeated visual hashes or diff aggregates."
+      - "Prove repeated deterministic sanitized receipt equality without timestamps or paths."
+      - "Rerun every public command recorded by T006 plus privacy and protected-file checks."
+    stop_if:
+      - "Correct Drag requires ambient layout lookup during expansion rather than explicit versioned target state or deterministic zero-origin tracks."
+      - "Hold cannot preserve every source slot field."
+      - "Existing cursor-click-reveal bytes, derived IDs, or digests change."
+      - "A second runtime or JavaScript interpolator is proposed."
+      - "Private material, later-phase scope, or a file outside this exact allowlist is required."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/scripts/qa-chrome.mjs
+        - apps/editor/src/main.ts
+        - apps/editor/tests/phase4-reusable-cues.spec.ts
+        - fixtures/public-synthetic/reusable-cues.html
+        - packages/domain/src/cue-authoring.test.ts
+        - packages/domain/src/cue-authoring.ts
+        - packages/domain/src/index.ts
+        - packages/local-service/src/seed.ts
+        - packages/motion-protocol/src/index.ts
+        - packages/visual-proof/src/reusable-cues.visual.test.ts
+      commands:
+        - cmd: "npm exec vitest run -- packages/domain/src/cue-authoring.test.ts --sequence.concurrent false"
+          status: pass
+        - cmd: "npm exec vitest run -- packages/domain/src/cue-authoring.test.ts packages/motion-protocol/src/index.test.ts packages/motion-cli/src/cli.test.ts --sequence.concurrent false"
+          status: pass
+        - cmd: "npm exec vitest run -- packages/visual-proof/src/reusable-cues.visual.test.ts --sequence.concurrent false"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues (run 1)"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues (run 2, byte-identical receipt)"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --shot1-spatial-parity-public"
+          status: pass
+        - cmd: "npm exec playwright test -- apps/editor/tests/editor.spec.ts apps/editor/tests/integrated-dogfood.spec.ts apps/editor/tests/moments.spec.ts apps/editor/tests/phase3.spec.ts apps/editor/tests/phase4-reusable-cues.spec.ts --config apps/editor/playwright.config.ts --workers=1"
+          status: pass
+        - cmd: "npm run test:unit"
+          status: pass
+        - cmd: "npm run test:phase3:service"
+          status: pass
+        - cmd: "npm run test:phase3:recovery"
+          status: pass
+        - cmd: "npm run test:phase3:parity"
+          status: pass
+        - cmd: "npm run test:phase3:browser"
+          status: pass
+        - cmd: "npm run test:visual"
+          status: pass
+        - cmd: "npm run test:visual:authoring"
+          status: pass
+        - cmd: "npm run test:visual:trajectory"
+          status: pass
+        - cmd: "npm run verify:determinism"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "git diff --exit-code -- package-lock.json scripts/check-sensitive.mjs scripts/check-private-ignore.mjs"
+          status: pass
+      summary: "Corrected every T004 finding: reusable roles are canvas-selectable with keyboard fallback; Drag uses deterministic zero-origin tracks and exact fixed-grip geometry; Hold preserves source playback metadata; Type is text-only and preserves final layout; reduced motion disables all reusable animations. Chrome now proves claims, stale/unauthorized rejection, reload, full per-family history, positive native animations, and complete diagnostics. Visual proof covers 29 boundary samples with repeated raster hashes and zero pixel drift. Two receipt runs were byte-identical and path/timestamp-free. Legacy digests, privacy, protected files, and all public suites pass."
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
+  - id: T008
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Re-audit every T004 rejection against the corrected implementation and fresh proof before final PM QA."
+    inputs:
+      - "T004 rejection receipt"
+      - "T007 correction receipt"
+      - "complete current diff"
+      - "current Chrome, visual, parity, determinism, and privacy evidence"
+    constraints:
+      - "Read-only; do not fix findings."
+      - "Independently inspect rather than accepting the Worker summary."
+      - "Reject if any canvas, geometry, Hold metadata, Type target, reduced-motion, deterministic-receipt, boundary, diagnostics, claim, history, or phase-containment defect remains."
+    expected_output:
+      - "approved | rejected"
+      - "Evidence disposition for every T004 finding"
+      - "User-facing claim and top-three-failure analysis"
+      - "Exact corrective package if rejected"
+    receipt:
+      result: done
+      decision: rejected
+      full_outcome_complete: false
+      rationale: "User-facing claim: Type, Select, Drag, and Hold are simple canvas-first cues with durable editor/CLI parity and native deterministic CSS. Most T004 defects are corrected, but the claim still fails: the editor creates only two-point Drags and silently discards CLI-authored intermediate arrivals on edit; the purported keyboard proof uses Playwright selectOption rather than keyboard input; multi-target Hold canvas picking replaces prior choices; and boundary proof establishes repeatability without proving each transition’s expected state. These are material canvas, metadata-preservation, accessibility, and proof gaps. Geometry, Hold playback metadata, Type restriction/layout, reduced motion, diagnostics, deterministic receipts, privacy, and phase containment now pass."
+      evidence:
+        - "T004 canvas disposition — partially corrected: apps/editor/src/main.ts:414-420 and 1517-1552 enable canvas target picking, while apps/editor/tests/phase4-reusable-cues.spec.ts:52-89 exercises mouse selection and a canvas path drag."
+        - "Remaining P1 Drag canvas/authority defect — apps/editor/src/main.ts:1278-1284 always reconstructs Drag with exactly start/end waypoints; hydrateCueForm at 1369-1376 loads only first/last. Therefore the unified canvas cannot create the goal-required intermediate arrival, and editing a CLI-authored three-point Drag silently deletes its middle waypoint. Domain support is proven by packages/domain/src/cue-authoring.test.ts:213-239, making the editor loss directly observable rather than a schema limitation."
+        - "Remaining P2 Hold canvas defect — renderReusableTargetOverlay at apps/editor/src/main.ts:1538-1542 handles a multiple select by setting only the clicked option selected and clearing all others. The Motion targets canvas control therefore cannot accumulate the ordered multi-target scope represented by Hold semantics."
+        - "Remaining P2 keyboard-proof defect — apps/editor/tests/phase4-reusable-cues.spec.ts:78-81 calls focus() and Playwright selectOption(); it sends no keyboard events and does not prove the advertised keyboard fallback. The wide/narrow transition has no responsive containment or reachability assertion."
+        - "T004 Drag geometry disposition — corrected: packages/domain/src/cue-authoring.ts:239-261 emits deterministic zero-origin left/top tracks and coordinated transforms; visual proof measured the stored grip delta at 6.4/-7.2 CSS pixels."
+        - "T004 Hold disposition — corrected: packages/domain/src/cue-authoring.ts:385-409 preserves delay, binding override, iteration count, direction, fill mode, play state, timing function, and keyframe data. Focused metadata and missing-enter-boundary tests pass."
+        - "T004 Type disposition — corrected: cueTargetSnapshots and validation require contentKind=text; the editor exposes reusableTextTargetOptions only; clip-path reveal leaves the final computed width at 80px in Chrome."
+        - "T004 reduced-motion disposition — corrected: packages/local-service/src/seed.ts:70-72 disables animation for the reusable scene, and installed Chrome reports reducedAnimationCount=0."
+        - "T004 visual-proof disposition — improved but incomplete: the test samples 29 t-1/t/t+1 times, obtains two identical raster-hash runs with zero repeated pixel drift, and checks grip geometry. However packages/visual-proof/src/reusable-cues.visual.test.ts:80-88 asserts only global distinct-value counts plus one Hold equality; it would still pass if individual Type steps or Drag press/release boundaries were wrong. No per-boundary expected-state/delta map is emitted."
+        - "T004 receipt and diagnostics disposition — corrected: the installed-Chrome receipt is path- and timestamp-free and contains canonical/export/compiler digests, cue and diagnostic counts, a visual aggregate digest, and command status. Chrome asserts positive native CSSAnimation inventory and zero console, page, HTTP, failed-request, and unexpected-network errors."
+        - "T004 claim/history disposition — substantially corrected: installed Chrome exercises a claimed agent update, unauthorized and stale rejection, durable reload, and detach/delete/undo/redo for every family while preserving compiled bytes. The remaining intermediate-waypoint deletion prevents complete metadata/history confidence."
+        - "Independent verification passed: installed-Chrome browser workflow 1/1; visual proof 1/1; focused domain/protocol/CLI suites 30/30; git diff --check; protected-file diff; sensitive scan findingCount=0 across tracked/diff/index/worktree/untracked; private-ignore targetCount=3, ignoredCount=3, trackedPrivateCount=0."
+        - "Failure mode 1, cue/track drift and editor/CLI divergence — FAIL: editor hydration/resubmission deletes an intermediate Drag waypoint created through the CLI. Hold metadata and per-family detach/history otherwise pass."
+        - "Failure mode 2, hidden/missing canvas behavior or incorrect native boundaries — FAIL: intermediate arrival authoring, multi-target Hold canvas selection, genuine keyboard operation, responsive assertions, and per-boundary expected-state proof remain incomplete; fixed-grip geometry and native CSS rendering pass."
+        - "Failure mode 3, leakage or masked runtime failures — PASS: sensitive/private scans, named-subdomain Chrome, reduced motion, positive animation inventory, complete browser diagnostics, deterministic receipts, and phase-containment inspection passed."
+      subgoal_contract: null
+      parallel_safety:
+        safe: false
+        reason: "The correction couples Drag semantic hydration/submission, shared canvas controls, browser interaction proof, and visual receipt assertions. Separate writers could make UI semantics and proof disagree."
+      blocked_tasks:
+        - T005
+        - T999
+      missing_evidence:
+        - "Create and adjust a Drag with at least one intermediate arrival entirely through the unified canvas, then edit/reload/undo without losing any waypoint."
+        - "Genuine keyboard-only target selection and responsive containment/reachability at wide and narrow viewports."
+        - "Canvas accumulation and preservation of multiple Hold targets, or an explicit contract narrowing Hold to one target."
+        - "Per-boundary expected-state or expected-delta assertions and sanitized aggregates for every Type step and Select, Drag, and Hold boundary."
+      required_board_updates:
+        - "Insert one bounded corrective Worker before T005. Objective: preserve and author intermediate Drag arrivals on canvas, make reusable multi-target picking additive, prove real keyboard/responsive operation, and strengthen boundary proof without changing cue/domain/compiler architecture."
+        - "Corrective allowed_files: apps/editor/src/main.ts; apps/editor/src/styles.css; apps/editor/tests/phase4-reusable-cues.spec.ts; apps/editor/scripts/qa-chrome.mjs; packages/visual-proof/src/reusable-cues.visual.test.ts."
+        - "Corrective verify: create a three-waypoint Drag from the editor; drag its middle point; edit timing without waypoint loss; reload and exact undo/redo; round-trip an equivalent CLI Drag; select multiple Hold targets on canvas; operate fallback selects using keyboard events at wide and narrow viewports with containment assertions; assert expected state/delta at every t-1/t/t+1 boundary; run installed Chrome twice and require byte-identical sanitized receipts; rerun focused suites, sensitive/private scans, protected-file diff, and git diff --check."
+        - "Corrective stop_if: a domain/protocol/compiler change is required; intermediate arrivals cannot remain explicit versioned cue data; fixing proof requires a second runtime/interpolator; legacy cue bytes change; private material or later-phase scope is required; or any file outside the corrective allowlist is needed."
+        - "After correction, rerun this Judge gate before activating T005."
+  - id: T009
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Preserve and author intermediate Drag arrivals on canvas, make multi-target Hold picking additive, prove genuine keyboard and responsive operation, and strengthen every boundary assertion without changing cue/domain/compiler architecture."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/src/styles.css"
+      - "apps/editor/tests/phase4-reusable-cues.spec.ts"
+      - "apps/editor/scripts/qa-chrome.mjs"
+      - "packages/visual-proof/src/reusable-cues.visual.test.ts"
+    verify:
+      - "Create a three-waypoint Drag from the editor, move its middle point, edit timing without loss, reload, and prove exact undo/redo."
+      - "Round-trip an equivalent CLI Drag without losing the intermediate waypoint."
+      - "Select and preserve multiple Hold targets through canvas interaction."
+      - "Operate fallback controls with real keyboard events at wide and narrow viewports and assert containment and reachability."
+      - "Assert the expected state or delta at every t-1/t/t+1 boundary."
+      - "Run installed Chrome twice and require byte-identical sanitized receipts."
+      - "Rerun focused suites, sensitive and private scans, protected-file diff, and git diff --check."
+    stop_if:
+      - "A domain, protocol, service, CLI, or compiler change is required."
+      - "Intermediate arrivals cannot remain explicit versioned cue data."
+      - "Proof requires a second runtime or interpolator."
+      - "Legacy cue bytes change."
+      - "Private material, later-phase scope, or a file outside this exact allowlist is required."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/src/main.ts
+        - apps/editor/tests/phase4-reusable-cues.spec.ts
+        - packages/visual-proof/src/reusable-cues.visual.test.ts
+      commands:
+        - cmd: "npm exec vitest run -- packages/visual-proof/src/reusable-cues.visual.test.ts --sequence.concurrent false"
+          status: pass
+        - cmd: "npm exec playwright test -- apps/editor/tests/phase4-reusable-cues.spec.ts --config apps/editor/playwright.config.ts --workers=1"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues"
+          status: pass
+        - cmd: "cmp --silent /tmp/phase4-reusable-installed-chrome-final-first.json .motion/receipts/phase4-reusable-installed-chrome.json && sha256sum /tmp/phase4-reusable-installed-chrome-final-first.json .motion/receipts/phase4-reusable-installed-chrome.json"
+          status: pass
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "git diff --exit-code -- package-lock.json scripts/check-sensitive.mjs scripts/check-private-ignore.mjs"
+          status: pass
+      deviations:
+        - "The initial typecheck found test-only DOM option typing at apps/editor/tests/phase4-reusable-cues.spec.ts:87. The option was explicitly cast to HTMLOptionElement; the final typecheck passed."
+      summary: "Claim: reusable cues now preserve explicit intermediate Drag arrivals through canvas editing, CLI round-trip, reload, timing edits, and exact undo/redo; Hold canvas picks accumulate targets; keyboard and responsive operation are directly proven. The top failure modes—waypoint deletion, prior Hold-selection replacement, and false keyboard/boundary evidence—are covered by installed-Chrome assertions and 30 expected boundary checks. Final Chrome receipts matched byte-for-byte, with zero runtime, HTTP, request, or unexpected-network failures. No stop condition was reached and no architecture-layer change was required."
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
+  - id: T010
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Re-audit the T008 residual findings after T009 and decide whether final PM QA may begin."
+    inputs:
+      - "T008 rejection receipt"
+      - "T009 correction receipt"
+      - "current diff and installed-Chrome/visual evidence"
+    constraints:
+      - "Read-only; do not fix findings."
+      - "Independently verify intermediate Drag preservation, additive Hold selection, real keyboard/responsive behavior, and per-boundary expectations."
+      - "Reject any regression in previously accepted T004 evidence."
+    expected_output:
+      - "approved | rejected"
+      - "Disposition of every T008 gap"
+      - "Permission or exact blocker for T005"
+    receipt:
+      result: done
+      decision: rejected
+      full_outcome_complete: false
+      rationale: "User-facing claim: all four cues are trustworthy canvas-first operations with durable editor/CLI parity and native deterministic CSS. T009 fixes intermediate Drag authoring/preservation, real keyboard and responsive checks, and per-boundary semantic assertions. Additive Hold selection is mechanically fixed but semantically false: the proof selects an unanimated text element alongside the animated target; projectCueReplacement accepts the mixed scope, and expansion generates no held track for the text element. The cue silently claims a target it does not affect, violating fail-closed semantics and masking the exact residual the proof intended to close. Earlier geometry, playback metadata, Type, reduced-motion, diagnostics, history, determinism, privacy, and phase-containment evidence remains green."
+      evidence:
+        - "T008 Drag residual — PASS: apps/editor/src/main.ts:1285-1297 creates a default interior waypoint and preserves/rescales all existing interior points. Installed Chrome creates three points, drags waypoint 1, verifies its coordinate changes, reloads, accepts a three-point CLI update, edits the cue, and proves exact waypoint preservation through undo/redo at apps/editor/tests/phase4-reusable-cues.spec.ts:97-167."
+        - "T008 keyboard/responsive residual — PASS: installed Chrome uses actual Home and ArrowDown key events on the focused native select at apps/editor/tests/phase4-reusable-cues.spec.ts:85-91. Narrow and wide viewport checks assert visibility and no horizontal overflow at lines 92-96 and 115."
+        - "T008 boundary residual — PASS: packages/visual-proof/src/reusable-cues.visual.test.ts:89-105 now asserts expected before/exact/after behavior for every Type step plus Select choose/settle, Drag press/move/arrive/release, and Hold enter/exit. The sanitized receipt reports 29 samples, 30 expected assertions, two identical raster runs, 19 distinct rasters, and zero repeated pixel drift."
+        - "T008 additive Hold residual — FAIL: apps/editor/src/main.ts:1551-1556 now accumulates multiple selected options, but the proof chooses ids.hold and ids.type at apps/editor/tests/phase4-reusable-cues.spec.ts:70-74. fixtures/public-synthetic/reusable-cues.html gives .hold an animation and .type no animation."
+        - "Domain counterexample — packages/domain/src/index.ts:1022-1043 accepts Hold when at least one selected target has a track; it never requires every targetId to contribute a replacement track. packages/domain/src/cue-authoring.ts:390-409 iterates only replacement tracks and checks track-to-target membership, not target-to-track coverage. Thus the resulting cue retains both target snapshots while generating Hold motion only for .hold; .type is silently ignored."
+        - "This is not cosmetic proof weakness: the UI promises “Choose animated motion,” yet its Hold options include every element through reusableTargetOptions, and shared CLI/domain preparation accepts the same mixed animated/unanimated scope. Unsupported target semantics therefore do not fail visibly."
+        - "Previously accepted evidence did not regress: installed-Chrome browser workflow passed 1/1 and visual proof passed 1/1; focused domain/protocol/CLI suites passed 30/30; native CSSAnimation inventory remains positive before reduced motion; reducedAnimationCount=0; runtime, console, HTTP, failed-request, and unexpected-network counts remain zero."
+        - "Determinism/privacy/containment remain sound: T009 recorded byte-identical installed-Chrome receipts across two runs; independent sensitive scan passed with findingCount=0 across tracked/diff/index/worktree/untracked; private-ignore passed with targetCount=3, ignoredCount=3, trackedPrivateCount=0; protected-file diff and git diff --check passed; no Slice 3 or Phase 5 work appears."
+        - "Failure mode 1, cue metadata/track drift or editor/CLI divergence — FAIL: a Hold semantic and its target snapshots can name an unanimated target absent from generated tracks. Intermediate Drag and history parity now pass."
+        - "Failure mode 2, hidden canvas gaps or incorrect browser boundaries — FAIL only for misleading Hold eligibility/effect; Drag canvas, genuine keyboard interaction, responsive containment, compiler-native preview, and per-boundary state proof pass."
+        - "Failure mode 3, leakage or green tests masking runtime failures — privacy, deterministic receipts, diagnostics, reduced motion, and phase containment PASS, but the current green browser test itself masks the mixed-scope Hold semantic defect."
+      subgoal_contract: null
+      parallel_safety:
+        safe: false
+        reason: "The correction must align domain eligibility, editor target projection, the synthetic fixture, CLI rejection behavior, and installed-Chrome proof. Splitting writers risks another test that demonstrates selection without demonstrating effect."
+      blocked_tasks:
+        - T005
+        - T999
+      missing_evidence:
+        - "A multi-target Hold where every selected stable element has eligible animated tracks and every selected target appears in the generated Hold track inventory."
+        - "Atomic fail-closed rejection, with unchanged revision, when any Hold target is unanimated or lacks the explicit enter boundary."
+        - "Editor Hold target projection that exposes only eligible animated motion or clearly rejects an ineligible canvas choice."
+      required_board_updates:
+        - "Insert one corrective Worker before T005. Objective: make Hold target coverage exact and fail closed, expose only eligible Hold canvas targets, and replace the false multi-target proof with two genuinely animated targets."
+        - "Corrective allowed_files: packages/domain/src/index.ts; packages/domain/src/cue-authoring.test.ts; packages/motion-cli/src/cli.test.ts; fixtures/public-synthetic/reusable-cues.html; apps/editor/src/main.ts; apps/editor/tests/phase4-reusable-cues.spec.ts."
+        - "Corrective verify: add a second independent animated synthetic target with an explicit enter boundary; select both on canvas; assert semantic target IDs and generated Hold track element IDs cover both exactly after durable reload; reject animated-plus-unanimated and missing-boundary scopes atomically through domain and CLI with unchanged revision; verify the editor does not advertise ineligible Hold targets; rerun installed Chrome twice for byte-identical receipts, focused suites, sensitive/private scans, protected-file diff, and git diff --check."
+        - "Corrective stop_if: exact Hold coverage requires changing protocol shape, compiler/runtime interpretation, legacy cue bytes, private material, later-phase scope, or a file outside the corrective allowlist."
+        - "After correction, rerun the Judge gate before activating T005."
+  - id: T011
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Make Hold target coverage exact and fail closed, expose only eligible Hold canvas targets, and prove multi-target Hold with two genuinely animated targets."
+    allowed_files:
+      - "packages/domain/src/index.ts"
+      - "packages/domain/src/cue-authoring.test.ts"
+      - "packages/motion-cli/src/cli.test.ts"
+      - "fixtures/public-synthetic/reusable-cues.html"
+      - "apps/editor/src/main.ts"
+      - "apps/editor/tests/phase4-reusable-cues.spec.ts"
+    verify:
+      - "Add a second independent animated synthetic target with an explicit enter boundary."
+      - "Select both on canvas and prove semantic target IDs and generated Hold element IDs cover both exactly after durable reload."
+      - "Reject animated-plus-unanimated and missing-boundary scopes atomically through domain and CLI with unchanged revision."
+      - "Verify the editor does not advertise ineligible Hold targets."
+      - "Rerun installed Chrome twice for byte-identical receipts, focused suites, privacy scans, protected-file diff, and git diff --check."
+    stop_if:
+      - "Exact Hold coverage requires changing protocol shape, compiler or runtime interpretation, legacy cue bytes, private material, later-phase scope, or a file outside this exact allowlist."
+    receipt:
+      result: done
+      changed_files:
+        - packages/domain/src/index.ts
+        - packages/domain/src/cue-authoring.test.ts
+        - packages/motion-cli/src/cli.test.ts
+        - fixtures/public-synthetic/reusable-cues.html
+        - apps/editor/src/main.ts
+        - apps/editor/tests/phase4-reusable-cues.spec.ts
+      commands:
+        - cmd: "npm exec vitest run -- packages/domain/src/cue-authoring.test.ts --sequence.concurrent false"
+          status: pass
+        - cmd: "npm exec vitest run -- packages/motion-cli/src/cli.test.ts --sequence.concurrent false"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues"
+          status: pass
+        - cmd: "cmp --silent /tmp/t011-installed-chrome-final-first.json .motion/receipts/phase4-reusable-installed-chrome.json && sha256sum /tmp/t011-installed-chrome-final-first.json .motion/receipts/phase4-reusable-installed-chrome.json"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "git diff --exit-code -- package-lock.json scripts/check-sensitive.mjs scripts/check-private-ignore.mjs"
+          status: pass
+      deviations:
+        - "TDD red proofs first demonstrated the mixed animated/unanimated scope was accepted by domain projection and the editor advertised five ineligible targets."
+        - "The first full-suite pass exposed shared-animation coupling in the synthetic domain fixture; the second animated target was corrected to an independent rule/application."
+        - "A late external-revision browser refresh intermittently exceeded Playwright’s implicit five-second poll; the proof now uses an explicit 15-second settled-state timeout within its existing 60-second budget."
+      summary: "Claim: Hold now fails closed unless every selected target contributes animated tracks with an explicit enter boundary. The editor advertises only eligible targets, and installed Chrome selects two independent animations then proves semantic IDs exactly equal generated Hold track element IDs after durable reload. Top failures—silent mixed-scope acceptance, partial missing-boundary mutation, and misleading UI eligibility—are covered by domain and CLI unchanged-revision rejection plus browser assertions. Two final installed-Chrome receipts were byte-identical (SHA-256 6fd8348a8c5c1f3afba6e8d3cb39c6ce252c75949c64c4e4ba0f000d40a5ec82), with clean diagnostics and privacy guards."
+      remaining_blockers: []
+      verification_attempts: 2
+      stopped_because: null
+  - id: T012
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Re-audit exact Hold target coverage and all previously accepted evidence after T011, then decide whether final PM QA may begin."
+    inputs:
+      - "T010 rejection receipt"
+      - "T011 correction receipt"
+      - "complete current diff and proof"
+    constraints:
+      - "Read-only; do not fix findings."
+      - "Require every selected Hold target to contribute eligible generated tracks and invalid scopes to fail atomically."
+      - "Recheck earlier accepted Drag, keyboard, boundary, native, determinism, privacy, and phase-containment evidence."
+    expected_output:
+      - "approved | rejected"
+      - "Disposition of the exact Hold coverage defect"
+      - "Permission or exact blocker for T005"
+    receipt:
+      result: done
+      decision: rejected
+      full_outcome_complete: false
+      rationale: "User-facing claim: Type, Select, Drag, and Hold are trustworthy canvas-first cues that remain adjustable through the shared durable/native path. T011 fixes exact Hold target coverage: two independently animated targets produce matching generated-track coverage, while mixed and missing-boundary scopes reject atomically. However, the new editor eligibility filter regresses Hold adjustment. After authoring a Hold, changing its enter time recomputes eligibility against cue-generated tracks; because the source tracks now live only in the cue replacement, all valid selected targets disappear and update becomes disabled. This blocks a valid boundary change despite the domain’s stored replacement supporting it. All other previously accepted evidence remains green, but T005 should not begin until this bounded UI defect is corrected."
+      evidence:
+        - "Exact Hold target coverage — PASS: packages/domain/src/index.ts:1022-1028 now rejects when any semantic target lacks a source track; the replacement bundle then validates an explicit enter boundary for every included track at lines 1029-1047."
+        - "Genuine multi-target Hold — PASS: fixtures/public-synthetic/reusable-cues.html defines independent opacity and transform animations with explicit 1000 ms boundaries. Installed Chrome selects exactly those two targets and, after durable reload, asserts sorted semantic target IDs equal generated Hold track element IDs at apps/editor/tests/phase4-reusable-cues.spec.ts:71-79 and 134-141."
+        - "Fail-closed atomicity — PASS: packages/domain/src/cue-authoring.test.ts:267-292 rejects animated-plus-unanimated scope with CUE_HOLD_TARGET_UNANIMATED and missing-boundary scope with CUE_HOLD_ENTER_BOUNDARY_MISSING while canonical bytes and revision remain unchanged."
+        - "CLI parity — PASS: packages/motion-cli/src/cli.test.ts:204-222 exercises both invalid scopes through the service, receives the exact reason codes, confirms workspace revision remains 3 after each rejection, then successfully commits the valid two-target Hold at revision 4."
+        - "Initial editor eligibility — PASS: holdTargetOptions filters the initial Hold list through projectCueReplacement; installed Chrome asserts only the two eligible animated stable IDs are advertised."
+        - "Remaining P1 adjustment regression — apps/editor/src/main.ts:1577-1585 recognizes an attached Hold only when its existing enterMs equals the newly entered time. After creation, ordinary source tracks have been replaced by cue-owned generated tracks. Changing enter from 1000 ms to another valid stored-source boundary such as 0 ms makes projectCueReplacement inspect generated tracks, reject them as replacement input, and return no options."
+        - "The change listener at apps/editor/src/main.ts:432-435 immediately calls refreshHoldTargetOptions; lines 1589-1595 rebuild the select, cannot restore now-absent selected IDs, and rerender with the Hold submit disabled. The stored cue replacement would allow this valid update through packages/domain/src/index.ts:938-959, so the UI—not the domain contract—is the blocker."
+        - "No browser test edits an authored Hold’s enter boundary; the current green proof covers creation and exact coverage but cannot detect this regression. This contradicts the goal oracle’s requirement that the cue remain adjustable."
+        - "Previously accepted Drag evidence remains green: three-waypoint creation, direct intermediate-point drag, CLI round-trip, reload, timing edit, and exact undo/redo are still covered."
+        - "Keyboard, responsive, boundary, native-preview, reduced-motion, diagnostics, and history evidence did not regress: installed Chrome passed 1/1, visual proof passed 1/1 with 29 samples and 30 expected assertions, and the receipt reports positive native animations before reduced motion and zero reduced animations/errors/failed requests/HTTP errors/unexpected network."
+        - "Independent focused regression passed 31/31 domain/protocol/CLI tests. Sensitive scan passed with findingCount=0 across tracked/diff/index/worktree/untracked; private-ignore passed with targetCount=3, ignoredCount=3, trackedPrivateCount=0; protected-file diff and git diff --check passed."
+        - "Failure mode 1, cue/track drift or editor/CLI divergence — domain/CLI exact coverage and atomicity PASS, but editor adjustment parity FAILS because a valid stored-replacement Hold update is made unreachable."
+        - "Failure mode 2, hidden/missing canvas functionality or incorrect boundaries — Drag and visual boundaries PASS; Hold creation PASS; valid Hold enter-boundary adjustment FAILS in the filtered UI."
+        - "Failure mode 3, leakage or green tests masking runtime failures — privacy/runtime diagnostics PASS, but the green browser workflow masks the untested authored-Hold adjustment regression. Slice 3 and Phase 5 remain untouched."
+      subgoal_contract: null
+      parallel_safety:
+        safe: false
+        reason: "The correction is one coupled editor behavior and installed-Chrome regression proof; splitting it would add coordination without creating a safely independent work package."
+      blocked_tasks:
+        - T005
+        - T999
+      missing_evidence:
+        - "An authored two-target Hold can change to another valid explicit source boundary without losing selected targets, then persist and reload with exact generated-target coverage."
+        - "An invalid edited enter boundary remains visibly unavailable or rejects atomically without corrupting the existing Hold, while returning to a valid boundary restores eligibility."
+      required_board_updates:
+        - "Insert one bounded corrective Worker before T005. Objective: compute eligibility for an attached Hold from its stored source replacement so valid enter-boundary edits retain exact target coverage and invalid edits remain fail-closed."
+        - "Corrective allowed_files: apps/editor/src/main.ts; apps/editor/tests/phase4-reusable-cues.spec.ts."
+        - "Corrective verify: author the two-target Hold at 1000 ms; edit it to another valid explicit stored-source boundary; assert both selections remain, commit durably, reload, and prove semantic/generated target equality; exercise an invalid boundary and assert unchanged revision plus visible unavailability or rejection; restore a valid boundary; rerun installed Chrome twice for byte-identical receipts, focused suites, privacy scans, protected-file diff, and git diff --check."
+        - "Corrective stop_if: solving attached-Hold eligibility requires changing domain/protocol/compiler/runtime behavior, legacy cue bytes, private material, later-phase scope, or any file outside the two-file allowlist."
+        - "After correction, rerun this Judge gate before activating T005."
+  - id: T013
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Compute attached-Hold eligibility from its stored source replacement so valid boundary edits retain exact target coverage and invalid edits remain fail closed."
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/tests/phase4-reusable-cues.spec.ts"
+    verify:
+      - "Author a two-target Hold, edit it to another valid stored-source boundary, retain both selections, commit, reload, and prove semantic/generated target equality."
+      - "Exercise an invalid boundary and prove unchanged revision plus visible unavailability or rejection, then restore a valid boundary."
+      - "Rerun installed Chrome twice for byte-identical receipts, focused suites, privacy scans, protected-file diff, and git diff --check."
+    stop_if:
+      - "The fix requires domain, protocol, compiler, runtime, legacy cue, private, later-phase, or any file outside this two-file allowlist."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/src/main.ts
+        - apps/editor/tests/phase4-reusable-cues.spec.ts
+      commands:
+        - cmd: "npm exec playwright test -- apps/editor/tests/phase4-reusable-cues.spec.ts --config apps/editor/playwright.config.ts --workers=1"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "npm run build"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues"
+          status: pass
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues"
+          status: pass
+        - cmd: "cmp --silent /tmp/t013-installed-chrome-first.json .motion/receipts/phase4-reusable-installed-chrome.json && sha256sum /tmp/t013-installed-chrome-first.json .motion/receipts/phase4-reusable-installed-chrome.json"
+          status: pass
+        - cmd: "npm run check:sensitive"
+          status: pass
+        - cmd: "npm run check:private-ignore"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+        - cmd: "git diff --exit-code -- package-lock.json scripts/check-sensitive.mjs scripts/check-private-ignore.mjs"
+          status: pass
+      deviations:
+        - "The TDD red proof first confirmed that an invalid attached-Hold boundary disabled submission without visible error feedback and that restoring another valid boundary could not recover targets from generated tracks."
+      summary: "Claim: attached two-target Holds now evaluate edited boundaries against their stored source replacement. A valid 0 ms boundary retains both selected targets, commits, reloads, and preserves exact semantic/generated target coverage. An invalid 900 ms boundary disables submission, reports visible unavailability, leaves revision unchanged, and recovers when restored. Top failures—generated-track eligibility drift, silent invalid edits, and target loss across persistence—are directly covered in installed Chrome. Two sanitized receipts were byte-identical (SHA-256 dc4ef6e8a990f1fa40913d1c4d4ee4b2d2bf3fbf8ab18d127337c8649738d14f); diagnostics, privacy, protected files, typecheck, and build are clean."
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+  - id: T014
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Re-audit attached-Hold adjustment after T013 and decide whether final PM QA may begin."
+    inputs:
+      - "T012 rejection receipt"
+      - "T013 correction receipt"
+      - "complete current diff and proof"
+    constraints:
+      - "Read-only; do not fix findings."
+      - "Require valid boundary edits, invalid-boundary atomicity, target retention, recovery, persistence, and no regression elsewhere."
+    expected_output:
+      - "approved | rejected"
+      - "Permission or exact blocker for T005"
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      rationale: "User-facing claim: a human can create and adjust Type, Select, Drag, and multi-target Hold cues on the unified canvas while agents use the same durable operations, with deterministic browser-native CSS and safe history. T013 closes the last gate: attached Hold eligibility is derived from stored source replacement data, valid boundary edits retain both targets and persist exact generated coverage, and invalid boundaries disable submission with visible feedback and no revision change before recovery. Independent Chrome, visual, focused, privacy, and protected-file checks pass, with no regression in Drag, keyboard, boundaries, metadata, claims, history, reduced motion, diagnostics, or determinism. Final PM QA may begin; slice completion still requires T005 and T999."
+      evidence:
+        - "Attached-Hold eligibility — PASS: apps/editor/src/main.ts:1577-1604 derives valid edited boundaries from the attached cue’s stored replacement tracks, applications, bindings, slots, and keyframes rather than cue-generated document tracks."
+        - "Invalid-boundary atomicity and recovery — PASS: refreshHoldTargetOptions at apps/editor/src/main.ts:1606-1623 removes unavailable targets, disables submission through the normal render path, emits explicit error feedback naming the boundary and unchanged revision, and restores attached semantic targets when a valid boundary returns."
+        - "Installed Chrome proves the exact regression path at apps/editor/tests/phase4-reusable-cues.spec.ts:80-110: create a two-target Hold at 1000 ms; edit to invalid 900 ms; observe disabled submission, error status, and revision 1; restore valid 0 ms; retain both targets; commit revision 2; reload; and verify enterMs plus semantic/generated target equality."
+        - "Exact Hold coverage remains PASS: every selected target must contribute source tracks; mixed unanimated and missing-boundary scopes reject with exact reason codes and unchanged service revision; two independent animated targets produce generated tracks covering both stable IDs."
+        - "Intermediate Drag remains PASS: the editor creates three waypoints, directly drags the middle waypoint, preserves the CLI-authored intermediate through reload and form edits, and proves exact undo/redo."
+        - "Keyboard and responsive evidence remains PASS: installed Chrome uses real Home/ArrowDown events on the focused fallback select and checks unified workspace visibility and horizontal containment at 760 px and 1280 px widths."
+        - "Boundary proof remains PASS: installed Chrome visual proof records 29 t-1/t/t+1 samples, 30 expected semantic assertions across Type, Select, Drag, and Hold, two identical raster runs, 19 distinct rasters, and zero repeated pixel drift."
+        - "Native-preview and reduced-motion evidence remains PASS: iframe srcdoc equals compiled HTML, positive browser-created CSSAnimation inventory is asserted before reduction, and the final reduced-motion inventory is zero."
+        - "Durable parity/history remains PASS: reload, claimed agent update, stale and unauthorized rejection, per-family detach/delete/undo/redo, and exact compiled-byte preservation are exercised through the service-backed editor/CLI path."
+        - "Independent verification passed: installed-Chrome browser workflow 1/1; visual proof 1/1; focused domain/protocol/CLI suites 31/31. The current sanitized browser receipt reports revision 35, four cues, and zero runtime, failed-request, HTTP, or unexpected-network diagnostics."
+        - "T013 recorded byte-identical installed-Chrome receipts across two runs with SHA-256 dc4ef6e8a990f1fa40913d1c4d4ee4b2d2bf3fbf8ab18d127337c8649738d14f; receipt structure remains timestamp- and path-free."
+        - "Sensitive-content and containment checks pass: findingCount=0 across tracked/diff/index/worktree/untracked; private-ignore targetCount=3, ignoredCount=3, trackedPrivateCount=0; protected-file diff and git diff --check pass; no Slice 3 or Phase 5 implementation appears."
+        - "Failure mode 1, cue metadata/track drift or editor/CLI divergence — PASS: exact Hold and Drag target/waypoint coverage, durable reload, atomic rejection, detach, and history are directly asserted."
+        - "Failure mode 2, hidden canvas gaps or incorrect native boundaries — PASS: canvas target/path editing, attached Hold adjustment, genuine keyboard fallback, responsive containment, native preview, and every expected boundary are exercised."
+        - "Failure mode 3, private leakage or green tests masking browser/reduced-motion failures — PASS at this gate: sanitized deterministic receipts, comprehensive browser diagnostics, reduced-motion inventory, privacy scans, and protected-file checks are clean."
+      subgoal_contract: null
+      parallel_safety: null
+      blocked_tasks: []
+      missing_evidence:
+        - "T005 final named-subdomain PM walkthrough and aggregate repository proof."
+        - "T999 final completion audit mapping the entire Slice 2 oracle to current receipts and verification."
+      required_board_updates:
+        - "Mark T014 done with decision approved."
+        - "Activate T005 for final PM QA; keep T999 queued until T005 completes."
+        - "Do not start Slice 3, Phase 5, publication, push, pull request, or merge work."
+  - id: T005
+    type: pm
+    assignee: PM
+    status: done
+    reasoning_hint: default
+    objective: "Run the final named-subdomain walkthrough and aggregate repository proof, present a succinct human QA decision surface if needed, and package a sanitized handoff without publishing."
+    inputs:
+      - "T004 passing receipt or completed corrective receipt and re-review"
+      - "current worktree"
+    constraints:
+      - "Use installed Chrome and the real service/compiler/native-animation path."
+      - "Do not expose private acceptance artifacts or absolute corpus paths."
+      - "Do not push, open a pull request, merge, publish, or start Slice 3."
+    expected_output:
+      - "Named-subdomain URL and walkthrough result"
+      - "Exact test counts, digests, boundary aggregates, and diagnostics"
+      - "Sensitive-content exclusion and complete diff inspection"
+      - "User-facing claim and top-three-failure evidence"
+      - "Clean handoff or exact remaining blocker"
+    receipt:
+      result: done
+      decision: approved
+      full_outcome_complete: false
+      summary: "User-facing claim: Phase 4 Slice 2 now provides durable, canvas-first Type, Select, Drag, and multi-target Hold authoring through the same typed service operations used by the CLI, with deterministic browser-native HTML/CSS output, native-animation scrubbing, exact history, responsive/keyboard access, reduced-motion behavior, and discrete-boundary visual proof. Fresh installed-Chrome QA found and test-first fixed one transient zero-width resize error. Slice 3, Phase 5, publication, push, pull request, and merge work were not started."
+      commands:
+        - cmd: "installed Chrome manual walkthrough on http://lineage-motion.localhost:5187/"
+          status: pass
+        - cmd: "installed Chrome full-page capture regression after T015"
+          status: pass
+        - cmd: "npm run test:unit"
+          status: "pass: 359 tests"
+        - cmd: "npm run test:phase3:service"
+          status: "pass: 18 tests"
+        - cmd: "npm run test:phase3:recovery"
+          status: "pass: 35 tests"
+        - cmd: "npm run test:phase3:parity"
+          status: "pass: 29 tests"
+        - cmd: "npm run test:phase3:browser"
+          status: "pass: 22 tests"
+        - cmd: "explicit public browser suite"
+          status: "pass: 35 tests"
+        - cmd: "npm run test:visual"
+          status: "pass: 3 tests"
+        - cmd: "npm run test:visual:authoring"
+          status: "pass: 1 test"
+        - cmd: "npm run test:visual:trajectory"
+          status: "pass: 1 test"
+        - cmd: "npm run verify:determinism"
+          status: "pass: 34 tests"
+        - cmd: "node apps/editor/scripts/qa-chrome.mjs --phase4-reusable-cues, twice"
+          status: "pass: byte-identical receipts"
+        - cmd: "npm run typecheck && npm run build"
+          status: pass
+        - cmd: "npm run check:sensitive && npm run check:private-ignore"
+          status: pass
+        - cmd: "git diff --check and protected-file diff"
+          status: pass
+      evidence:
+        - "Complete workflow inventory: installed Chrome created Hold, Type, Select, and Drag in order; Hold retained two animated targets, Type used stepped text reveal, Select used real keyboard plus canvas targeting, and Drag exposed three waypoint handles including an intermediate 400 ms point."
+        - "Durability and fail-closed behavior: the dragged intermediate waypoint committed at revision 5 and survived reload; an invalid Hold update reported that revision 5 was unchanged, then a valid boundary update retained both targets and committed revision 6."
+        - "Playback and layout: Play advanced the native preview from 401 ms to 500 ms before Pause; Chrome containment measured 18..742 within a 760 px viewport and 24..1256 within a 1280 px viewport with no workspace overflow."
+        - "Chrome diagnostics after the regression fix: full-page capture produced zero editor-origin errors. The aggregate browser receipt reports runtimeErrorCount=0, failedRequestCount=0, httpErrorCount=0, and unexpectedNetworkCount=0."
+        - "Deterministic repeated export: two complete installed-Chrome runs produced the same receipt digest dc4ef6e8a990f1fa40913d1c4d4ee4b2d2bf3fbf8ab18d127337c8649738d14f, browser proof digest ae488c8cf7d681714d462794161ace560b05ac5370cc1a541670bcd7b04392d8, and visual proof digest d8e725dac2ab22c414c323c3bd381436630d585d2dbf3d91a2a082fceb4e9d2b."
+        - "Visual equivalence around discrete boundaries: 29 sampled frames, 30 expected boundary assertions, two raster runs, 19 distinct rasters, maximum repeated pixel difference 0, and zero unexpected requests. Samples cover every Type step and Select, Drag, and Hold boundaries on both sides."
+        - "Reduced motion and native output: browser proof reports four cues at revision 35 and reducedAnimationCount=0; the browser suite positively asserts compiler-exact iframe HTML and CSSAnimation objects rather than a JavaScript interpolator."
+        - "Sensitive-content exclusion: the repository scan covered tracked inventory, branch diff, index, worktree, and untracked files with findingCount=0 and privateNeedleCount=0. The private-ignore receipt reports targetCount=3, ignoredCount=3, trackedPrivateCount=0. Package lock and both privacy checker files are unchanged."
+        - "Private-only exclusion: the legacy cursor-click-reveal browser spec still requires its intentionally absent ignored private canonical input. The complete public suite excludes only that intrinsic-private spec and passes 35/35; no private input was fabricated or copied."
+        - "Scope inspection: changed production surfaces are limited to the approved domain, protocol, service seed, CLI, editor, public synthetic fixture, visual proof, package script, and goal-control files. No Slice 3, Phase 5, database artifact, screenshot, private fixture, branding, publication, or integration work is present."
+      top_three_failure_modes:
+        - "Cue semantics diverge between human editor, CLI, durable service, and generated tracks, especially multi-target Hold and intermediate Drag waypoints."
+        - "The preview or proof hides compiler/native-animation defects at discrete boundaries, during reduced motion, reload, or transient browser layout changes."
+        - "Private corpus material or unstable outputs enter the repository or receipts while broad aggregate tests appear green."
+      remaining_blockers:
+        - "Final T999 Judge audit must still map the complete oracle to current evidence with full_outcome_complete=true before the goal may close."
+      verification_attempts: 2
+      stopped_because: null
+  - id: T015
+    type: worker
+    assignee: Worker
+    status: done
+    reasoning_hint: medium
+    objective: "Eliminate the installed-Chrome transient-resize PREVIEW_PROJECTION_INVALID error with a minimal tested layout fix, preserving all cue semantics and output bytes."
+    inputs:
+      - "T014 approved implementation"
+      - "T005 installed-Chrome reproduction: a full-page capture triggers a resize while previewStage.clientWidth is transiently zero"
+      - "apps/editor/src/main.ts configurePreviewCanvas and editor browser tests"
+    allowed_files:
+      - "apps/editor/src/main.ts"
+      - "apps/editor/tests/**"
+    verify:
+      - "Add a focused regression test first and observe it fail for the editor-origin PREVIEW_PROJECTION_INVALID error during a transient zero-width resize or equivalent full-page capture condition."
+      - "Run the focused regression test green after the smallest fix."
+      - "npx playwright test apps/editor/tests/phase4-reusable-cues.spec.ts --config apps/editor/playwright.config.ts --workers=1"
+      - "npm run typecheck"
+      - "git diff --check"
+    stop_if:
+      - "The correction requires changing cue semantics, compiler output, canonical bytes, or any file outside the allowlist."
+      - "The regression cannot be reproduced by a focused real-browser test."
+      - "The same verification fails twice without a grounded diagnosis."
+    receipt:
+      result: done
+      changed_files:
+        - apps/editor/src/main.ts
+        - apps/editor/tests/preview-transient-resize.spec.ts
+      commands:
+        - cmd: "npx playwright test apps/editor/tests/preview-transient-resize.spec.ts --config apps/editor/playwright.config.ts --workers=1"
+          status: pass
+        - cmd: "npx playwright test apps/editor/tests/phase4-reusable-cues.spec.ts --config apps/editor/playwright.config.ts --workers=1"
+          status: pass
+        - cmd: "npm run typecheck"
+          status: pass
+        - cmd: "git diff --check"
+          status: pass
+      summary: "Installed Chrome full-page capture exposed a transient zero-width resize that threw PREVIEW_PROJECTION_INVALID. A focused real-browser regression failed before the fix and now passes. The resize handler skips only the unmeasurable transient state; a subsequent normal resize restores a positive projection and the iframe remains compiler-exact. The complete reusable-cue Chrome workflow, typecheck, and diff checks pass without cue semantic or compiler-byte changes."
+      remaining_blockers: []
+      verification_attempts: 1
+      stopped_because: null
+  - id: T999
+    type: judge
+    assignee: Judge
+    status: done
+    reasoning_hint: high
+    objective: "Audit whether Phase 4 Slice 2 is genuinely complete and safe to hand off while Slice 3 and Phase 5 remain untouched."
+    inputs:
+      - "All completed task receipts"
+      - "Latest verification and Chrome/visual evidence"
+      - "Complete diff and privacy scans"
+      - "Original oracle and non-goals"
+    constraints:
+      - "Read-only."
+      - "Reject completion if any required Worker or corrective work remains."
+      - "Require the user-facing claim, top three realistic failures, and exact evidence."
+      - "Do not treat PR creation or merge as part of this goal."
+    expected_output:
+      - "complete | not_complete"
+      - "full_outcome_complete: true | false"
+      - "Oracle evidence map"
+      - "Missing evidence or exact next task"
+      - "Explicit confirmation that Slice 3 and Phase 5 were not started"
+    receipt:
+      result: done
+      decision: complete
+      full_outcome_complete: true
+      rationale: "The full Slice 2 oracle is proven on current origin/main plus the complete uncommitted diff. Fresh installed-Chrome and aggregate reruns confirm all four canvas-first cues, durable editor/CLI parity, atomic rejection, exact detach/history, native compiled playback, responsive/keyboard access, reduced motion, deterministic boundary proof, and clean diagnostics. T015 is a minimal one-condition resize guard with a focused real-Chrome recovery test and no semantic/compiler change. Repeated receipt digests match T005 exactly; public/private exclusion and privacy scans are explicit. No required Worker remains, and Slice 3, Phase 5, publishing, push, or pull-request work has started."
+      evidence:
+        - "User-facing claim: owners and agents can create and adjust Type, Select, Drag with an intermediate arrival, and exact multi-target Hold through one durable typed operation path, then reload, inspect, scrub, detach, undo/redo, and export deterministic browser-native HTML/CSS without editing CSS percentages."
+        - "Failure mode 1 — metadata/generated-track drift or editor/CLI/history divergence: fresh installed-Chrome reusable-cue proof passed; fresh unit 359, service 18, recovery 35, parity 29, and phase3-browser 22 tests passed."
+        - "Failure mode 2 — simplified UX, timing, or preview hides defects: compiler-exact iframe source, CSSAnimation objects, reducedAnimationCount=0, zero runtime/request/HTTP/unexpected-network errors, and visual proof with 29 samples, 30 boundary assertions, two raster runs, 19 distinct rasters, and maximum repeated pixel difference 0."
+        - "T015 is a minimal transient-resize guard; its focused installed-Chrome test proves zero page errors, recovery to a finite positive projection, and iframe source equal to compiler output."
+        - "Failure mode 3 — private leakage, silent unsupported behavior, or misleading green proof: sensitive findingCount=0/privateNeedleCount=0; private-ignore targetCount=3/ignoredCount=3/trackedPrivateCount=0; invalid semantic, authority, stale revision, claim, and locked-track paths fail atomically."
+        - "Two independent complete runs produced byte-identical installed, browser, and visual receipt digests: dc4ef6e8a990f1fa40913d1c4d4ee4b2d2bf3fbf8ab18d127337c8649738d14f, ae488c8cf7d681714d462794161ace560b05ac5370cc1a541670bcd7b04392d8, and d8e725dac2ab22c414c323c3bd381436630d585d2dbf3d91a2a082fceb4e9d2b."
+        - "The explicit public browser suite passed 35/35 and excludes only the legacy cue spec whose contract requires the intentionally absent ignored private canonical input; no private input was fabricated or copied."
+        - "Fresh aggregate visual, authoring, trajectory, determinism, typecheck, build, diff, privacy, and protected-file checks passed. The only build note is the existing non-failing Vite chunk-size warning."
+        - "HEAD remains the approved origin/main base with zero commits ahead. Scope is confined to Slice 2; no Slice 3, Phase 5, publishing, push, pull request, or merge work exists."
+      blocked_tasks: []
+      missing_evidence: []
+      remaining_blockers: []
+checks:
+  dirty_fingerprint: "Main checkout at ddfd5c7 is behind origin/main and contains pre-existing untracked goal artifacts; the new worktree must instead base on origin/main df0075b and preserve all existing files."
+  last_verification:
+    result: unknown
+    task: null
+    commands: []

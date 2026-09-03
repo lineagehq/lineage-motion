@@ -55,6 +55,10 @@ describe('deterministic cursor, click, and reveal cue authoring', () => {
     const runs = [expandCue(input), expandCue(input), expandCue(input)];
     expect(new Set(runs.map((run) => run.inputDigest))).toHaveLength(1);
     expect(new Set(runs.map((run) => run.expansionDigest))).toHaveLength(1);
+    expect([runs[0]!.inputDigest, runs[0]!.expansionDigest]).toEqual([
+      'b1c58f9b5eacc128cfea5da868a6486d27baf55c41c73c85a78898918e2ad9cc',
+      '10e4aef1f64de7ea6a3b5ad37ff98204dbb8bda6b4718ca411ffec459b29345e',
+    ]);
     expect(runs[0]).toEqual(runs[1]);
     expect(runs[0]!.rules[0]!.tracks[2]!.keyframes.map((frame) => frame.value)).toEqual([
       'translate(5vw, 10vh)', 'translate(30vw, 40vh)', 'translate(60vw, 50vh)',
@@ -144,5 +148,180 @@ describe('deterministic cursor, click, and reveal cue authoring', () => {
         targetSnapshots: cueTargetSnapshots(state.document, moved) } });
     expect(result).toMatchObject({ ok: false, diagnostic: { code: 'CUE_REPLACEMENT_SCOPE_CHANGE' } });
     expect(sha256Hex(canonicalContentBytes(result.state.document))).toBe(before);
+  });
+});
+
+describe('deterministic reusable cue breadth', () => {
+  const reusableScene = (): AuthoringState => {
+    const imported = importMotionHtml(`<!doctype html><html><head><style>
+      .hold { animation: hold-source 2s linear both; }
+      .hold-two { animation: hold-source-two 2s linear both; }
+      .hold-missing-boundary { animation: hold-missing 2s linear both; }
+      @keyframes hold-source { 0% { opacity: 0; } 50% { opacity: .5; } 100% { opacity: 1; } }
+      @keyframes hold-source-two { 0% { transform: scale(.8); } 50% { transform: scale(1); } 100% { transform: scale(1.2); } }
+      @keyframes hold-missing { 0% { opacity: 0; } 40% { opacity: .4; } 100% { opacity: 1; } }
+    </style></head><body><div class="hold"></div><section class="hold-two"></section>
+      <aside class="hold-missing-boundary"></aside><span></span><i></i><b></b></body></html>`);
+    if (!imported.document) throw new Error('synthetic import failed');
+    imported.document.elements.push(
+      { id: 'el_type', selectorHint: '', structuralFingerprint: 'synthetic/type', editableText: 'Synthetic text' },
+      { id: 'el_cursor', selectorHint: '', structuralFingerprint: 'synthetic/cursor' },
+      { id: 'el_selected', selectorHint: '', structuralFingerprint: 'synthetic/selected' },
+      { id: 'el_highlight', selectorHint: '', structuralFingerprint: 'synthetic/highlight' },
+      { id: 'el_dragged', selectorHint: '', structuralFingerprint: 'synthetic/dragged' },
+    );
+    imported.document.durationMs = 3000;
+    return createAuthoringState(imported.document);
+  };
+
+  test('materializes Type as a stepped width reveal without changing text', () => {
+    const state = reusableScene();
+    const semantic = { kind: 'type', targetId: 'el_type', startMs: 200, completeMs: 1000, stepCount: 8 } as unknown as CueSemantic;
+    const expansion = expandCue(cueExpansionInput(deriveCueId(state.document.documentId, 'type'), semantic,
+      cueTargetSnapshots(state.document, semantic)));
+    expect(expansion.rules).toHaveLength(1);
+    expect(expansion.rules[0]!.tracks).toEqual([expect.objectContaining({ property: 'clip-path', interpolation: 'step',
+      keyframes: [expect.objectContaining({ offset: 0, value: 'inset(0 100% 0 0)' }),
+        expect.objectContaining({ offset: 1, value: 'inset(0 0% 0 0)' })] })]);
+    expect(expansion.applications[0]!.slots[0]).toMatchObject({ durationMs: 800, delayMs: 200,
+      fillMode: 'both', timingFunction: { kind: 'steps', count: 8, position: 'end' } });
+    expect(state.document.elements.find((element) => element.id === 'el_type')!.editableText).toBe('Synthetic text');
+  });
+
+  test('rejects Type on a non-text target and rejects overlapping Select and Drag roles', () => {
+    const state = reusableScene();
+    const invalid = [
+      { kind: 'type', targetId: 'el_dragged', startMs: 0, completeMs: 500, stepCount: 5 },
+      { kind: 'select', cursorTargetId: 'el_cursor', selectedTargetId: 'el_cursor', approachMs: 0, chooseMs: 100, settleMs: 200 },
+      { kind: 'drag', cursorTargetId: 'el_dragged', draggedTargetId: 'el_dragged', approachMs: 0, pressMs: 100,
+        moveStartMs: 200, arriveMs: 600, releaseMs: 700, grabOffsetXPpm: 0, grabOffsetYPpm: 0,
+        waypoints: [{ timeMs: 200, xPpm: 0, yPpm: 0 }, { timeMs: 600, xPpm: 100_000, yPpm: 100_000 }] },
+    ] as CueSemantic[];
+    for (const [index, semantic] of invalid.entries()) expect(() => expandCue(cueExpansionInput(
+      deriveCueId(state.document.documentId, `invalid-reusable-${index}`), semantic, cueTargetSnapshots(state.document, semantic),
+    ))).toThrow();
+  });
+
+  test('materializes Select with approach, choose, settle, and an existing highlight boundary', () => {
+    const state = reusableScene();
+    const semantic = { kind: 'select', cursorTargetId: 'el_cursor', selectedTargetId: 'el_selected',
+      highlightTargetId: 'el_highlight', approachMs: 100, chooseMs: 400, settleMs: 700 } as unknown as CueSemantic;
+    const expansion = expandCue(cueExpansionInput(deriveCueId(state.document.documentId, 'select'), semantic,
+      cueTargetSnapshots(state.document, semantic)));
+    expect(expansion.tracks.map((track) => [track.elementId, track.property])).toEqual([
+      ['el_cursor', 'scale'], ['el_highlight', 'opacity'], ['el_highlight', 'visibility'],
+    ]);
+    const visibility = expansion.rules.flatMap((rule) => rule.tracks).find((track) => track.property === 'visibility')!;
+    expect(visibility.keyframes.map((frame) => [frame.offset, frame.value])).toEqual([[0, 'hidden'], [0.5, 'visible'], [1, 'visible']]);
+  });
+
+  test('materializes Drag with one stored grab offset and coordinated cursor/object arrivals', () => {
+    const state = reusableScene();
+    const semantic = { kind: 'drag', cursorTargetId: 'el_cursor', draggedTargetId: 'el_dragged',
+      approachMs: 100, pressMs: 300, moveStartMs: 400, arriveMs: 900, releaseMs: 1000,
+      grabOffsetXPpm: 20_000, grabOffsetYPpm: -30_000, waypoints: [
+        { timeMs: 400, xPpm: 100_000, yPpm: 200_000 }, { timeMs: 650, xPpm: 450_000, yPpm: 500_000 },
+        { timeMs: 900, xPpm: 700_000, yPpm: 600_000 },
+      ] } as unknown as CueSemantic;
+    const expansion = expandCue(cueExpansionInput(deriveCueId(state.document.documentId, 'drag'), semantic,
+      cueTargetSnapshots(state.document, semantic)));
+    const transforms = expansion.rules.flatMap((rule) => rule.tracks).filter((track) => track.property === 'transform');
+    expect(transforms).toHaveLength(2);
+    expect(expansion.tracks.filter((track) => ['left', 'top'].includes(track.property)).map((track) =>
+      [track.elementId, track.property])).toEqual([
+      ['el_cursor', 'left'], ['el_cursor', 'top'], ['el_dragged', 'left'], ['el_dragged', 'top'],
+    ]);
+    expect(transforms[0]!.keyframes.map((frame) => frame.value)).toEqual([
+      'translate(12vw, 17vh)', 'translate(12vw, 17vh)', 'translate(12vw, 17vh)',
+      'translate(47vw, 47vh)', 'translate(72vw, 57vh)', 'translate(72vw, 57vh)',
+    ]);
+    expect(transforms[1]!.keyframes.map((frame) => frame.value)).toEqual([
+      'translate(10vw, 20vh)', 'translate(45vw, 50vh)', 'translate(70vw, 60vh)', 'translate(70vw, 60vh)',
+    ]);
+  });
+
+  test('materializes Hold by duplicating an explicit enter boundary and shifting later source timing', () => {
+    const state = reusableScene();
+    const sourceTrack = state.document.tracks[0]!;
+    const semantic = { kind: 'hold', targetIds: [sourceTrack.elementId], enterMs: 1000, durationMs: 500,
+      exitMs: 1500 } as unknown as CueSemantic;
+    const cueId = deriveCueId(state.document.documentId, 'hold');
+    const replacement = projectCueReplacement(state.document, cueId, semantic);
+    expect(replacement).toMatchObject({ ok: true, trackIds: [sourceTrack.id] });
+    if (!replacement.ok) throw new Error(replacement.code);
+    const operation = create(state, 'hold', semantic);
+    if (operation.kind !== 'motion.cue.create') throw new Error('expected create');
+    expect(operation.payload.replacementTrackIds).toEqual([]);
+    operation.payload.replacementTrackIds = replacement.trackIds;
+    operation.payload.replacementInputDigest = replacement.inputDigest;
+    const next = dispatch(state, operation).document;
+    const hold = next.cues.find((cue): cue is AuthoringCue => cue.schemaVersion === 'motion.authoring-cue.v1'
+      && cue.semantic.kind === 'hold')!;
+    const rule = next.rules.find((candidate) => hold.generatedRuleIds.includes(candidate.id))!;
+    expect(rule.tracks[0]!.keyframes.map((frame) => [frame.offset, frame.value])).toEqual([
+      [0, '0'], [0.4, '.5'], [0.6, '.5'], [1, '1'],
+    ]);
+    expect(next.durationMs).toBe(3500);
+  });
+
+  test('requires every Hold target to contribute an animated track with the explicit enter boundary', () => {
+    const state = reusableScene();
+    const animatedTargetIds = [...new Set(state.document.tracks.map((track) => track.elementId))];
+    const validTargetIds = animatedTargetIds.slice(0, 2);
+    const valid = { kind: 'hold', targetIds: validTargetIds, enterMs: 1000, durationMs: 500,
+      exitMs: 1500 } as CueSemantic;
+    const cueId = deriveCueId(state.document.documentId, 'multi-hold');
+    const replacement = projectCueReplacement(state.document, cueId, valid);
+    expect(replacement).toMatchObject({ ok: true });
+    if (!replacement.ok) throw new Error(replacement.code);
+    const operation = create(state, 'multi-hold', valid);
+    if (operation.kind !== 'motion.cue.create') throw new Error('expected create');
+    operation.payload.replacementTrackIds = replacement.trackIds;
+    operation.payload.replacementInputDigest = replacement.inputDigest;
+    const next = dispatch(state, operation).document;
+    expect(next.tracks.filter((track) => track.cueOwnership?.cueId === cueId).map((track) => track.elementId).sort())
+      .toEqual([...validTargetIds].sort());
+
+    const before = { revision: state.document.revision, bytes: canonicalContentBytes(state.document) };
+    const mixed = { ...valid, targetIds: [validTargetIds[0]!, 'el_type'] };
+    expect(projectCueReplacement(state.document, deriveCueId(state.document.documentId, 'mixed-hold'), mixed))
+      .toEqual({ ok: false, code: 'CUE_HOLD_TARGET_UNANIMATED' });
+    const missingBoundary = { ...valid, targetIds: [validTargetIds[0]!, animatedTargetIds[2]!] };
+    expect(projectCueReplacement(state.document, deriveCueId(state.document.documentId, 'boundary-hold'), missingBoundary))
+      .toEqual({ ok: false, code: 'CUE_HOLD_ENTER_BOUNDARY_MISSING' });
+    expect({ revision: state.document.revision, bytes: canonicalContentBytes(state.document) }).toEqual(before);
+  });
+
+  test('preserves every source playback field while inserting Hold time', () => {
+    const state = reusableScene();
+    const sourceTrack = state.document.tracks[0]!;
+    const sourceApplication = state.document.applications.find((application) =>
+      application.slots.some((slot) => slot.id === sourceTrack.slotId))!;
+    const sourceSlot = sourceApplication.slots.find((slot) => slot.id === sourceTrack.slotId)!;
+    Object.assign(sourceSlot, { iterationCount: 'infinite', direction: 'alternate-reverse', fillMode: 'backwards',
+      playState: 'paused', timingFunction: { kind: 'keyword', value: 'ease-in-out' }, delayMs: 17 });
+    const semantic = { kind: 'hold', targetIds: [sourceTrack.elementId], enterMs: 1000, durationMs: 500,
+      exitMs: 1500 } as CueSemantic;
+    const cueId = deriveCueId(state.document.documentId, 'metadata-hold');
+    const replacement = projectCueReplacement(state.document, cueId, semantic);
+    if (!replacement.ok) throw new Error(replacement.code);
+    const operation = create(state, 'metadata-hold', semantic);
+    if (operation.kind !== 'motion.cue.create') throw new Error('expected create');
+    operation.payload.replacementTrackIds = replacement.trackIds;
+    operation.payload.replacementInputDigest = replacement.inputDigest;
+    const next = dispatch(state, operation).document;
+    const cue = next.cues.find((candidate): candidate is AuthoringCue => candidate.schemaVersion === 'motion.authoring-cue.v1'
+      && candidate.semantic.kind === 'hold')!;
+    const generated = next.applications.find((application) => cue.generatedApplicationIds.includes(application.id))!;
+    expect(generated.slots[0]).toMatchObject({ iterationCount: 'infinite', direction: 'alternate-reverse',
+      fillMode: 'backwards', playState: 'paused', timingFunction: { kind: 'keyword', value: 'ease-in-out' }, delayMs: 17 });
+  });
+
+  test('fails Hold closed when its target has no explicit value boundary at enter', () => {
+    const state = reusableScene();
+    const semantic = { kind: 'hold', targetIds: [state.document.tracks[0]!.elementId], enterMs: 900,
+      durationMs: 500, exitMs: 1400 } as unknown as CueSemantic;
+    expect(projectCueReplacement(state.document, deriveCueId(state.document.documentId, 'invalid-hold'), semantic))
+      .toEqual({ ok: false, code: 'CUE_HOLD_ENTER_BOUNDARY_MISSING' });
   });
 });

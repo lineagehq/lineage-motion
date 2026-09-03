@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+    .stage { position: relative; width: 640px; height: 360px; background: #eef2ff; }
+    .hold, .hold-secondary, .type, .cursor, .selected, .highlight, .dragged { position: absolute; box-sizing: border-box; }
+    .hold { left: 32px; top: 32px; width: 90px; height: 48px; background: #0f766e; animation: source 2s linear both; }
+    .hold-secondary { left: 40px; top: 94px; width: 78px; height: 34px; background: #0e7490; animation: source-secondary 2s linear both; }
+    .type { left: 150px; top: 40px; width: 180px; white-space: nowrap; overflow: hidden; }
+    .cursor { left: 80px; top: 150px; width: 20px; height: 20px; border-radius: 50%; background: #111827; }
+    .selected { left: 220px; top: 140px; width: 100px; height: 60px; background: #f59e0b; }
+    .highlight { left: 214px; top: 134px; width: 112px; height: 72px; border: 3px solid #2563eb; }
+    .dragged { left: 390px; top: 150px; width: 80px; height: 54px; background: #7c3aed; }
+    @keyframes source { 0% { opacity: 0; } 50% { opacity: .5; } 100% { opacity: 1; } }
+    @keyframes source-secondary { 0% { transform: scale(.8); } 50% { transform: scale(1); } 100% { transform: scale(1.2); } }
+  </style>
+</head>
+<body><main class="stage"><div class="hold"></div><p class="type" data-motion-id="el_1000000000000001">Synthetic typing sample</p><i class="cursor" data-motion-id="el_1000000000000002"></i>
+  <button class="selected" data-motion-id="el_1000000000000003">Select</button><div class="highlight" data-motion-id="el_1000000000000004"></div><div class="dragged" data-motion-id="el_1000000000000005"></div><section class="hold-secondary"></section></main></body>
+</html>

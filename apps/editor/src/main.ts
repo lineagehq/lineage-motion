@@ -5,7 +5,9 @@ import {
   canonicalContentBytes,
   createAuthoringState,
   cueTargetSnapshots,
+  deriveCueId,
   dispatchAuthoringOperation,
+  projectCueReplacement,
   projectShotWorkspace,
   projectTrajectorySelection,
   projectTransformTrajectory,
@@ -90,6 +92,13 @@ let draftConflictRevision: number | null = null;
 let draftStaleBaseRevision: number | null = null;
 const detachedCueKinds = new Set<CueSemantic['kind']>();
 let cuePathDefaultsInitialized = false;
+const reusableCueWorkspace = payload.cueWorkspace?.schemaVersion === 'motion.editor-cue-workspace.v2';
+const reusableTargetOptions = `<option value="">Choose on canvas</option>${authoring.document.elements
+  .map((element, index) => `<option value="${element.id}">Object ${index + 1}</option>`).join('')}`;
+const reusableTextTargetOptions = `<option value="">Choose text on canvas</option>${authoring.document.elements
+  .filter((element) => element.editableText !== undefined)
+  .map((element, index) => `<option value="${element.id}">Text ${index + 1}</option>`).join('')}`;
+const reusableHoldTargetOptions = holdTargetOptions(1000);
 
 document.body.innerHTML = `
   <main class="editor-shell">
@@ -114,7 +123,7 @@ document.body.innerHTML = `
         <output data-service-diagnostic role="alert" hidden></output>
       </section>` : ''}
     </header>
-    ${payload.cueWorkspace ? `<section class="cue-workspace" data-cue-workspace aria-labelledby="cue-workspace-heading">
+    ${payload.cueWorkspace ? `<section class="cue-workspace" data-cue-workspace data-cue-family="${reusableCueWorkspace ? 'reusable' : 'cursor-click-reveal'}" aria-labelledby="cue-workspace-heading">
       <header><div><p class="eyebrow">Current action</p><h2 id="cue-workspace-heading">Click the cursor on the canvas</h2><p data-cue-guidance>The canvas is already active—no setup button required.</p></div><span class="cue-progress-count" data-cue-progress-count>Choose objects</span></header>
       <section class="cue-role-step" aria-labelledby="cue-role-heading"><h3 id="cue-role-heading">Choose the three objects</h3>
         <div class="cue-role-grid">
@@ -132,6 +141,11 @@ document.body.innerHTML = `
         <form data-cue-form="cursor-path" hidden><h3>Move the cursor</h3><p data-cue-path-guidance>Create the movement, then drag Start and Arrive on the canvas.</p><details class="cue-timing"><summary>Timing · 0 to 700 ms</summary><div class="cue-fields"><label>Start (ms)<input name="start" type="number" min="0" value="0"></label><label>Arrive (ms)<input name="arrive" type="number" min="1" value="700"></label></div></details><details class="cue-coordinate-advanced"><summary>Exact coordinates</summary><div class="cue-fields"><label>Start X (%)<input name="startX" type="number" step="0.0001" value="8"></label><label>Start Y (%)<input name="startY" type="number" step="0.0001" value="12"></label><label>End X (%)<input name="endX" type="number" step="0.0001" value="62"></label><label>End Y (%)<input name="endY" type="number" step="0.0001" value="55"></label></div></details><div class="cue-form-actions"><button type="submit" disabled>Create cursor movement</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>
         <form data-cue-form="reveal" hidden><h3>Reveal the content</h3><p>Use the suggested timing or open Timing to fine-tune it.</p><details class="cue-timing"><summary>Timing · 800 to 1200 ms</summary><div class="cue-fields"><label>Start (ms)<input name="start" type="number" min="0" value="800"></label><label>Complete (ms)<input name="complete" type="number" min="1" value="1200"></label></div></details><div class="cue-form-actions"><button type="submit" disabled>Create reveal</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>
         <form data-cue-form="click" hidden><h3>Add the click</h3><p>Use the suggested press and pulse, or open Details to tune them.</p><details class="cue-timing"><summary>Click details · 700 to 1300 ms</summary><div class="cue-fields"><label>Arrive (ms)<input name="arrive" type="number" min="0" value="700"></label><label>Press (ms)<input name="press" type="number" min="1" value="800"></label><label>Release (ms)<input name="release" type="number" min="2" value="920"></label><label>Pulse end (ms)<input name="pulseEnd" type="number" min="3" value="1300"></label><label>Press scale (%)<input name="scale" type="number" min="1" value="82"></label><label>Pulse radius (px)<input name="radius" type="number" min="1" value="18"></label></div></details><div class="cue-form-actions"><button type="submit" disabled>Create click</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>
+        ${reusableCueWorkspace ? `
+        <form data-cue-form="type" hidden><h3>Type text</h3><p>Choose existing text directly on the canvas.</p><label>Text target<select name="target" data-reusable-target>${reusableTextTargetOptions}</select></label><button type="button" data-reusable-pick="target">Choose text on canvas</button><details class="cue-timing"><summary>Timing</summary><div class="cue-fields"><label>Start (ms)<input name="start" type="number" min="0" value="100"></label><label>Complete (ms)<input name="complete" type="number" min="1" value="600"></label><label>Steps<input name="stepCount" type="number" min="1" value="5"></label></div></details><div class="cue-form-actions"><button type="submit">Create type</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>
+        <form data-cue-form="select" hidden><h3>Select an object</h3><p>Choose each role directly on the canvas; dropdowns remain as the keyboard fallback.</p><div class="cue-fields"><label>Cursor<select name="cursor" data-reusable-target>${reusableTargetOptions}</select><button type="button" data-reusable-pick="cursor">Choose cursor on canvas</button></label><label>Selected object<select name="selected" data-reusable-target>${reusableTargetOptions}</select><button type="button" data-reusable-pick="selected">Choose object on canvas</button></label><label>Highlight<select name="highlight" data-reusable-target>${reusableTargetOptions}</select><button type="button" data-reusable-pick="highlight">Choose highlight on canvas</button></label></div><details class="cue-timing"><summary>Timing</summary><div class="cue-fields"><label>Approach<input name="approach" type="number" value="100"></label><label>Choose<input name="choose" type="number" value="300"></label><label>Settle<input name="settle" type="number" value="500"></label></div></details><div class="cue-form-actions"><button type="submit">Create select</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>
+        <form data-cue-form="drag" hidden><h3>Drag an object</h3><p>Choose both roles and shape their shared path directly on the canvas.</p><div class="cue-fields"><label>Cursor<select name="cursor" data-reusable-target>${reusableTargetOptions}</select><button type="button" data-reusable-pick="cursor">Choose cursor on canvas</button></label><label>Dragged object<select name="dragged" data-reusable-target>${reusableTargetOptions}</select><button type="button" data-reusable-pick="dragged">Choose object on canvas</button></label></div><details class="cue-timing"><summary>Timing and exact geometry</summary><div class="cue-fields"><label>Approach<input name="approach" type="number" value="0"></label><label>Press<input name="press" type="number" value="100"></label><label>Move start<input name="moveStart" type="number" value="200"></label><label>Arrive<input name="arrive" type="number" value="600"></label><label>Release<input name="release" type="number" value="700"></label><label>Start X (%)<input name="startX" type="number" value="10"></label><label>Start Y (%)<input name="startY" type="number" value="20"></label><label>End X (%)<input name="endX" type="number" value="60"></label><label>End Y (%)<input name="endY" type="number" value="50"></label><label>Grip X (%)<input name="gripX" type="number" value="1"></label><label>Grip Y (%)<input name="gripY" type="number" value="-2"></label></div></details><div class="cue-form-actions"><button type="submit">Create drag</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>
+        <form data-cue-form="hold" hidden><h3>Hold a motion beat</h3><p>Choose animated motion directly on the canvas at an explicit source boundary.</p><label>Motion targets<select name="target" data-reusable-target multiple><option value="">Choose motion on canvas</option>${reusableHoldTargetOptions}</select></label><button type="button" data-reusable-pick="target">Choose motion on canvas</button><details class="cue-timing"><summary>Timing</summary><div class="cue-fields"><label>Enter<input name="enter" type="number" value="1000"></label><label>Duration<input name="duration" type="number" value="300"></label></div></details><div class="cue-form-actions"><button type="submit">Create hold</button><button type="button" data-cue-cancel-edit hidden>Done</button></div></form>` : ''}
       </div>
       <section class="cue-complete" data-cue-complete hidden><div><span aria-hidden="true">&#10003;</span><div><strong>Interaction ready</strong><p>Drag the cursor handles on the canvas, press Play, or edit a beat below.</p></div></div></section>
       <div class="cue-history-slot" data-cue-history-slot></div>
@@ -269,7 +283,9 @@ const cueTargetOverlay = document.querySelector<HTMLElement>('[data-cue-target-o
 const cuePathOverlay = document.querySelector<HTMLElement>('[data-cue-path-overlay]');
 type CueCanvasRole = 'cursor' | 'pulse' | 'reveal';
 type CursorPathAuthoringCue = AuthoringCue & { semantic: Extract<CueSemantic, { kind: 'cursor-path' }> };
+type PathAuthoringCue = AuthoringCue & { semantic: Extract<CueSemantic, { kind: 'cursor-path' | 'drag' }> };
 let cuePickRole: CueCanvasRole | null = null;
+let reusablePickControl: HTMLSelectElement | null = null;
 let cueEditingKind: CueSemantic['kind'] | null = null;
 let cueCanvasGeneration = 0;
 let cueCanvasFrame: number | null = null;
@@ -395,6 +411,29 @@ for (const button of document.querySelectorAll<HTMLButtonElement>('[data-cue-pic
 for (const select of document.querySelectorAll<HTMLSelectElement>('[data-cue-cursor], [data-cue-pulse], [data-cue-reveal]')) {
   select.addEventListener('change', () => { cuePickRole = null; renderCueCanvas(); });
 }
+for (const select of document.querySelectorAll<HTMLSelectElement>('[data-reusable-target]')) {
+  select.addEventListener('change', () => { reusablePickControl = null; renderCueCanvas(); });
+  select.addEventListener('keydown', (event) => {
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
+    event.preventDefault();
+    const next = event.key === 'Home' ? 0 : event.key === 'End' ? select.options.length - 1
+      : Math.max(0, Math.min(select.options.length - 1, select.selectedIndex + (event.key === 'ArrowDown' ? 1 : -1)));
+    select.selectedIndex = next; select.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+for (const button of document.querySelectorAll<HTMLButtonElement>('[data-reusable-pick]')) {
+  button.addEventListener('click', () => {
+    const form = button.closest<HTMLFormElement>('[data-cue-form]');
+    reusablePickControl = form?.elements.namedItem(button.dataset.reusablePick ?? '') as HTMLSelectElement | null;
+    renderCueCanvas();
+    announceCueStatus('Click the intended object directly on the canvas.', false);
+  });
+}
+const holdForm = document.querySelector<HTMLFormElement>('[data-cue-form="hold"]');
+const holdEnter = holdForm?.elements.namedItem('enter');
+if (holdForm && holdEnter instanceof HTMLInputElement) {
+  holdEnter.addEventListener('change', () => refreshHoldTargetOptions(holdForm));
+}
 }
 
 for (const radio of document.querySelectorAll<HTMLInputElement>('input[name="creation-target"]')) {
@@ -508,7 +547,10 @@ if (serviceClient) await refreshDurableContext();
 schedulePreviewSelection();
 setPublicationState('settled');
 document.querySelector('main')!.setAttribute('data-editor-ready', 'true');
-window.addEventListener('resize', () => { configurePreviewCanvas(); schedulePreviewSelection(); scheduleCueCanvas(); if (shotConfig) renderShotWorkspace(); });
+window.addEventListener('resize', () => {
+  if (previewStage.clientWidth <= 0) return;
+  configurePreviewCanvas(); schedulePreviewSelection(); scheduleCueCanvas(); if (shotConfig) renderShotWorkspace();
+});
 
 const inspectShotWorkspace = () => ({ open: Boolean(shotConfig), mode: shotMode, momentMs: shotMomentMs,
   selectedElementIds: [...shotSelection], revision: authoring.document.revision,
@@ -1236,20 +1278,46 @@ async function submitCueForm(form: HTMLFormElement): Promise<void> {
     ] };
   } else if (kind === 'reveal') {
     semantic = { kind, targetIds: [revealTargetId], startMs: number('start'), completeMs: number('complete') };
-  } else {
+  } else if (kind === 'click') {
     const reveal = authoring.document.cues.find((cue): cue is AuthoringCue => cue.schemaVersion === 'motion.authoring-cue.v1'
       && cue.semantic.kind === 'reveal');
     semantic = { kind, cursorTargetId, pulseTargetId, arriveMs: number('arrive'), pressMs: number('press'),
       releaseMs: number('release'), pulseEndMs: number('pulseEnd'), pressScalePpm: Math.round(number('scale') * 10_000),
       pulseRadiusPpm: Math.round(number('radius') * 1_000_000), pulseOpacityPpm: 700_000,
       ...(reveal ? { revealCueId: reveal.id } : {}) };
+  } else if (kind === 'type') {
+    semantic = { kind, targetId: String(new FormData(form).get('target')), startMs: number('start'),
+      completeMs: number('complete'), stepCount: number('stepCount') };
+  } else if (kind === 'select') {
+    const data = new FormData(form); const highlightTargetId = String(data.get('highlight') ?? '');
+    semantic = { kind, cursorTargetId: String(data.get('cursor')), selectedTargetId: String(data.get('selected')),
+      ...(highlightTargetId ? { highlightTargetId } : {}), approachMs: number('approach'), chooseMs: number('choose'),
+      settleMs: number('settle') };
+  } else if (kind === 'drag') {
+    const data = new FormData(form); const moveStartMs = number('moveStart'); const arriveMs = number('arrive');
+    const prior = existing?.semantic.kind === 'drag' ? existing.semantic : null;
+    const interior = prior ? prior.waypoints.slice(1, -1).map((point) => ({ ...point,
+      timeMs: Math.round(moveStartMs + (point.timeMs - prior.moveStartMs)
+        / (prior.arriveMs - prior.moveStartMs) * (arriveMs - moveStartMs)) })) : [{ timeMs: Math.round((moveStartMs + arriveMs) / 2),
+      xPpm: Math.round((number('startX') + number('endX')) * 5_000),
+      yPpm: Math.round((number('startY') + number('endY')) * 5_000) }];
+    semantic = { kind, cursorTargetId: String(data.get('cursor')), draggedTargetId: String(data.get('dragged')),
+      approachMs: number('approach'), pressMs: number('press'), moveStartMs, arriveMs, releaseMs: number('release'),
+      grabOffsetXPpm: Math.round(number('gripX') * 10_000), grabOffsetYPpm: Math.round(number('gripY') * 10_000),
+      waypoints: [{ timeMs: moveStartMs, xPpm: Math.round(number('startX') * 10_000), yPpm: Math.round(number('startY') * 10_000) },
+        ...interior, { timeMs: arriveMs, xPpm: Math.round(number('endX') * 10_000), yPpm: Math.round(number('endY') * 10_000) }] };
+  } else {
+    const enterMs = number('enter'); const durationMs = number('duration');
+    semantic = { kind, targetIds: new FormData(form).getAll('target').map(String), enterMs, durationMs,
+      exitMs: enterMs + durationMs };
   }
   const intent: OperationIntentPayload = existing
     ? { kind: 'motion.cue.update', cueId: existing.id, semantic }
     : { kind: 'motion.cue.create', creationKey: `editor-${kind}`, semantic };
   const result = await prepareAndDispatchIntent(intent);
   if (result.ok) { cueEditingKind = null; renderCueCanvas(); }
-  announceCueStatus(result.ok ? `${kind === 'cursor-path' ? 'Cursor path' : kind === 'click' ? 'Click' : 'Reveal'} ${existing ? 'updated' : 'created'} at revision ${authoring.document.revision}.`
+  const label = kind === 'cursor-path' ? 'Cursor path' : kind[0]!.toUpperCase() + kind.slice(1);
+  announceCueStatus(result.ok ? `${label} ${existing ? 'updated' : 'created'} at revision ${authoring.document.revision}.`
     : cueDiagnosticMessage(result.code ?? 'UNKNOWN', kind), !result.ok, result.ok ? undefined : result.code);
 }
 
@@ -1257,7 +1325,8 @@ function renderAuthoredCues(): void {
   reconcileCueEditingProjection();
   const container = required<HTMLElement>('[data-authored-cues]'); container.replaceChildren();
   const createLabels: Record<CueSemantic['kind'], string> = {
-    'cursor-path': 'Create cursor path', reveal: 'Create reveal', click: 'Create click',
+    'cursor-path': 'Create cursor path', reveal: 'Create reveal', click: 'Create click', type: 'Create type',
+    select: 'Create select', drag: 'Create drag', hold: 'Create hold',
   };
   for (const form of document.querySelectorAll<HTMLFormElement>('[data-cue-form]')) {
     form.querySelector('button[type="submit"]')!.textContent = createLabels[form.dataset.cueForm as CueSemantic['kind']];
@@ -1307,12 +1376,32 @@ function hydrateCueForm(form: HTMLFormElement, semantic: CueSemantic): void {
   } else if (semantic.kind === 'reveal') {
     required<HTMLSelectElement>('[data-cue-reveal]').value = semantic.targetIds[0]!;
     set('start', semantic.startMs); set('complete', semantic.completeMs);
-  } else {
+  } else if (semantic.kind === 'click') {
     required<HTMLSelectElement>('[data-cue-cursor]').value = semantic.cursorTargetId;
     required<HTMLSelectElement>('[data-cue-pulse]').value = semantic.pulseTargetId;
     set('arrive', semantic.arriveMs); set('press', semantic.pressMs); set('release', semantic.releaseMs);
     set('pulseEnd', semantic.pulseEndMs); set('scale', semantic.pressScalePpm / 10_000);
     set('radius', semantic.pulseRadiusPpm / 1_000_000);
+  } else if (semantic.kind === 'type') {
+    (form.elements.namedItem('target') as HTMLSelectElement).value = semantic.targetId;
+    set('start', semantic.startMs); set('complete', semantic.completeMs); set('stepCount', semantic.stepCount);
+  } else if (semantic.kind === 'select') {
+    (form.elements.namedItem('cursor') as HTMLSelectElement).value = semantic.cursorTargetId;
+    (form.elements.namedItem('selected') as HTMLSelectElement).value = semantic.selectedTargetId;
+    (form.elements.namedItem('highlight') as HTMLSelectElement).value = semantic.highlightTargetId ?? '';
+    set('approach', semantic.approachMs); set('choose', semantic.chooseMs); set('settle', semantic.settleMs);
+  } else if (semantic.kind === 'drag') {
+    (form.elements.namedItem('cursor') as HTMLSelectElement).value = semantic.cursorTargetId;
+    (form.elements.namedItem('dragged') as HTMLSelectElement).value = semantic.draggedTargetId;
+    set('approach', semantic.approachMs); set('press', semantic.pressMs); set('moveStart', semantic.moveStartMs);
+    set('arrive', semantic.arriveMs); set('release', semantic.releaseMs); set('gripX', semantic.grabOffsetXPpm / 10_000);
+    set('gripY', semantic.grabOffsetYPpm / 10_000); set('startX', semantic.waypoints[0]!.xPpm / 10_000);
+    set('startY', semantic.waypoints[0]!.yPpm / 10_000); set('endX', semantic.waypoints.at(-1)!.xPpm / 10_000);
+    set('endY', semantic.waypoints.at(-1)!.yPpm / 10_000);
+  } else {
+    const target = form.elements.namedItem('target') as HTMLSelectElement;
+    for (const option of target.options) option.selected = semantic.targetIds.includes(option.value);
+    set('enter', semantic.enterMs); set('duration', semantic.durationMs);
   }
 }
 
@@ -1372,14 +1461,15 @@ function renderCueCanvas(): void {
   const authoredKinds = new Set(authoring.document.cues.filter((cue): cue is AuthoringCue => cue.schemaVersion === 'motion.authoring-cue.v1')
     .map((cue) => cue.semantic.kind));
   reconcileCueEditingProjection();
-  if (!missingCueTarget(selections) && !authoredKinds.has('cursor-path') && !cuePathDefaultsInitialized) initializeCuePathDefaults(selections);
-  const detachedKind = (['cursor-path', 'reveal', 'click'] as const).find((kind) => detachedCueKinds.has(kind) && !authoredKinds.has(kind));
-  const missingRole = (['cursor', 'pulse', 'reveal'] as const).find((role) => !selections.get(role));
+  if (!reusableCueWorkspace && !missingCueTarget(selections) && !authoredKinds.has('cursor-path') && !cuePathDefaultsInitialized) initializeCuePathDefaults(selections);
+  const cueSequence: CueSemantic['kind'][] = reusableCueWorkspace ? ['hold', 'type', 'select', 'drag']
+    : ['cursor-path', 'reveal', 'click'];
+  const detachedKind = cueSequence.find((kind) => detachedCueKinds.has(kind) && !authoredKinds.has(kind));
+  const missingRole = reusableCueWorkspace ? undefined : (['cursor', 'pulse', 'reveal'] as const).find((role) => !selections.get(role));
   if (!cuePickRole && missingRole) cuePickRole = missingRole;
   const workflowStep = cueEditingKind ?? missingRole ? (cueEditingKind ? `edit-${cueEditingKind}` : `pick-${missingRole}`)
     : detachedKind ? `detached-${detachedKind}`
-    : !authoredKinds.has('cursor-path') ? 'cursor-path'
-      : !authoredKinds.has('reveal') ? 'reveal' : !authoredKinds.has('click') ? 'click' : 'complete';
+    : cueSequence.find((kind) => !authoredKinds.has(kind)) ?? 'complete';
   cueWorkspace.dataset.step = workflowStep;
   const guidance: Record<string, string> = {
     'pick-cursor': 'The canvas is active. Click the object that should move as the cursor.', 'pick-pulse': 'Now click the object the cursor should press.',
@@ -1391,13 +1481,18 @@ function renderCueCanvas(): void {
     'detached-click': 'The click response is now ordinary motion and still compiles exactly as before. Use Undo to restore guided editing.',
     'edit-cursor-path': 'Adjust the cursor movement, then save your changes.', 'edit-reveal': 'Adjust the reveal timing, then save your changes.',
     'edit-click': 'Adjust the click response, then save your changes.',
+    type: 'Choose existing text, then add a stepped reveal.', select: 'Choose the cursor, selected object, and optional highlight.',
+    drag: 'Choose the cursor and dragged object, then set their shared path.', hold: 'Choose animated motion with an explicit enter boundary.',
+    'edit-type': 'Adjust the text reveal, then save your changes.', 'edit-select': 'Adjust the selection choreography, then save your changes.',
+    'edit-drag': 'Adjust the coordinated drag, then save your changes.', 'edit-hold': 'Adjust the hold duration, then save your changes.',
   };
   required<HTMLElement>('[data-cue-guidance]').textContent = guidance[workflowStep] ?? guidance.complete!;
   required<HTMLElement>('#cue-workspace-heading').textContent = workflowStep === 'pick-cursor' ? 'Choose the moving cursor object'
     : workflowStep === 'pick-pulse' ? 'Click the destination object' : workflowStep === 'pick-reveal' ? 'Click the content to reveal'
       : workflowStep === 'cursor-path' ? 'Shape the cursor movement' : workflowStep === 'reveal' ? 'Add the reveal'
         : workflowStep === 'click' ? 'Add the click response' : workflowStep === 'complete' ? 'Interaction ready'
-          : workflowStep.startsWith('detached-') ? 'Guided editing detached' : 'Edit the interaction';
+          : workflowStep.startsWith('detached-') ? 'Guided editing detached'
+            : reusableCueWorkspace && !workflowStep.startsWith('edit-') ? `Add ${workflowStep}` : 'Edit the interaction';
   required<HTMLElement>('[data-cue-progress-count]').textContent = workflowStep === 'complete' ? 'Ready'
     : workflowStep.startsWith('edit-') ? 'Editing' : missingRole ? 'Choose objects' : 'Build motion';
   required<HTMLElement>('.preview-title p').textContent = workflowStep.startsWith('pick-')
@@ -1428,8 +1523,107 @@ function renderCueCanvas(): void {
   required<HTMLButtonElement>('[data-cue-form="cursor-path"] button[type="submit"]').disabled = !cursorSelected || detachedKind === 'cursor-path';
   required<HTMLButtonElement>('[data-cue-form="reveal"] button[type="submit"]').disabled = !revealSelected || detachedKind === 'reveal';
   required<HTMLButtonElement>('[data-cue-form="click"] button[type="submit"]').disabled = !(cursorSelected && pulseSelected) || detachedKind === 'click';
-  renderCueTargetOverlay(selections);
-  void renderCuePathOverlay(++cueCanvasGeneration);
+  if (reusableCueWorkspace) {
+    required<HTMLElement>('.cue-role-step').hidden = true;
+    renderReusableTargetOverlay();
+    void renderCuePathOverlay(++cueCanvasGeneration);
+    for (const kind of ['type', 'select', 'drag', 'hold'] as const) {
+      const button = required<HTMLButtonElement>(`[data-cue-form="${kind}"] button[type="submit"]`);
+      const selects = [...required<HTMLFormElement>(`[data-cue-form="${kind}"]`).querySelectorAll<HTMLSelectElement>('select[required], select[data-reusable-target]')];
+      button.disabled = selects.some((select) => select.name !== 'highlight' && !select.value) || detachedKind === kind;
+    }
+  } else {
+    renderCueTargetOverlay(selections);
+    void renderCuePathOverlay(++cueCanvasGeneration);
+  }
+}
+
+function renderReusableTargetOverlay(): void {
+  if (!cueTargetOverlay) return;
+  cueTargetOverlay.replaceChildren();
+  if (!reusablePickControl) { cueTargetOverlay.hidden = true; cueTargetOverlay.dataset.picking = 'false'; return; }
+  const allowed = new Set([...reusablePickControl.options].map((option) => option.value).filter(Boolean));
+  const entries = authoring.document.elements.map((element) => ({ elementId: element.id, bounds: cueVisualBounds(element.id) }))
+    .filter((entry): entry is { elementId: string; bounds: ProjectionRect } => allowed.has(entry.elementId) && Boolean(entry.bounds))
+    .sort((left, right) => left.elementId.localeCompare(right.elementId));
+  for (const [index, entry] of entries.entries()) {
+    const marker = document.createElement('span'); marker.className = 'cue-target-candidate';
+    marker.dataset.cueTargetCandidate = ''; marker.dataset.elementId = entry.elementId; marker.dataset.objectLabel = `Object ${index + 1}`;
+    Object.assign(marker.style, { left: `${entry.bounds.left}px`, top: `${entry.bounds.top}px`,
+      width: `${entry.bounds.width}px`, height: `${entry.bounds.height}px` });
+    cueTargetOverlay.append(marker);
+  }
+  cueTargetOverlay.dataset.candidateCount = String(entries.length); cueTargetOverlay.dataset.picking = 'true'; cueTargetOverlay.hidden = false;
+  cueTargetOverlay.onclick = (event) => {
+    const overlayRect = cueTargetOverlay.getBoundingClientRect(); const source = controller.sourceSize();
+    const x = (event.clientX - overlayRect.left) * source.widthCssPixels / overlayRect.width;
+    const y = (event.clientY - overlayRect.top) * source.heightCssPixels / overlayRect.height;
+    const hits = entries.filter(({ bounds }) => x >= bounds.left && x <= bounds.right && y >= bounds.top && y <= bounds.bottom);
+    const commit = (elementId: string) => {
+      if (!reusablePickControl) return;
+      if (reusablePickControl.multiple) for (const option of reusablePickControl.options)
+        option.selected = option.selected || option.value === elementId;
+      else reusablePickControl.value = elementId;
+      reusablePickControl.dispatchEvent(new Event('change', { bubbles: true })); announceCueStatus('Canvas target selected.', false);
+    };
+    if (hits.length === 0) { announceCueStatus('No eligible object is under that point.', true); return; }
+    if (hits.length === 1) { commit(hits[0]!.elementId); return; }
+    const chooser = document.createElement('div'); chooser.className = 'cue-target-disambiguation'; chooser.dataset.cueTargetDisambiguation = '';
+    Object.assign(chooser.style, { left: `${x}px`, top: `${y}px` });
+    for (const hit of hits) { const choice = document.createElement('button'); choice.type = 'button'; choice.dataset.cueTargetChoice = '';
+      choice.dataset.elementId = hit.elementId; choice.textContent = 'Choose object';
+      choice.addEventListener('click', (choiceEvent) => { choiceEvent.stopPropagation(); commit(hit.elementId); }); chooser.append(choice); }
+    cueTargetOverlay.append(chooser);
+  };
+}
+
+function holdTargetOptions(enterMs: number): string {
+  const attached = authoring.document.cues.find((cue): cue is AuthoringCue => cue.schemaVersion === 'motion.authoring-cue.v1'
+    && cue.semantic.kind === 'hold');
+  const attachedIds = new Set(attached?.semantic.kind === 'hold' && attachedHoldSupportsBoundary(attached, enterMs)
+    ? attached.semantic.targetIds : []);
+  const eligibilityCueId = deriveCueId(authoring.document.documentId, 'editor-hold-target-eligibility');
+  return authoring.document.elements.flatMap((element, index) => {
+    const semantic: CueSemantic = { kind: 'hold', targetIds: [element.id], enterMs, durationMs: 1, exitMs: enterMs + 1 };
+    return attachedIds.has(element.id) || projectCueReplacement(authoring.document, eligibilityCueId, semantic).ok
+      ? [`<option value="${element.id}">Motion ${index + 1}</option>`] : [];
+  }).join('');
+}
+
+function attachedHoldSupportsBoundary(cue: AuthoringCue, enterMs: number): boolean {
+  if (cue.semantic.kind !== 'hold' || !cue.replacement) return false;
+  const contributingIds = new Set(cue.replacement.tracks.map((track) => track.elementId));
+  if (cue.semantic.targetIds.some((targetId) => !contributingIds.has(targetId))) return false;
+  return cue.replacement.tracks.every((sourceTrack) => {
+    const application = cue.replacement!.applications.find((candidate) => candidate.slots.some((slot) => slot.id === sourceTrack.slotId));
+    const slotIndex = application?.slots.findIndex((slot) => slot.id === sourceTrack.slotId) ?? -1;
+    const slot = application?.slots[slotIndex];
+    const binding = application?.bindings.find((candidate) => candidate.elementId === sourceTrack.elementId);
+    const ruleTrack = cue.replacement!.rules.find((rule) => rule.id === sourceTrack.ruleId)?.tracks
+      .find((track) => track.property === sourceTrack.property);
+    return Boolean(slot && binding && ruleTrack?.keyframes.some((frame) =>
+      binding.delayOverridesMs[slotIndex]! + frame.offset * slot.durationMs === enterMs));
+  });
+}
+
+function refreshHoldTargetOptions(form: HTMLFormElement): void {
+  const target = form.elements.namedItem('target') as HTMLSelectElement;
+  const attached = authoring.document.cues.find((cue): cue is AuthoringCue => cue.schemaVersion === 'motion.authoring-cue.v1'
+    && cue.semantic.kind === 'hold');
+  const selected = new Set(attached?.semantic.kind === 'hold' ? attached.semantic.targetIds
+    : [...target.selectedOptions].map((option) => option.value));
+  const enterMs = Number((form.elements.namedItem('enter') as HTMLInputElement).value);
+  target.innerHTML = `<option value="">Choose motion on canvas</option>${holdTargetOptions(enterMs)}`;
+  for (const option of target.options) option.selected = selected.has(option.value);
+  reusablePickControl = null; renderCueCanvas();
+  if (attached?.semantic.kind === 'hold') {
+    const retained = attached.semantic.targetIds.every((targetId) => [...target.selectedOptions]
+      .some((option) => option.value === targetId));
+    announceCueStatus(retained
+      ? `Hold targets remain available at the explicit ${enterMs} ms boundary.`
+      : `No complete Hold boundary exists at ${enterMs} ms. Existing Hold remains unchanged at revision ${authoring.document.revision}.`,
+    !retained);
+  }
 }
 
 function missingCueTarget(selections: Map<CueCanvasRole, string>): boolean {
@@ -1528,18 +1722,19 @@ function renderCueTargetOverlay(selections: Map<CueCanvasRole, string>): void {
 async function renderCuePathOverlay(generation: number): Promise<void> {
   if (!cuePathOverlay) return;
   if (controller.readState().playStates.some((playState) => playState === 'running')) return;
-  const cue = authoring.document.cues.find((candidate): candidate is CursorPathAuthoringCue => candidate.schemaVersion === 'motion.authoring-cue.v1'
-    && candidate.semantic.kind === 'cursor-path');
+  const cue = authoring.document.cues.find((candidate): candidate is PathAuthoringCue => candidate.schemaVersion === 'motion.authoring-cue.v1'
+    && (candidate.semantic.kind === 'cursor-path' || (reusableCueWorkspace && candidate.semantic.kind === 'drag')));
   cuePathOverlay.replaceChildren();
-  if (!cue || cuePickRole) {
-    required<HTMLElement>('[data-cue-path-guidance]').textContent = cuePickRole
+  if (!cue || cuePickRole || reusablePickControl) {
+    required<HTMLElement>('[data-cue-path-guidance]').textContent = cuePickRole || reusablePickControl
       ? 'Finish choosing the canvas target to edit the path.'
       : 'Pick the cursor, create its path, then drag Start and Arrive on the canvas.';
     return;
   }
   const restoreTime = controller.readState().playheadMs;
+  const pathTargetId = cue.semantic.kind === 'drag' ? cue.semantic.draggedTargetId : cue.semantic.cursorTargetId;
   const samples = cue.semantic.waypoints.map((waypoint) => {
-    controller.scrub(waypoint.timeMs); return { timeMs: waypoint.timeMs, bounds: cueVisualBounds(cue.semantic.cursorTargetId) };
+    controller.scrub(waypoint.timeMs); return { timeMs: waypoint.timeMs, bounds: cueVisualBounds(pathTargetId) };
   });
   controller.scrub(restoreTime);
   if (generation !== cueCanvasGeneration) return;
@@ -1603,7 +1798,7 @@ function refreshCuePathSegments(): void {
   }
 }
 
-function beginCuePathDrag(event: PointerEvent, cue: CursorPathAuthoringCue, waypointIndex: number): void {
+function beginCuePathDrag(event: PointerEvent, cue: PathAuthoringCue, waypointIndex: number): void {
   if (event.button !== 0) return;
   const projection = readShotProjection(); if (!projection) return;
   const surface = event.currentTarget as HTMLButtonElement; const start = { clientX: event.clientX, clientY: event.clientY };

@@ -35,7 +35,8 @@ declare global {
         activeDraft: null | { commandBytes: string; compiledHtml: string; exportDigest: string; operation: AuthoringOperation } };
       inspectCueWorkspace: () => { active: boolean; pickRole: 'cursor' | 'pulse' | 'reveal' | null;
         selectedRoles: { cursor: boolean; pulse: boolean; reveal: boolean }; targetCandidateCount: number; pathHandleCount: number;
-        authoredCues: Array<{ kind: 'cursor-path' | 'click' | 'reveal'; semantic: unknown; generatedTrackCount: number }> };
+        authoredCues: Array<{ kind: 'cursor-path' | 'click' | 'reveal' | 'type' | 'select' | 'drag' | 'hold';
+          semantic: unknown; generatedTrackCount: number }> };
       inspectCollaboration: () => {
         workspace: import('../../../packages/domain/src/index.ts').WorkspaceProjection | null;
         branches: import('../../../packages/motion-protocol/src/index.ts').BranchList | null;

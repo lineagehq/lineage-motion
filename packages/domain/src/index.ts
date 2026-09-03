@@ -15,7 +15,8 @@ export {
 } from './css-motion-semantics.js';
 import { sha256Hex } from './sha256.js';
 import {
-  CUE_GENERATOR_ID, CUE_GENERATOR_VERSION, cueExpansionInput, cueFromExpansion,
+  CUE_GENERATOR_ID, CUE_GENERATOR_VERSION, REUSABLE_CUE_GENERATOR_ID, REUSABLE_CUE_GENERATOR_VERSION,
+  cueExpansionInput, cueFromExpansion,
   cueTargetSnapshots, deriveCueId, expandCue, isAuthoringCue, replacementInputDigest,
   type AuthoringCue, type CueOwnership, type CueReplacementBundle, type CueSemantic,
   type CueTargetSnapshot,
@@ -234,8 +235,8 @@ const motionDocumentSchema = z.object({
     cueOwnership: z.object({
       schemaVersion: z.literal('motion.cue-ownership.v1'),
       cueId: identifier,
-      generatorId: z.literal(CUE_GENERATOR_ID),
-      generatorVersion: z.literal(CUE_GENERATOR_VERSION),
+      generatorId: z.union([z.literal(CUE_GENERATOR_ID), z.literal(REUSABLE_CUE_GENERATOR_ID)]),
+      generatorVersion: z.union([z.literal(CUE_GENERATOR_VERSION), z.literal(REUSABLE_CUE_GENERATOR_VERSION)]),
       targetRoleOrdinal: z.number().int().nonnegative(),
       expansionDigest: z.string().regex(/^[a-f0-9]{64}$/),
     }).optional(),
@@ -548,7 +549,10 @@ function validateAttachedCues(document: MotionDocument): string | null {
 
 function maximumCueMoment(semantic: CueSemantic): number {
   return semantic.kind === 'cursor-path' ? semantic.arriveMs
-    : semantic.kind === 'click' ? semantic.pulseEndMs : semantic.completeMs;
+    : semantic.kind === 'click' ? semantic.pulseEndMs
+      : semantic.kind === 'reveal' || semantic.kind === 'type' ? semantic.completeMs
+        : semantic.kind === 'select' ? semantic.settleMs
+          : semantic.kind === 'drag' ? semantic.releaseMs : semantic.exitMs;
 }
 
 export function canonicalBytes(document: MotionDocument): Uint8Array {
@@ -911,6 +915,7 @@ function applyCueOperation(
     next.applications.push(...structuredClone(expansion.applications));
     next.tracks.push(...structuredClone(expansion.tracks));
     next.cues.push(cue);
+    if (cue.semantic.kind === 'hold') next.durationMs += cue.semantic.durationMs;
     refreshInventory(next);
     if (cue.semantic.kind === 'click' && cue.semantic.revealCueId) {
       const revealCueId = cue.semantic.revealCueId;
@@ -947,6 +952,9 @@ function applyCueOperation(
     if (hasCueCollision(next, expansion.rules, expansion.applications, expansion.tracks)) return fail('CUE_ID_COLLISION');
     if (hasPropertyOverlap(next, expansion.tracks)) return fail('CUE_PROPERTY_OVERLAP');
     Object.assign(nextCue, cueFromExpansion(expansion, cue.replacement));
+    if (cue.semantic.kind === 'hold' && operation.payload.semantic.kind === 'hold') {
+      next.durationMs += operation.payload.semantic.durationMs - cue.semantic.durationMs;
+    }
     next.rules.push(...structuredClone(expansion.rules)); next.applications.push(...structuredClone(expansion.applications));
     next.tracks.push(...structuredClone(expansion.tracks)); refreshInventory(next);
     if (nextCue.semantic.kind === 'click' && nextCue.semantic.revealCueId) {
@@ -958,19 +966,24 @@ function applyCueOperation(
     return cueResult(before, next, operation);
   }
 
+  if (operation.kind === 'motion.cue.detach') {
+    next.cues = next.cues.filter((candidate) => candidate.id !== cue.id);
+    for (const track of next.tracks.filter((candidate) => cue.generatedTrackIds.includes(candidate.id))) {
+      delete track.cueOwnership;
+    }
+    refreshInventory(next);
+    return cueResult(before, next, operation);
+  }
+
   removeGeneratedBundle(next, cue);
   next.cues = next.cues.filter((candidate) => candidate.id !== cue.id);
+  if (operation.kind === 'motion.cue.delete' && cue.semantic.kind === 'hold') next.durationMs -= cue.semantic.durationMs;
   if (operation.kind === 'motion.cue.delete' && cue.replacement) {
     if (hasCueCollision(next, cue.replacement.rules, cue.replacement.applications, cue.replacement.tracks)) return fail('CUE_RESTORE_COLLISION');
     if (hasPropertyOverlap(next, cue.replacement.tracks)) return fail('CUE_RESTORE_OVERLAP');
     next.rules.push(...structuredClone(cue.replacement.rules));
     next.applications.push(...structuredClone(cue.replacement.applications));
     next.tracks.push(...structuredClone(cue.replacement.tracks));
-  } else if (operation.kind === 'motion.cue.detach') {
-    next.rules.push(...cue.generatedRuleIds.map((id) => structuredClone(document.rules.find((rule) => rule.id === id)!)));
-    next.applications.push(...cue.generatedApplicationIds.map((id) => structuredClone(document.applications.find((application) => application.id === id)!)));
-    next.tracks.push(...cue.generatedTrackIds.map((id) => document.tracks.find((track) => track.id === id)!)
-      .map((track) => { const detached = structuredClone(track); delete detached.cueOwnership; return detached; }));
   }
   refreshInventory(next);
   return cueResult(before, next, operation);
@@ -1006,6 +1019,33 @@ function collectReplacementBundle(document: MotionDocument, trackIds: string[]):
 export function projectCueReplacement(document: MotionDocument, cueId: string, semantic: CueSemantic):
   { ok: true; trackIds: string[]; inputDigest: string | null } | { ok: false; code: string } {
   try {
+    if (semantic.kind === 'hold') {
+      const initial = document.tracks.filter((track) => semantic.targetIds.includes(track.elementId)).map((track) => track.id);
+      const contributingTargetIds = new Set(document.tracks.filter((track) => initial.includes(track.id))
+        .map((track) => track.elementId));
+      if (semantic.targetIds.some((targetId) => !contributingTargetIds.has(targetId))) {
+        return { ok: false, code: 'CUE_HOLD_TARGET_UNANIMATED' };
+      }
+      const projected = collectReplacementBundle(document, closedReplacementTrackIds(document, initial).trackIds);
+      if (!projected.ok || !projected.bundle) return projected.ok
+        ? { ok: false, code: 'CUE_REPLACEMENT_INVALID' } : projected;
+      for (const sourceTrack of projected.bundle.tracks) {
+        const application: MotionDocument['applications'][number] | undefined = projected.bundle.applications
+          .find((candidate: MotionDocument['applications'][number]) => candidate.slots.some((slot) => slot.id === sourceTrack.slotId));
+        const slotIndex = application?.slots.findIndex((slot: MotionDocument['applications'][number]['slots'][number]) =>
+          slot.id === sourceTrack.slotId) ?? -1;
+        const slot = application?.slots[slotIndex];
+        const binding = application?.bindings.find((candidate: MotionDocument['applications'][number]['bindings'][number]) =>
+          candidate.elementId === sourceTrack.elementId);
+        const ruleTrack = projected.bundle.rules.find((rule) => rule.id === sourceTrack.ruleId)?.tracks
+          .find((track) => track.property === sourceTrack.property);
+        if (!slot || !binding || !ruleTrack || !ruleTrack.keyframes.some((frame) =>
+          binding.delayOverridesMs[slotIndex]! + frame.offset * slot.durationMs === semantic.enterMs)) {
+          return { ok: false, code: 'CUE_HOLD_ENTER_BOUNDARY_MISSING' };
+        }
+      }
+      return { ok: true, trackIds: projected.bundle.trackIds, inputDigest: projected.bundle.inputDigest };
+    }
     const expansion = expandCue(cueExpansionInput(cueId, semantic, cueTargetSnapshots(document, semantic)));
     const initial = document.tracks.filter((track) => expansion.tracks.some((generated) =>
       generated.elementId === track.elementId && generated.property === track.property)).map((track) => track.id);
@@ -1190,8 +1230,14 @@ function stageFromViewport(exportDigest: string, viewport: { widthCssPixels: num
 }
 
 function semanticElementIds(semantic: CueSemantic): string[] {
-  return [...new Set(semantic.kind === 'reveal' ? semantic.targetIds : semantic.kind === 'cursor-path'
-    ? [semantic.cursorTargetId] : [semantic.cursorTargetId, semantic.pulseTargetId])].sort();
+  const ids = semantic.kind === 'reveal' || semantic.kind === 'hold' ? semantic.targetIds
+    : semantic.kind === 'type' ? [semantic.targetId]
+      : semantic.kind === 'cursor-path' ? [semantic.cursorTargetId]
+        : semantic.kind === 'click' ? [semantic.cursorTargetId, semantic.pulseTargetId]
+          : semantic.kind === 'select' ? [semantic.cursorTargetId, semantic.selectedTargetId,
+            ...(semantic.highlightTargetId ? [semantic.highlightTargetId] : [])]
+            : [semantic.cursorTargetId, semantic.draggedTargetId];
+  return [...new Set(ids)].sort();
 }
 
 function closedReplacementTrackIds(document: MotionDocument, initialTrackIds: string[]): {
@@ -2224,16 +2270,37 @@ function validCueSemanticRecord(value: unknown): value is CueSemantic {
       && typeof semantic.pulseTargetId === 'string' && (!('revealCueId' in semantic) || typeof semantic.revealCueId === 'string')
       && allInteger(['arriveMs', 'pressMs', 'releaseMs', 'pulseEndMs', 'pressScalePpm', 'pulseRadiusPpm', 'pulseOpacityPpm']);
   }
-  return semantic.kind === 'reveal' && hasExactObjectKeys(semantic, ['kind', 'targetIds', 'startMs', 'completeMs'])
+  if (semantic.kind === 'reveal') return hasExactObjectKeys(semantic, ['kind', 'targetIds', 'startMs', 'completeMs'])
     && Array.isArray(semantic.targetIds) && semantic.targetIds.every((id) => typeof id === 'string')
     && allInteger(['startMs', 'completeMs']);
+  if (semantic.kind === 'type') return hasExactObjectKeys(semantic, ['kind', 'targetId', 'startMs', 'completeMs', 'stepCount'])
+    && typeof semantic.targetId === 'string' && allInteger(['startMs', 'completeMs', 'stepCount']);
+  if (semantic.kind === 'select') {
+    const keys = ['kind', 'cursorTargetId', 'selectedTargetId', 'approachMs', 'chooseMs', 'settleMs'];
+    if ('highlightTargetId' in semantic) keys.push('highlightTargetId');
+    return hasExactObjectKeys(semantic, keys) && typeof semantic.cursorTargetId === 'string'
+      && typeof semantic.selectedTargetId === 'string'
+      && (!('highlightTargetId' in semantic) || typeof semantic.highlightTargetId === 'string')
+      && allInteger(['approachMs', 'chooseMs', 'settleMs']);
+  }
+  if (semantic.kind === 'drag') return hasExactObjectKeys(semantic, ['kind', 'cursorTargetId', 'draggedTargetId',
+    'approachMs', 'pressMs', 'moveStartMs', 'arriveMs', 'releaseMs', 'grabOffsetXPpm', 'grabOffsetYPpm', 'waypoints'])
+    && typeof semantic.cursorTargetId === 'string' && typeof semantic.draggedTargetId === 'string'
+    && allInteger(['approachMs', 'pressMs', 'moveStartMs', 'arriveMs', 'releaseMs', 'grabOffsetXPpm', 'grabOffsetYPpm'])
+    && Array.isArray(semantic.waypoints) && semantic.waypoints.every((point) => { const record = plainRecord(point); return record
+      && hasExactObjectKeys(record, ['timeMs', 'xPpm', 'yPpm']) && Object.values(record).every(Number.isSafeInteger); });
+  return semantic.kind === 'hold' && hasExactObjectKeys(semantic, ['kind', 'targetIds', 'enterMs', 'durationMs', 'exitMs'])
+    && Array.isArray(semantic.targetIds) && semantic.targetIds.every((id) => typeof id === 'string')
+    && allInteger(['enterMs', 'durationMs', 'exitMs']);
 }
 
 function validCueTargetSnapshotRecords(value: unknown): value is CueTargetSnapshot[] {
   return Array.isArray(value) && value.every((snapshot) => { const record = plainRecord(snapshot); return record
-    && hasExactObjectKeys(record, ['role', 'ordinal', 'elementId', 'structuralFingerprint'])
+    && hasExactObjectKeys(record, record.contentKind === undefined
+      ? ['role', 'ordinal', 'elementId', 'structuralFingerprint']
+      : ['role', 'ordinal', 'elementId', 'structuralFingerprint', 'contentKind'])
     && typeof record.role === 'string' && Number.isSafeInteger(record.ordinal) && typeof record.elementId === 'string'
-    && typeof record.structuralFingerprint === 'string'; });
+    && typeof record.structuralFingerprint === 'string' && (record.contentKind === undefined || record.contentKind === 'text'); });
 }
 
 function isDigest(value: unknown): value is string { return typeof value === 'string' && /^[a-f0-9]{64}$/.test(value); }
