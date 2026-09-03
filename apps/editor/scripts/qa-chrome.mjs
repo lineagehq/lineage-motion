@@ -1146,16 +1146,22 @@ async function runCanvasFirstUxQa(repositoryRoot) {
     await page.locator('[data-play]').click(); await page.waitForTimeout(80); await page.locator('[data-pause]').click();
     const visibleMoments = await page.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number(input.value)));
     let nativeScrubSynchronized = true;
+    const nativeAligned = (requestedTimeMs, distinctFromTimeMs = null) => page.evaluate(({ requestedTimeMs, distinctFromTimeMs }) => {
+      const frame = document.querySelector('[data-preview]'); const animations = frame.contentDocument.getAnimations();
+      return animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation'
+        && animation.effect?.constructor.name === 'KeyframeEffect' && animation.timeline?.constructor.name === 'DocumentTimeline'
+        && animation.playState === 'paused' && typeof animation.currentTime === 'number'
+        && Math.abs(animation.currentTime - requestedTimeMs) <= .001
+        && (distinctFromTimeMs === null || Math.abs(animation.currentTime - distinctFromTimeMs) > .001));
+    }, { requestedTimeMs, distinctFromTimeMs });
+    let priorNativeTimeMs = visibleMoments[0] === 0 ? 1 : 0;
+    await page.locator('[data-scrub]').fill(String(priorNativeTimeMs));
+    nativeScrubSynchronized &&= await nativeAligned(priorNativeTimeMs, visibleMoments[0]);
     for (const moment of visibleMoments) {
-      await page.locator(`input[name="shot-moment"][value="${moment}"]`).check();
+      nativeScrubSynchronized &&= await nativeAligned(priorNativeTimeMs, moment);
       await page.locator('[data-scrub]').fill(String(moment));
-      nativeScrubSynchronized &&= await page.evaluate((requestedTimeMs) => { const frame = document.querySelector('[data-preview]');
-        const animations = frame.contentDocument.getAnimations();
-        return animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation'
-          && animation.effect?.constructor.name === 'KeyframeEffect' && animation.timeline?.constructor.name === 'DocumentTimeline'
-          && animation.playState === 'paused' && typeof animation.currentTime === 'number'
-          && Math.abs(animation.currentTime - requestedTimeMs) <= .001);
-      }, moment);
+      nativeScrubSynchronized &&= await nativeAligned(moment);
+      priorNativeTimeMs = moment;
     }
 
     const geometry = () => page.evaluate(() => ['.preview-stage', '[data-preview]', '[data-preview-canvas]', '[data-preview-object-overlay]',

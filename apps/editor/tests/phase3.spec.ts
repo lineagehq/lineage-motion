@@ -462,14 +462,21 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   await page.locator('input[name="shot-moment"][value="700"]').check();
   await page.evaluate(() => { const handles = [...document.querySelectorAll<HTMLElement>('[data-trajectory-overlay] [data-keyframe-id]')];
     (window as unknown as { __alignmentNodes: Map<string, HTMLElement> }).__alignmentNodes = new Map(handles.map((handle) => [handle.dataset.keyframeId!, handle])); });
+  let priorNativeTimeMs = 700;
   for (const timeMs of [0, 700, 2100, 700]) {
-    await page.locator(`input[name="shot-moment"][value="${timeMs}"]`).check();
+    expect(await page.evaluate(({ priorNativeTimeMs, targetTimeMs }) => { const animations = document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument!.getAnimations();
+      return animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation' && animation.effect?.constructor.name === 'KeyframeEffect'
+        && animation.timeline?.constructor.name === 'DocumentTimeline' && animation.playState === 'paused' && typeof animation.currentTime === 'number'
+        && Math.abs(animation.currentTime - priorNativeTimeMs) <= .001 && Math.abs(animation.currentTime - targetTimeMs) > .001);
+    }, { priorNativeTimeMs, targetTimeMs: timeMs })).toBe(true);
+    await page.locator('[data-scrub]').fill(String(timeMs));
     expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: timeMs, currentTimes: [timeMs, timeMs],
-      playStates: ['paused', 'paused'] }, slider: timeMs, visibleTime: `${timeMs} ms`, selectedMoment: timeMs });
+      playStates: ['paused', 'paused'] }, slider: timeMs, visibleTime: `${timeMs} ms`, selectedMoment: 700 });
     expect(await page.evaluate((requestedTimeMs) => { const animations = document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument!.getAnimations();
       return animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation' && animation.effect?.constructor.name === 'KeyframeEffect'
         && animation.timeline?.constructor.name === 'DocumentTimeline' && animation.playState === 'paused'
         && typeof animation.currentTime === 'number' && Math.abs(animation.currentTime - requestedTimeMs) <= .001); }, timeMs)).toBe(true);
+    priorNativeTimeMs = timeMs;
   }
   await page.locator('[data-trajectory-overlay] [data-keyframe-id][data-time-ms="0"]').click();
   expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: 0, currentTimes: [0, 0],
