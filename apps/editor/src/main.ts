@@ -189,10 +189,10 @@ document.body.innerHTML = `
           <p class="shot-guidance visually-hidden" data-shot-guidance role="note"></p>
           <section class="shot-context-dock" data-shot-context-dock aria-label="Selected moment controls">
             <section class="moment-editor" aria-labelledby="moment-editor-heading">
-              <div class="moment-heading"><div><strong id="moment-editor-heading">Moments</strong><span>Select a moment. Use + to add a point.</span></div><button type="button" data-shot-remove-moment disabled>Remove point</button></div>
-              <div class="moment-transition" data-shot-moment-transition><label><span>When this moment happens</span><input data-shot-moment-time type="range" min="1" max="2099" step="1"><output data-shot-moment-time-output></output></label><label><span>Movement after this moment</span><select data-shot-easing><option value="custom" disabled>Custom</option><option value="ease">Smooth</option><option value="ease-out">Glide in</option><option value="ease-in">Build speed</option><option value="ease-in-out">Soft in &amp; out</option><option value="linear">Constant speed</option></select></label><button type="button" data-shot-apply-easing>Apply movement</button></div>
+              <div class="moment-heading"><div><strong id="moment-editor-heading" data-shot-context-name>Moments</strong><span>Select a moment. Use + to add a point.</span></div><button type="button" data-shot-context-remove data-shot-remove-moment disabled>Remove point</button></div>
+              <div class="moment-transition" data-shot-moment-transition><label><span>When this moment happens</span><input data-shot-context-time data-shot-moment-time type="range" min="1" max="2099" step="1"><output data-shot-moment-time-output></output></label><label><span>Movement after this moment</span><select data-shot-context-easing data-shot-easing><option value="custom" disabled>Custom</option><option value="ease">Smooth</option><option value="ease-out">Glide in</option><option value="ease-in">Build speed</option><option value="ease-in-out">Soft in &amp; out</option><option value="linear">Constant speed</option></select></label><button type="button" data-shot-apply-easing>Apply movement</button></div>
             </section>
-            <details class="shot-advanced" data-shot-advanced><summary>Inspect &amp; fine-tune</summary><div class="advanced-content"><form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form><div class="shot-timing"><label>Hold begins (ms)<input data-shot-settled type="number" min="2" max="2099" value="1820"></label><button type="button" data-shot-hold>Hold final pose through Settle</button></div></div></details>
+            <details class="shot-advanced" data-shot-advanced><summary data-shot-advanced-toggle>Inspect &amp; fine-tune</summary><div class="advanced-content"><form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form><div class="shot-timing"><label>Hold begins (ms)<input data-shot-settled type="number" min="2" max="2099" value="1820"></label><button type="button" data-shot-hold>Hold final pose through Settle</button></div></div></details>
           </section>
           <aside class="shot-advanced-drawer" data-shot-advanced-drawer hidden aria-label="Advanced motion controls"></aside>
           <div class="shot-history-slot" data-shot-history-slot></div>
@@ -2191,6 +2191,11 @@ function selectShotMoment(timeMs: number): void {
   shotMomentMs = timeMs; renderShotWorkspace();
 }
 
+function focusShotMoment(timeMs: number): void {
+  requestAnimationFrame(() => document.querySelector<HTMLInputElement>(
+    `input[name="shot-moment"][value="${timeMs}"]`)?.focus());
+}
+
 function shotMomentLabel(timeMs: number): string {
   if (timeMs === shotConfig?.startMs) return 'Start';
   if (timeMs === shotConfig?.settledMs) return 'Settle';
@@ -2271,6 +2276,7 @@ function renderShotWorkspace(): void {
     .sort((left, right) => Math.abs(left - shotMomentMs) - Math.abs(right - shotMomentMs) || left - right)[0]!;
   if (shotMode === 'path' && shotMomentMs !== momentBeforeReconciliation && !alignShotPreviewToMoment(shotMomentMs)) return;
   moveTogether.disabled = !moveTogether.checked && !sharedTimes.includes(shotMomentMs);
+  renderShotContextDock(inventories);
   const displayedWaypoints = primaryInventory.waypoints.filter((waypoint) => requestedTimes.includes(waypoint.timeMs));
   const displayedPaths = inventories.map((inventory, objectIndex) => ({ elementId: inventory.elementId, objectIndex,
     waypoints: inventory.waypoints.map(({ keyframeId, timeMs }) => ({ keyframeId, timeMs })) }));
@@ -2319,7 +2325,6 @@ function renderShotWorkspace(): void {
   for (const control of shotPoseForm.querySelectorAll<HTMLInputElement>('input')) control.disabled = !selected;
   if (selected) { controls.x!.value = String(selected.pose.translateXMicrounits / 1_000_000); controls.y!.value = String(selected.pose.translateYMicrounits / 1_000_000);
     controls.scale!.value = String(selected.pose.scalePpm / 1_000_000); controls.rotate!.value = String(selected.pose.rotateMicrodegrees / 1_000_000); }
-  syncShotTimingControls(inventories);
   shotOverlay.dataset.mode = shotMode;
   previewObjectOverlay.dataset.mode = shotMode;
   shotOverlay.toggleAttribute('inert', shotMode !== 'path');
@@ -2333,7 +2338,7 @@ function renderShotWorkspace(): void {
   schedulePreviewSelection();
 }
 
-function syncShotTimingControls(inventories: NonNullable<ReturnType<typeof canonicalShotInventory>>): void {
+function renderShotContextDock(inventories: NonNullable<ReturnType<typeof canonicalShotInventory>>): void {
   if (!shotConfig) return;
   const editTogether = required<HTMLInputElement>('[data-move-together]').checked;
   const sharedTimes = inventories[0]!.waypoints.map((waypoint) => waypoint.timeMs)
@@ -2344,18 +2349,22 @@ function syncShotTimingControls(inventories: NonNullable<ReturnType<typeof canon
   const editableTimes = editTogether ? sharedTimes : primaryTimes;
   const selectedIndex = editableTimes.indexOf(shotMomentMs);
   const protectedMoment = shotMomentMs === shotConfig.startMs || shotMomentMs === shotConfig.settledMs;
-  const timeInput = required<HTMLInputElement>('[data-shot-moment-time]');
+  const noFollowingEditableSegment = selectedIndex < 0 || selectedIndex === editableTimes.length - 1;
+  required<HTMLElement>('[data-shot-context-name]').textContent = shotMomentLabel(shotMomentMs);
+  const timeInput = required<HTMLInputElement>('[data-shot-context-time]');
   const timeOutput = required<HTMLOutputElement>('[data-shot-moment-time-output]');
   timeInput.min = String((editableTimes[selectedIndex - 1] ?? shotMomentMs - 1) + 1);
   timeInput.max = String((editableTimes[selectedIndex + 1] ?? shotMomentMs + 1) - 1);
   timeInput.value = String(shotMomentMs); timeOutput.value = `${shotMomentMs} ms`;
   timeInput.disabled = protectedMoment || selectedIndex < 0;
-  required<HTMLButtonElement>('[data-shot-remove-moment]').disabled = protectedMoment || editableTimes.length <= 3;
+  const remove = required<HTMLButtonElement>('[data-shot-context-remove]');
+  remove.hidden = timeInput.disabled;
+  remove.disabled = timeInput.disabled || editableTimes.length <= 3;
   const editingElementIds = editTogether ? shotConfig.targetElementIds : shotPrimaryElementId ? [shotPrimaryElementId] : [];
   const selected = projectTrajectorySelection(authoring.document, editingElementIds, shotMomentMs);
-  const easing = required<HTMLSelectElement>('[data-shot-easing]');
+  const easing = required<HTMLSelectElement>('[data-shot-context-easing]');
   const applyEasing = required<HTMLButtonElement>('[data-shot-apply-easing]');
-  easing.disabled = !selected.eligible || shotMomentMs === shotConfig.settledMs;
+  easing.disabled = !selected.eligible || noFollowingEditableSegment;
   applyEasing.disabled = easing.disabled;
   if (!selected.eligible) return;
   const timings = effectiveShotTimings(selected.targets);
@@ -2859,6 +2868,7 @@ async function addShotMoment(beforeMs: number, afterMs: number): Promise<void> {
   shotStatus.value = result.ok ? `Point added at ${timeMs} ms · revision ${authoring.document.revision}.`
     : `${result.code} · no point added.`;
   renderShotWorkspace();
+  if (result.ok) focusShotMoment(timeMs);
 }
 
 async function removeShotMoment(): Promise<void> {
@@ -2873,6 +2883,7 @@ async function removeShotMoment(): Promise<void> {
   if (result.ok) { shotMomentMs = previous; alignShotPreviewToMoment(previous); }
   shotStatus.value = result.ok ? `Point removed · revision ${authoring.document.revision}.` : `${result.code} · unchanged.`;
   renderShotWorkspace();
+  if (result.ok) focusShotMoment(previous);
 }
 
 async function applyShotMomentTime(targetTimeMs: number): Promise<void> {

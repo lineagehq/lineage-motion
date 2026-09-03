@@ -422,6 +422,7 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
 .shot-active .moment-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .shot-active .moment-heading > div { display: grid; gap: 2px; }
 .shot-active .moment-heading strong { font-size: 13px; }
+.shot-active [data-shot-context-name] { color: #ffe3a6; }
 .shot-active .moment-heading span { color: #94a1b8; font-size: 11px; }
 .shot-active .moment-heading button { min-height: 32px; padding: 5px 9px; font-size: 11px; }
 .shot-active .shot-moments { display: block; min-width: 0; margin: 0; padding: 0; border: 0; }

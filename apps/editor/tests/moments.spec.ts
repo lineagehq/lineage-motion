@@ -53,11 +53,19 @@ test('the canvas uses repeatable moments through the shared durable operation pa
     ]);
     await expect(page.locator('.moment-add')).toHaveCount(2);
     const baseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    const dock = page.locator('[data-shot-context-dock]');
+    await expect(dock.locator('[data-shot-context-name]')).toHaveText('Point 1');
+    await expect(dock.locator('[data-shot-context-time]')).toHaveValue('700');
+    await expect(dock.locator('[data-shot-context-easing]')).toHaveValue('ease-out');
 
     await page.locator('.moment-add').first().click();
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
     expect(await momentValues()).toEqual([0, 350, 700, 2100]);
-    await expect(page.locator('input[name="shot-moment"][value="350"]')).toBeChecked();
+    const pointOne = page.getByRole('radio', { name: 'Point 1 350 ms' });
+    await expect(pointOne).toBeChecked();
+    await expect(pointOne).toBeFocused();
+    await expect(dock.locator('[data-shot-context-name]')).toHaveText('Point 1');
+    await expect(dock.locator('[data-shot-context-time]')).toHaveValue('350');
     await expect(page.locator('[data-shot-moments]').getByText('Point 1', { exact: true })).toBeVisible();
     await expect(page.locator('[data-shot-moments]').getByText('Point 2', { exact: true })).toBeVisible();
     await expect.poll(canvasMomentLabels).toEqual([
@@ -86,9 +94,11 @@ test('the canvas uses repeatable moments through the shared durable operation pa
     await workspace.locator('[data-shot-apply-easing]').click();
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(3);
 
-    await workspace.locator('[data-shot-remove-moment]').click();
+    await dock.locator('[data-shot-context-remove]').click();
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(4);
     expect(await momentValues()).toEqual([0, 700, 2100]);
+    await expect(page.getByRole('radio', { name: 'Start 0 ms' })).toBeChecked();
+    await expect(page.getByRole('radio', { name: 'Start 0 ms' })).toBeFocused();
     expect((await page.evaluate(() => window.__motionEditor.inspectAuthoring())).contentDigest).toBe(baseline.contentDigest);
     await page.locator('[data-undo]').click();
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(5);
