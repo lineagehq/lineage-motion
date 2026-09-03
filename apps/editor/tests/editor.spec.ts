@@ -44,7 +44,7 @@ test('renders exact compiled output and controls native animations without mutat
   await page.goto(editorUrl);
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
   await expect(page).toHaveTitle('Motion Editor');
-  await expect(page.locator('[data-shot-workspace]')).toBeHidden();
+  await expect(page.locator('[data-shot-workspace]')).toHaveAttribute('data-active', 'false');
   await expect(page.locator('[data-shot-targets] input')).toHaveCount(0);
   expect(await page.evaluate(() => window.__motionEditor.inspectShotWorkspace())).toMatchObject({ open: false });
 

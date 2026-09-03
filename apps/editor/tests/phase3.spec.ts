@@ -143,6 +143,78 @@ test('durable chrome, canonical state, and compiler preview publish atomically a
   expect(commandBodies).toHaveLength(commandsWhileFailed);
 });
 
+test('rejected and failed retimes preserve one visible coherent moment before retry', async ({ page }) => {
+  processHandle?.kill('SIGTERM');
+  if (processHandle?.exitCode === null) await new Promise((resolveExit) => processHandle!.once('exit', resolveExit));
+  const root = resolve(import.meta.dirname, '../../..'); const seed = createTrajectorySeed(root);
+  const runtimeSeedPath = join(directory, 'retime-failure-seed.json'); await writeFile(runtimeSeedPath, `${JSON.stringify(seed)}\n`);
+  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'retime-failure.sqlite'), PHASE3_EDITOR_PORT: '0',
+      PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
+      LANDING_SHOT1_DOCUMENT_PATH: runtimeSeedPath }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const addresses = await new Promise<{ editorUrl: string }>((resolveAddress, reject) => {
+    let output = ''; const timer = setTimeout(() => reject(new Error('RETIME_FAILURE_SERVER_TIMEOUT')), 10_000);
+    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
+      if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); } });
+    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`RETIME_FAILURE_SERVER_EXIT_${code}`)); });
+  });
+  let commandCount = 0; page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) commandCount += 1; });
+  await page.goto(addresses.editorUrl); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await page.evaluate(() => window.__motionEditor.disconnectEvents());
+  const readState = () => page.evaluate(() => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    const feedback = document.querySelector<HTMLOutputElement>('[data-shot-control-feedback]');
+    return { revision: window.__motionEditor.inspectAuthoring().revision, compiler: window.__motionEditor.compiledHtml,
+      iframe: frame.srcdoc, selectedMoment: window.__motionEditor.inspectShotWorkspace().momentMs,
+      selectedChip: Number(document.querySelector<HTMLInputElement>('input[name="shot-moment"]:checked')?.value),
+      dockTime: Number(document.querySelector<HTMLInputElement>('[data-shot-context-time]')?.value),
+      scrubber: Number(document.querySelector<HTMLInputElement>('[data-scrub]')?.value),
+      playhead: document.querySelector<HTMLOutputElement>('[data-playhead]')?.value,
+      native: window.__motionEditor.readState(), publicationState: window.__motionEditor.inspectAuthoring().publicationState,
+      feedback: feedback ? { value: feedback.value, hidden: feedback.hidden, visible: feedback.getClientRects().length > 0
+        && getComputedStyle(feedback).visibility !== 'hidden' } : null,
+      diagnostic: document.querySelector<HTMLOutputElement>('[data-service-diagnostic]')?.value ?? null,
+      diagnosticVisible: Boolean(document.querySelector<HTMLOutputElement>('[data-service-diagnostic]')?.getClientRects().length),
+      drawerHidden: document.querySelector<HTMLElement>('[data-shot-advanced-drawer]')!.hidden,
+    }; });
+  const baseline = await readState();
+
+  await page.route('**/operations/prepare', async (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({
+    ok: false, code: 'VALIDATION', diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'REJECTED_RETIME', category: 'domain', retryable: false },
+  }) }));
+  await page.locator('[data-shot-context-time]').fill('840');
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectCollaboration().diagnostic?.code)).toBe('REJECTED_RETIME');
+  const rejected = await readState(); await page.unroute('**/operations/prepare');
+  await page.locator('[data-scrub]').fill('700');
+
+  await page.evaluate(() => window.__motionEditor.failNextPublication());
+  await page.locator('[data-shot-context-time]').fill('840');
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('failed');
+  await expect.poll(() => page.locator('[data-shot-control-feedback]').evaluate((output) => (output as HTMLOutputElement).value)).toContain('Timing');
+  const failed = await readState();
+  expect(await page.evaluate(() => window.__motionEditor.retryPublication())).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('settled');
+  const retried = await readState();
+
+  const oldTuple = { selectedMoment: 700, selectedChip: 700, dockTime: 700, scrubber: 700, playhead: '700 ms',
+    native: { playheadMs: 700, currentTimes: [700, 700], playStates: ['paused', 'paused'] } };
+  expect({ rejected, failed, retried, commandCount }).toMatchObject({
+    rejected: { revision: 0, compiler: baseline.compiler, iframe: baseline.iframe, ...oldTuple,
+      publicationState: 'settled', feedback: { hidden: false, visible: true,
+        value: 'Timing could not be changed. Your previous moment is still active.' },
+      diagnostic: 'REJECTED_RETIME · domain · not retryable', diagnosticVisible: false, drawerHidden: true },
+    failed: { revision: 0, compiler: baseline.compiler, iframe: baseline.iframe, ...oldTuple,
+      publicationState: 'failed', feedback: { hidden: false, visible: true,
+        value: 'Timing could not be published. Your previous moment is still active.' },
+      diagnostic: 'PUBLICATION_FAILED · storage · retryable', diagnosticVisible: false, drawerHidden: true },
+    retried: { revision: 1, selectedMoment: 840, selectedChip: 840, dockTime: 840, scrubber: 840, playhead: '840 ms',
+      native: { playheadMs: 840, currentTimes: [840, 840], playStates: ['paused', 'paused'] },
+      publicationState: 'settled', feedback: { hidden: true, visible: false }, drawerHidden: true },
+    commandCount: 1,
+  });
+  expect(`${failed.feedback?.value} ${rejected.feedback?.value}`).not.toContain('Pose');
+});
+
 test('Shot 1 workspace commits five durable operations and exact undo/redo through compiler-native preview', async ({ page }) => {
   await page.setViewportSize({ width: 1183, height: 900 });
   processHandle?.kill('SIGTERM');

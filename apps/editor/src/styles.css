@@ -235,6 +235,8 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
 .reduced-panel p { margin: 5px 0; }
 .reduced-panel pre { margin: 8px 0 0; white-space: pre-wrap; color: #81d8c9; }
 .shot-workspace { margin: 0 0 18px; padding: 18px; border: 1px solid #334052; border-radius: 14px; background: #151b25; }
+.shot-workspace[data-active="false"] { display: contents; }
+.shot-workspace[data-active="false"] > :not(.preview-stage):not(.preview-control-rail) { display: none !important; }
 .shot-workspace > header, .shot-grid, .pose-fields, .shot-timing { display: flex; align-items: end; flex-wrap: wrap; gap: 12px; }
 .shot-workspace > header { align-items: flex-start; justify-content: space-between; }
 .shot-workspace h2 { margin: 0; color: #f1f4f9; }
@@ -329,8 +331,8 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
 .cue-active .preview-canvas { overflow: visible; box-shadow: 0 0 0 1px #405064, 0 12px 28px rgba(0,0,0,.38); }
 .cue-active .inspect-panel { margin-top: 10px; opacity: .76; }
 
-.editor-shell.shot-active { width: min(1320px, 100%); }
-.shot-active .topbar { align-items: center; margin-bottom: 12px; }
+.editor-shell.shot-active { width: min(1320px, 100%); padding: 12px 24px; }
+.shot-active .topbar { align-items: center; margin-bottom: 6px; }
 .shot-active .topbar .eyebrow { margin-bottom: 3px; }
 .shot-active .topbar h1 { margin-bottom: 4px; font-size: clamp(23px, 2.5vw, 32px); }
 .shot-active .branch-controls, .shot-active .workflow { display: none; }
@@ -445,7 +447,7 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
 .shot-active .moment-transition input[type="range"] { min-width: 0; width: 100%; margin: 0; accent-color: #facf74; }
 .shot-active .moment-transition output { min-width: 56px; color: #ffe3a6; text-align: right; }
 .shot-active .moment-transition button { min-height: 38px; white-space: nowrap; }
-.shot-active .shot-advanced { position: absolute; z-index: 13; top: 12px; right: 14px; }
+.shot-active .shot-advanced { position: relative; z-index: 13; align-self: start; margin: 20px 12px 0 0; }
 .shot-active [data-shot-advanced-toggle] { min-height: 40px; padding: 9px 12px; border-color: #3c4659; background: #171c26; }
 .shot-active [data-shot-advanced-toggle][aria-expanded="true"] { border-color: #81d8c9; color: #bff2e8; }
 .shot-active .shot-advanced-drawer { position: absolute; z-index: 20; top: 44px; right: 10px; bottom: 58px;
@@ -464,32 +466,37 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
 .shot-active .shot-advanced-drawer .inspect-panel { margin-top: 0; opacity: 1; }
 .shot-active .preview-stage,
 .shot-active .preview-canvas { inline-size: 100%; }
-.shot-active .shot-history-slot { position: absolute; right: 205px; top: 12px; margin: 0; }
 .shot-active .shot-history-slot .workflow-footer { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; }
 .shot-active .shot-history-slot .operation-status { display: none; }
 .shot-active .preview-panel { position: relative; top: 0; overflow: visible; border-radius: 0 0 16px 16px; }
-.shot-active .preview-title { min-height: 48px; padding: 8px 12px; }
+.shot-active .preview-title { min-height: 40px; padding: 6px 12px; }
 .shot-active .preview-title > div > span { display: none; }
 .shot-active .preview-title h2 { margin: 0; font-size: 14px; }
 .shot-active .preview-title p { font-size: 10px; }
 .shot-active .preview-object-target[aria-pressed="true"] { border-color: #facf74; box-shadow: 0 0 0 3px rgba(250,207,116,.18); }
 .shot-active .preview-selection { border-radius: 2px; transition: none; box-shadow: 0 0 0 1px rgba(11,13,18,.8); }
-.shot-active .preview-panel { position: relative; display: grid; grid-template-rows: auto minmax(430px, 1fr) auto; }
+.shot-active .preview-panel { position: relative; display: grid; grid-template-rows: auto auto minmax(430px, 1fr) auto auto auto; }
 .shot-active .preview-title { grid-row: 1; grid-column: 1; }
 .shot-active .preview-shot-toolbar { grid-row: 1; grid-column: 1; justify-self: end; align-self: center; z-index: 11; }
 .shot-active .shot-workspace { display: contents; }
-.shot-active .shot-object-bar { position: absolute; z-index: 12; top: 52px; left: 50%; display: flex; gap: 6px; translate: -50% 0; }
+.shot-active .shot-object-bar { position: relative; z-index: 12; grid-row: 2; grid-column: 1; justify-self: center;
+  display: flex; max-width: calc(100% - 20px); gap: 6px; margin: 2px 10px 4px; overflow-x: auto; }
 .shot-active .shot-object-bar fieldset { display: flex; align-items: center; min-width: 0; gap: 6px; padding: 0; border: 0; }
 .shot-active .shot-object-bar legend, .shot-active .shot-object-bar .move-together small { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .shot-active .shot-object-bar .move-together { display: flex; align-items: center; min-height: 44px; gap: 7px; padding: 6px 10px; border: 1px solid #303949; border-radius: 9px; background: #10151e; cursor: pointer; }
-.shot-active .shot-context-dock { position: relative; z-index: 12; grid-row: 2; grid-column: 1; align-self: end; margin: 0; }
-.shot-active .shot-context-dock .moment-editor { margin: 12px; }
-.shot-active .preview-stage { grid-row: 2; grid-column: 1; min-height: 430px; }
-.shot-active .preview-control-rail { grid-row: 3; grid-column: 1; position: relative; z-index: 11; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid #30394a; }
+.shot-active .preview-stage { grid-row: 3; grid-column: 1; min-height: 430px; }
+.shot-active .shot-context-dock { position: relative; z-index: 12; grid-row: 4; grid-column: 1; display: grid;
+  grid-template-columns: minmax(0, 1fr) auto; align-items: start; margin: 0; border-top: 1px solid #30394a; }
+.shot-active .shot-context-dock .moment-editor { margin: 12px 0 12px 12px; }
+.shot-active .shot-control-feedback { grid-column: 1 / -1; margin: 0 12px 12px; padding: 9px 11px;
+  border: 1px solid #8f4c55; border-radius: 8px; background: #28181d; color: #ffd8dc; font-size: 13px; line-height: 1.35; }
+.shot-active .shot-control-feedback[hidden] { display: none; }
+.shot-active .preview-control-rail { grid-row: 5; grid-column: 1; position: relative; z-index: 11; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid #30394a; }
 .shot-active .transport { display: flex; align-items: center; gap: 7px; padding: 0; border: 0; }
 .shot-active .transport label { flex: 1 1 220px; }
 .shot-active .shot-moments:not([hidden]) { display: flex; min-width: 0; margin: 0; padding: 0; border: 0; }
-.shot-active .shot-history-slot { position: relative; z-index: 13; grid-row: 3; grid-column: 1; align-self: center; justify-self: end; margin: 0; }
+.shot-active .shot-history-slot { position: relative; z-index: 13; grid-row: 6; grid-column: 1; justify-self: stretch;
+  display: flex; justify-content: flex-end; margin: 0; padding: 4px 12px; border-top: 1px solid #30394a; }
 .shot-active [data-shot-status] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .shot-active .shot-recovery { grid-row: 2; grid-column: 1; z-index: 14; margin: 18px; }
 .preview-transform-handle { position: absolute; z-index: 4; display: grid; box-sizing: content-box; margin: -1px; padding: 1px; place-items: center; pointer-events: auto;
@@ -512,23 +519,28 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
   translate: -50% -50%; }
 
 @media (max-width: 700px) {
-  .shot-active .editor-shell { padding: 9px; }
+  .editor-shell.shot-active { padding: 9px; }
   .shot-active .topbar { margin-bottom: 8px; }
   .shot-active .topbar .purpose { display: none; }
   .shot-active .shot-workspace { padding: 10px; }
   .shot-active .shot-grid { flex-wrap: wrap; }
   .shot-active .shot-grid .move-together { order: 3; flex-basis: 100%; }
-  .shot-active .moment-editor { grid-template-columns: 1fr; }
-  .shot-active .moment-heading { align-items: flex-start; }
-  .shot-active .moment-transition { grid-column: 1; }
-  .shot-active .moment-transition { grid-template-columns: 1fr; }
-  .shot-active .moment-transition button { width: 100%; }
-  .shot-active .shot-history-slot { position: static; margin-top: 7px; }
+  .shot-active .shot-history-slot { position: relative; margin: 0; }
   .shot-active .preview-shot-toolbar:not([hidden]) { position: static; display: none; }
-  .shot-active .shot-object-bar { top: 48px; max-width: calc(100% - 20px); overflow-x: auto; }
+  .shot-active .shot-object-bar { max-width: calc(100% - 20px); overflow-x: auto; }
   .shot-active .shot-object-bar fieldset { flex: 0 0 auto; }
+  .shot-active .shot-context-dock { grid-template-columns: minmax(0, 1fr); }
   .shot-active .shot-context-dock .moment-editor { margin: 9px; }
-  .shot-active .preview-control-rail { grid-template-columns: 1fr; }
+  .shot-active .shot-advanced { justify-self: stretch; margin: 0 9px 9px; }
+  .shot-active [data-shot-advanced-toggle] { width: 100%; }
   .shot-active [data-shot-moment-sequence] { overflow-x: auto; scroll-snap-type: x proximity; }
   .shot-active .shot-advanced-drawer { top: auto; left: 8px; right: 8px; bottom: 8px; width: auto; max-height: 68%; border-radius: 14px 14px 8px 8px; }
+}
+
+@media (max-width: 520px) {
+  .shot-active .moment-editor { grid-template-columns: 1fr; }
+  .shot-active .moment-heading { align-items: flex-start; }
+  .shot-active .moment-transition { grid-column: 1; grid-template-columns: 1fr; }
+  .shot-active .moment-transition button { width: 100%; }
+  .shot-active .preview-control-rail { grid-template-columns: 1fr; }
 }
