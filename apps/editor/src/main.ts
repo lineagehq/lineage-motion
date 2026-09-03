@@ -592,6 +592,8 @@ window.__motionEditor = {
     if (!serviceClient || publicationState !== 'failed') return false;
     const immutable = await serviceClient.head(authoring.document.documentId, activeBranchId);
     await applyImmutable(immutable, true);
+    status.value = `Change applied. Revision ${authoring.document.revision}.`;
+    status.dataset.kind = 'success';
     return true;
   },
 };
@@ -868,6 +870,7 @@ function setPublicationState(state: PublicationState, failureCode: string | null
   const main = document.querySelector('main')!;
   main.dataset.publicationPending = String(state === 'pending');
   main.dataset.publicationState = state;
+  if (state === 'failed' && shotConfig) shotStatus.value = 'Pose could not be published. Your previous motion is still active.';
 }
 
 function publishServiceDiagnostic(diagnostic: MotionDiagnostic): void {
@@ -989,6 +992,8 @@ async function applyImmutable(immutable: ImmutableHead, remote: boolean, preview
   const draft = captureDraft();
   const nextAuthoring = createAuthoringState(immutable.document); const nextCompiled = compileMotionDocument(nextAuthoring.document);
   const previousCompiled = compiled;
+  const previousPreviewHtml = iframe.srcdoc;
+  const previousPreviewCss = controller.readCompilerCommitState().committedCompilerCss ?? previousCompiled.css;
   setPublicationState('pending');
   let promoted = false;
   try {
@@ -1027,10 +1032,10 @@ async function applyImmutable(immutable: ImmutableHead, remote: boolean, preview
     }
     setPublicationState('settled');
   } catch (error) {
-    if (controller.readCompilerCommitState().committedHtml !== previousCompiled.html) {
-      try { await mountPreview(previousCompiled.html, previousCompiled.css); } catch { /* preserve explicit failed state */ }
-    }
+    try { await mountPreview(previousPreviewHtml, previousPreviewCss); } catch { /* preserve explicit failed state */ }
+    if (iframe.srcdoc !== previousPreviewHtml) iframe.srcdoc = previousPreviewHtml;
     setPublicationState('failed', error instanceof Error ? error.message : 'PUBLICATION_FAILED');
+    publishClientDiagnostic('PUBLICATION_FAILED', 'storage', true);
     throw error;
   }
 }
@@ -2359,7 +2364,9 @@ function renderShotWorkspace(): void {
   }
   const currentGeometry = committedShotGeometryKey === geometryKey;
   shotOverlay.setAttribute('aria-busy', String(!currentGeometry));
-  shotStatus.value = currentGeometry ? `${primaryLabel} · ${momentLabel} ready.` : 'Updating canvas…';
+  shotStatus.value = publicationState === 'failed'
+    ? 'Pose could not be published. Your previous motion is still active.'
+    : currentGeometry ? `${primaryLabel} · ${momentLabel} ready.` : 'Updating canvas…';
   schedulePreviewSelection();
 }
 
@@ -2611,7 +2618,9 @@ async function processShotGeometryRequest(request: ShotGeometryRequest): Promise
     committedShotGeometryKey = request.geometryKey;
     shotOverlay.setAttribute('aria-busy', 'false');
     const objectLabel = `Object ${shotConfig!.targetElementIds.indexOf(request.primaryElementId) + 1}`;
-    shotStatus.value = `${objectLabel} · ${shotMomentLabel(shotMomentMs)} ready.`;
+    shotStatus.value = publicationState === 'failed'
+      ? 'Pose could not be published. Your previous motion is still active.'
+      : `${objectLabel} · ${shotMomentLabel(shotMomentMs)} ready.`;
   } catch (error) {
     if (!isCurrentShotGeometryRequest(request)) return;
     shotProjection = null; shotGeometry = []; shotOverlay.replaceChildren(); shotOverlay.setAttribute('aria-busy', 'false');
@@ -2761,7 +2770,11 @@ async function applyShotPose(): Promise<void> {
     scalePpm: Math.round(Number(controls.scale!.value) * 1_000_000),
     rotateMicrodegrees: Math.round(Number(controls.rotate!.value) * 1_000_000) };
   const intent = directPoseIntent(nextPose, 'move'); if (!intent) { shotStatus.value = 'TRAJECTORY_SELECTION_INVALID · unchanged.'; return; }
-  const result = await prepareAndDispatchIntent(intent); shotStatus.value = result.ok ? `Pose applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`; renderShotWorkspace();
+  const result = await prepareAndDispatchIntent(intent); renderShotWorkspace();
+  shotStatus.value = result.ok ? `Pose applied at revision ${authoring.document.revision}.`
+    : result.code === 'SERVICE_PREPARATION_FAILED'
+      ? 'Pose could not be published. Your previous motion is still active.'
+      : 'Pose could not be applied. Your previous motion is still active.';
 }
 
 function buildWaypointTranslateOperation(momentMs: number, nextXMicrounits: number, nextYMicrounits: number): AuthoringOperation | null {

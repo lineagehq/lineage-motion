@@ -187,6 +187,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   });
   const consoleErrors: string[] = []; page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
   await page.goto(editorUrl); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await page.evaluate(() => window.__motionEditor.disconnectEvents());
   const workspace = page.locator('[data-shot-workspace]');
   await expect(workspace).toBeVisible();
   const layoutContract = await page.evaluate(() => {
@@ -837,7 +838,34 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     await page.locator('[data-shot-advanced-drawer] > details').first().locator('summary').click();
   }
   const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 8));
+  const failedPublicationBaseline = await page.evaluate(() => ({
+    revision: window.__motionEditor.inspectAuthoring().revision,
+    preview: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc,
+    selectedMoment: Number((document.querySelector('input[name="shot-moment"]:checked') as HTMLInputElement).value),
+  }));
+  const failedPublicationGeometry = await readGeometry();
+  await expect(page.locator('[data-shot-advanced-drawer]')).toBeVisible();
+  await page.evaluate(() => window.__motionEditor.failNextPublication());
   await page.getByRole('button', { name: 'Apply pose' }).click();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('failed');
+  await expect.poll(() => page.locator('[data-shot-status]').evaluate((output) => (output as HTMLOutputElement).value))
+    .toBe('Pose could not be published. Your previous motion is still active.');
+  await expect.poll(() => page.locator('[data-service-diagnostic]').evaluate((output) => (output as HTMLOutputElement).value))
+    .toBe('PUBLICATION_FAILED · storage · retryable');
+  expect(await page.evaluate(() => ({
+    revision: window.__motionEditor.inspectAuthoring().revision,
+    preview: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc,
+    selectedMoment: Number((document.querySelector('input[name="shot-moment"]:checked') as HTMLInputElement).value),
+  }))).toEqual(failedPublicationBaseline);
+  expect(await readGeometry()).toEqual(failedPublicationGeometry);
+  expect(await page.evaluate(() => window.__motionEditor.retryPublication())).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('settled');
+  expect(await page.evaluate(() => ({
+    revision: window.__motionEditor.inspectAuthoring().revision,
+    previewMatchesCompiler: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc === window.__motionEditor.compiledHtml,
+    selectedMoment: Number((document.querySelector('input[name="shot-moment"]:checked') as HTMLInputElement).value),
+  }))).toEqual({ revision: 2, previewMatchesCompiler: true, selectedMoment: failedPublicationBaseline.selectedMoment });
+  expect(await readGeometry()).toEqual(failedPublicationGeometry);
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
   await awaitShotMutationSettlement(2, 700);
   await page.keyboard.press('Escape');
