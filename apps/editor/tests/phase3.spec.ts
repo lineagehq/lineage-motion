@@ -2102,3 +2102,33 @@ test('a committed local command with a lost response converges once and clears p
     pendingRevision: null, immutableRefetchCount: 1, draftConflictRevision: null, draftDirty: false });
   await expect(page.locator('[data-draft-conflict]')).toBeHidden();
 });
+
+test('canvas-first installed Chrome emits only the aggregate adversarial receipt', async () => {
+  test.setTimeout(120_000);
+  if (processHandle?.exitCode === null) { processHandle.kill('SIGTERM'); await new Promise((resolveExit) => processHandle!.once('exit', resolveExit)); }
+  const root = resolve(import.meta.dirname, '../../..');
+  const child = spawn('node', [resolve(root, 'apps/editor/scripts/qa-chrome.mjs'), '--canvas-first-ux'], {
+    cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = ''; let stderr = '';
+  child.stdout!.on('data', (chunk) => { stdout += chunk.toString(); });
+  child.stderr!.on('data', (chunk) => { stderr += chunk.toString(); });
+  const exitCode = await new Promise<number | null>((resolveExit, reject) => {
+    const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('CANVAS_FIRST_QA_TIMEOUT')); }, 90_000);
+    child.once('exit', (code) => { clearTimeout(timer); resolveExit(code); });
+  });
+  expect(exitCode, stderr).toBe(0);
+  const lines = stdout.trim().split('\n'); expect(lines).toHaveLength(1);
+  const receipt = JSON.parse(lines[0]!) as Record<string, unknown>;
+  expect(Object.keys(receipt)).toEqual([
+    'schemaVersion', 'passed', 'viewport', 'operationCount', 'momentCount', 'geometryMaxDeltaCssPx',
+    'nativeCssAnimationCount', 'keyboardFlowPassed', 'failurePreservedCompiler', 'consoleErrorCount', 'networkErrorCount',
+  ]);
+  expect(receipt).toMatchObject({ schemaVersion: 'motion.canvas-first-qa.v1', passed: true,
+    viewport: { width: 1440, height: 900, dpr: 1 }, keyboardFlowPassed: true,
+    failurePreservedCompiler: true, consoleErrorCount: 0, networkErrorCount: 0 });
+  expect(receipt.operationCount).toEqual(expect.any(Number)); expect(receipt.operationCount).toBeGreaterThan(0);
+  expect(receipt.momentCount).toEqual(expect.any(Number)); expect(receipt.momentCount).toBeGreaterThanOrEqual(3);
+  expect(receipt.geometryMaxDeltaCssPx).toEqual(expect.any(Number)); expect(receipt.geometryMaxDeltaCssPx).toBeLessThanOrEqual(1);
+  expect(receipt.nativeCssAnimationCount).toEqual(expect.any(Number)); expect(receipt.nativeCssAnimationCount).toBeGreaterThan(0);
+});

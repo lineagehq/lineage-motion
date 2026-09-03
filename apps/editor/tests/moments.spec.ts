@@ -58,6 +58,33 @@ test('the canvas uses repeatable moments through the shared durable operation pa
     await expect(dock.locator('[data-shot-context-time]')).toHaveValue('700');
     await expect(dock.locator('[data-shot-context-easing]')).toHaveValue('ease-out');
 
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 680, height: 900 }]) {
+      await page.setViewportSize(viewport);
+      await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
+      const interactionGeometry = await page.evaluate(() => ({
+        handles: [...document.querySelectorAll<HTMLElement>('.trajectory-waypoint, .preview-transform-handle')]
+          .filter((node) => !node.hidden && getComputedStyle(node).visibility !== 'hidden')
+          .map((node) => {
+            const size = node.matches('.trajectory-waypoint')
+              ? getComputedStyle(node, '::before')
+              : node.getBoundingClientRect();
+            return { width: parseFloat(String(size.width)), height: parseFloat(String(size.height)) };
+          }),
+        railVisible: document.querySelector<HTMLElement>('[data-preview-control-rail]')!.getBoundingClientRect().bottom <= innerHeight,
+        objectBarOverlapsSelection: (() => {
+          const bar = document.querySelector<HTMLElement>('[data-shot-object-bar]')!.getBoundingClientRect();
+          const selection = document.querySelector<HTMLElement>('[data-preview-selection]')!.getBoundingClientRect();
+          return bar.left < selection.right && bar.right > selection.left && bar.top < selection.bottom && bar.bottom > selection.top;
+        })(),
+      }));
+      expect(interactionGeometry.railVisible).toBe(true);
+      expect(interactionGeometry.handles.every(({ width, height }) => width >= 44 && height >= 44),
+        JSON.stringify({ viewport, handles: interactionGeometry.handles })).toBe(true);
+      expect(interactionGeometry.objectBarOverlapsSelection).toBe(false);
+      expect(await canvasLabelsOverlap()).toBe(false);
+    }
+    await page.setViewportSize({ width: 1280, height: 900 });
+
     await page.route('**/operations/prepare', async (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({
       ok: false, code: 'VALIDATION', diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'REJECTED_ADD', category: 'domain', retryable: false },
     }) }));

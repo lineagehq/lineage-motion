@@ -72,6 +72,9 @@ if (process.argv[2] === '--landing-shot1') {
   await runLandingShot1Qa({ authority: 'private', workspaceSmokeOnly: process.argv.includes('--workspace-smoke-only') });
   process.exit();
 }
+if (process.argv[2] === '--canvas-first-ux') {
+  process.exit(await runCanvasFirstUxQa(resolve(import.meta.dirname, '../../..')));
+}
 if (process.argv[2] === '--phase4-cursor-click-reveal') {
   const qaRoot = resolve(import.meta.dirname, '../../..');
   const qaServer = spawn('npm', ['exec', 'vite-node', '--', resolve(qaRoot, 'apps/editor/scripts/qa-chrome.mjs'),
@@ -1081,6 +1084,152 @@ async function observeServerAddress(processHandle, label) {
     });
     processHandle.once('exit', (code) => { clearTimeout(timer); reject(new Error(`${label}_EXIT_${code}`)); });
   });
+}
+
+async function runCanvasFirstUxQa(repositoryRoot) {
+  const receipt = {
+    schemaVersion: 'motion.canvas-first-qa.v1', passed: false,
+    viewport: { width: 1440, height: 900, dpr: 1 }, operationCount: 0, momentCount: 0,
+    geometryMaxDeltaCssPx: 0, nativeCssAnimationCount: 0, keyboardFlowPassed: false,
+    failurePreservedCompiler: false, consoleErrorCount: 0, networkErrorCount: 0,
+  };
+  const directory = await mkdtemp(join(tmpdir(), 'lineage-motion-canvas-first-'));
+  const processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: repositoryRoot, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env,
+      PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: '0', LANDING_SHOT1_WORKSPACE: '1',
+      PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
+      PHASE3_AGENT_CAPABILITY: randomBytes(32).toString('base64url') },
+  });
+  let browser;
+  try {
+    const addresses = await observeServerAddress(processHandle, 'CANVAS_FIRST_CHROME_QA');
+    if (new URL(addresses.editorUrl).hostname !== 'lineage-motion.localhost') throw new Error('CANVAS_FIRST_NAMED_ORIGIN_REQUIRED');
+    browser = await chromium.launch({ channel: 'chrome', headless: true });
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+    const diagnostics = { consoleErrors: [], pageErrors: [], failedRequests: [], unexpectedNetwork: [], httpErrors: [] };
+    monitorPage(page, [addresses.editorUrl, addresses.serviceUrl], diagnostics);
+    page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) receipt.operationCount += 1; });
+    await page.goto(addresses.editorUrl); await page.locator('[data-editor-ready="true"]').waitFor();
+    const initial = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+    if (initial.revision !== 0) throw new Error('CANVAS_FIRST_REVISION_ZERO_REQUIRED');
+    await observeGeometryCommit(page, { sampleCount: 3, moments: [0, 700, 2100] });
+    await page.getByRole('radio', { name: 'Primary Object 1' }).check();
+    await page.locator('input[name="shot-moment"][value="700"]').check();
+
+    const waitForNextRevision = async (beforeRevision) => page.waitForFunction((revision) =>
+      window.__motionEditor.inspectAuthoring().revision === revision + 1, beforeRevision);
+    const dragControl = async (selector, delta) => {
+      const beforeRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
+      const box = await page.locator(selector).boundingBox(); if (!box) throw new Error('CANVAS_FIRST_CONTROL_BOUNDS_MISSING');
+      const x = box.x + box.width / 2; const y = box.y + box.height / 2;
+      await page.mouse.move(x, y); await page.mouse.down();
+      await page.mouse.move(x + delta.x, y + delta.y, { steps: 4 }); await page.mouse.up();
+      await waitForNextRevision(beforeRevision);
+      await page.locator('[data-trajectory-overlay][aria-busy="false"]').waitFor();
+    };
+    const path = page.getByRole('button', { name: 'Path', exact: true });
+    if (await path.getAttribute('aria-pressed') === 'true') await path.click();
+    await dragControl('[data-preview-object-id][aria-pressed="true"]', { x: 12, y: 8 });
+    await dragControl('[data-transform-corner="bottom-right"]:visible', { x: 12, y: 8 });
+    await dragControl('[data-transform-handle="rotate"]:visible', { x: 15, y: 7 });
+    if (await path.getAttribute('aria-pressed') !== 'true') await path.click();
+
+    let beforeRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
+    await page.locator('.moment-add').first().click(); await waitForNextRevision(beforeRevision);
+    beforeRevision += 1; await page.locator('[data-shot-context-time]').fill('420'); await waitForNextRevision(beforeRevision);
+    beforeRevision += 1; await page.locator('[data-shot-context-easing]').selectOption('ease-in-out');
+    await page.locator('[data-shot-apply-easing]').click(); await waitForNextRevision(beforeRevision);
+
+    await page.getByRole('radio', { name: 'Primary Object 2' }).check();
+    await page.locator('input[name="shot-moment"][value="700"]').check();
+    const together = page.locator('[data-move-together]'); await together.check(); await together.uncheck();
+    await page.locator('[data-play]').click(); await page.waitForTimeout(80); await page.locator('[data-pause]').click();
+    const visibleMoments = await page.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number(input.value)));
+    for (const moment of visibleMoments) {
+      await page.locator(`input[name="shot-moment"][value="${moment}"]`).check();
+      await page.locator('[data-scrub]').fill(String(moment));
+    }
+
+    const geometry = () => page.evaluate(() => ['[data-preview]', '[data-preview-canvas]', '[data-preview-object-overlay]',
+      '[data-trajectory-overlay]'].map((selector) => { const rect = document.querySelector(selector).getBoundingClientRect();
+      return [rect.left + scrollX, rect.top + scrollY, rect.width, rect.height]; }));
+    let responsiveDrawerPassed = true;
+    for (const viewport of [{ width: 1440, height: 900 }, { width: 680, height: 900 }]) {
+      await page.setViewportSize(viewport); await page.evaluate(() => new Promise((resolveFrame) =>
+        requestAnimationFrame(() => requestAnimationFrame(resolveFrame))));
+      await page.locator('[data-trajectory-overlay][aria-busy="false"]').waitFor();
+      const beforeAdvanced = await geometry();
+      await page.locator('[data-shot-advanced-toggle]').click(); await page.locator('[data-shot-advanced-drawer]').waitFor();
+      const afterAdvanced = await geometry();
+      receipt.geometryMaxDeltaCssPx = Math.max(receipt.geometryMaxDeltaCssPx, ...beforeAdvanced.flatMap((values, index) =>
+        values.map((value, offset) => Math.abs(value - afterAdvanced[index][offset]))));
+      responsiveDrawerPassed &&= await page.locator('[data-shot-advanced-drawer]').evaluate((drawer, narrow) => {
+        const rect = drawer.getBoundingClientRect();
+        const container = drawer.closest('.preview-panel').getBoundingClientRect();
+        return !narrow || (Math.abs(rect.left - container.left - 8) <= 1
+          && Math.abs(container.right - rect.right - 8) <= 1 && Math.abs(container.bottom - rect.bottom - 8) <= 1);
+      }, viewport.width <= 700);
+      await page.locator('[data-shot-advanced-close]').click();
+    }
+    await page.setViewportSize({ width: 1440, height: 900 });
+
+    await page.getByRole('radio', { name: 'Primary Object 1' }).check();
+    await page.locator('input[name="shot-moment"][value="420"]').check();
+    beforeRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
+    await page.locator('[data-shot-context-remove]').click(); await waitForNextRevision(beforeRevision);
+    beforeRevision += 1; await page.locator('[data-undo]').click(); await waitForNextRevision(beforeRevision);
+    beforeRevision += 1; await page.locator('[data-redo]').click(); await waitForNextRevision(beforeRevision);
+
+    const keyboardPoint = page.locator('input[name="shot-moment"][value="700"]');
+    await keyboardPoint.focus(); await keyboardPoint.press('Space');
+    const keyboardAdd = page.locator('.moment-add').first(); await keyboardAdd.focus();
+    beforeRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
+    await keyboardAdd.press('Enter'); await waitForNextRevision(beforeRevision);
+    const keyboardRemove = page.locator('[data-shot-context-remove]');
+    const insertionFocused = await page.locator('input[name="shot-moment"]:checked').evaluate((input) => input === document.activeElement);
+    await keyboardRemove.focus(); beforeRevision += 1; await keyboardRemove.press('Enter'); await waitForNextRevision(beforeRevision);
+    receipt.keyboardFlowPassed = insertionFocused && await page.locator('input[name="shot-moment"]:checked').evaluate((input) => input === document.activeElement);
+
+    await page.locator('[data-shot-advanced-toggle]').click();
+    const holdDetails = page.locator('[data-shot-advanced-drawer] > details').nth(1);
+    if (await holdDetails.getAttribute('open') === null) await holdDetails.locator('summary').click();
+    const failureBaseline = await page.evaluate(() => { const frame = document.querySelector('[data-preview]');
+      return { authoring: window.__motionEditor.inspectAuthoring(), native: window.__motionEditor.readState(), srcdoc: frame.srcdoc,
+        renderedCss: [...frame.contentDocument.querySelectorAll('style')].map((style) => style.textContent).join('') }; });
+    const commandCountBeforeFailure = receipt.operationCount; const invalidHold = page.locator('[data-shot-settled]');
+    await invalidHold.fill('2100'); await page.locator('[data-shot-hold]').click();
+    const failureAfter = await page.evaluate(() => { const frame = document.querySelector('[data-preview]');
+      return { authoring: window.__motionEditor.inspectAuthoring(), native: window.__motionEditor.readState(), srcdoc: frame.srcdoc,
+        renderedCss: [...frame.contentDocument.querySelectorAll('style')].map((style) => style.textContent).join('') }; });
+    receipt.failurePreservedCompiler = commandCountBeforeFailure === receipt.operationCount && await invalidHold.evaluate((input) => input === document.activeElement)
+      && failureAfter.authoring.revision === failureBaseline.authoring.revision
+      && failureAfter.authoring.contentDigest === failureBaseline.authoring.contentDigest
+      && failureAfter.authoring.exportDigest === failureBaseline.authoring.exportDigest
+      && failureAfter.authoring.compiledHtml === failureBaseline.authoring.compiledHtml
+      && failureAfter.srcdoc === failureBaseline.srcdoc && failureAfter.renderedCss === failureBaseline.renderedCss
+      && isDeepStrictEqual(failureAfter.native, failureBaseline.native);
+    await page.locator('[data-shot-advanced-close]').click();
+
+    const finalEvidence = await page.evaluate(() => { const frame = document.querySelector('[data-preview]');
+      return { dpr: devicePixelRatio, moments: document.querySelectorAll('input[name="shot-moment"]').length,
+        nativeAnimations: frame.contentDocument.getAnimations().filter((animation) => animation.constructor.name === 'CSSAnimation').length,
+        previewMatchesCompiler: frame.srcdoc === window.__motionEditor.compiledHtml }; });
+    receipt.viewport.dpr = finalEvidence.dpr; receipt.momentCount = finalEvidence.moments;
+    receipt.nativeCssAnimationCount = finalEvidence.nativeAnimations;
+    receipt.consoleErrorCount = diagnostics.consoleErrors.length + diagnostics.pageErrors.length;
+    receipt.networkErrorCount = diagnostics.failedRequests.length + diagnostics.unexpectedNetwork.length + diagnostics.httpErrors.length;
+    receipt.passed = receipt.operationCount > 0 && receipt.momentCount >= 3 && receipt.geometryMaxDeltaCssPx <= 1 && responsiveDrawerPassed
+      && receipt.nativeCssAnimationCount > 0 && receipt.keyboardFlowPassed && receipt.failurePreservedCompiler
+      && finalEvidence.previewMatchesCompiler && receipt.consoleErrorCount === 0 && receipt.networkErrorCount === 0;
+  } catch {
+    receipt.passed = false;
+  } finally {
+    await browser?.close(); processHandle.kill('SIGTERM');
+    if (processHandle.exitCode === null) await new Promise((resolveExit) => processHandle.once('exit', resolveExit));
+    await rm(directory, { recursive: true, force: true });
+  }
+  process.stdout.write(`${JSON.stringify(receipt)}\n`);
+  return receipt.passed ? 0 : 1;
 }
 
 async function startIsolatedQaEditor(repositoryRoot, label) {
