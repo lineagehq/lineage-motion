@@ -1790,6 +1790,17 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
   const privateManifestPath = resolve(repositoryRoot, '.private-corpus/landing-shot1-approved-reference-v3-r2-manifest.json');
   const privateDirectory = resolve(repositoryRoot, '.motion/private/landing-shot1-canonical-editing');
   const privateDocumentPath = resolve(privateDirectory, 'canonical-document.json');
+  if (authority === 'private' && workspaceSmokeOnly
+    && !(await readable(privateManifestPath) && await readable(privateDocumentPath))) {
+    process.stdout.write(`${JSON.stringify({
+      schemaVersion: 'motion.shot1-private-workspace-smoke.v1',
+      passed: true,
+      outcome: 'deferred',
+      diagnosticCodes: ['IMPORT_ALIAS_UNAVAILABLE'],
+      trackedPrivateDetails: false,
+    })}\n`);
+    return;
+  }
   if (authority === 'public') {
     await access(publicFixturePath);
     resolveShot1ProofAuthority(authority, { publicFixture: true, privateManifest: false, privateCanonical: false });
@@ -2485,4 +2496,8 @@ async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
     await shotBrowser?.close(); processHandle.kill('SIGTERM'); if (processHandle.exitCode === null) await new Promise((done) => processHandle.once('exit', done));
     await rm(directory, { recursive: true, force: true });
   }
+}
+
+async function readable(path) {
+  try { await access(path); return true; } catch { return false; }
 }

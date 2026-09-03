@@ -46,8 +46,14 @@ export function createLandingShot1EditorSeed(
 
 export function createPhase4SceneDSeed(
   repositoryRoot = resolve(import.meta.dirname, '../../..'),
-  privateDocumentPath = resolve(repositoryRoot, '.motion/private-canonical.json'),
+  privateDocumentPath?: string,
 ): MotionDocument {
+  if (!privateDocumentPath) {
+    const source = readFileSync(resolve(repositoryRoot, 'fixtures/public-synthetic/cursor-click-reveal.html'), 'utf8');
+    const imported = importMotionHtml(source);
+    if (!imported.document) throw new Error(imported.diagnostics[0]?.code ?? 'PHASE4_CURSOR_CLICK_REVEAL_SEED_IMPORT_FAILED');
+    return imported.document;
+  }
   const document = JSON.parse(readFileSync(privateDocumentPath, 'utf8')) as MotionDocument;
   if (!validateMotionDocument(document).ok || document.inventory.ruleCount !== 9
     || document.inventory.applicationCount !== 8 || document.inventory.slotCount !== 9

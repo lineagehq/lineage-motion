@@ -9,7 +9,7 @@
     .cursor { background: #111827; animation: cursor-path 1200ms linear both; }
     .pulse { left: 180px; top: 96px; border-radius: 50%; background: #2563eb;
       animation: click-pulse 600ms ease-out 700ms both; }
-    .reveal { left: 220px; top: 90px; background: #f59e0b;
+    .reveal { left: 180px; top: 96px; background: #f59e0b;
       animation: synchronized-reveal 400ms steps(2, end) 800ms both; }
     @keyframes cursor-path {
       0% { transform: translate(16px, 16px); background: #111827; }
@@ -27,7 +27,7 @@
       100% { opacity: 1; visibility: visible; }
     }
     @media (prefers-reduced-motion: reduce) {
-      .cursor, .pulse, .reveal { animation-duration: 1ms; animation-delay: 0ms; }
+      .cursor, .pulse, .reveal { animation: none; }
     }
   </style>
 </head>
