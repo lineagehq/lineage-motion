@@ -54,3 +54,20 @@ export function createPhase4SceneDSeed(
     || document.inventory.trackCount !== 20) throw new Error('PHASE4_SCENE_D_SEED_INVALID');
   return document;
 }
+
+export function createPhase4ReusableCueSeed(repositoryRoot = resolve(import.meta.dirname, '../../..')): MotionDocument {
+  const source = readFileSync(resolve(repositoryRoot, 'fixtures/public-synthetic/reusable-cues.html'), 'utf8');
+  const imported = importMotionHtml(source);
+  if (!imported.document) throw new Error(imported.diagnostics[0]?.code ?? 'PHASE4_REUSABLE_CUE_SEED_IMPORT_FAILED');
+  imported.document.elements.push(
+    { id: 'el_1000000000000001', selectorHint: '.type', structuralFingerprint: 'html[0]/body[0]/main[0]/p[0]',
+      editableText: 'Synthetic typing sample' },
+    { id: 'el_1000000000000002', selectorHint: '.cursor', structuralFingerprint: 'html[0]/body[0]/main[0]/i[0]' },
+    { id: 'el_1000000000000003', selectorHint: '.selected', structuralFingerprint: 'html[0]/body[0]/main[0]/button[0]' },
+    { id: 'el_1000000000000004', selectorHint: '.highlight', structuralFingerprint: 'html[0]/body[0]/main[0]/div[1]' },
+    { id: 'el_1000000000000005', selectorHint: '.dragged', structuralFingerprint: 'html[0]/body[0]/main[0]/div[2]' },
+  );
+  return { ...imported.document, durationMs: 3000,
+    reducedMotion: { mode: 'source-snapshot',
+      css: '@media (prefers-reduced-motion: reduce) { .stage * { animation: none; } }' } };
+}

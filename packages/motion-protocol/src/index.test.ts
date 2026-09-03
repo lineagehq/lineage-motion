@@ -74,6 +74,26 @@ describe('motion.protocol.v1', () => {
     expect(parseCommand({ ...command, command: { ...command.command, payload: { ...command.command.payload,
       semantic: { ...operation.payload.semantic, arriveMs: 0 } } } })).toEqual({ ok: false, code: 'VALIDATION' });
   });
+  test('strictly transports Type, Select, Drag, and Hold intents without hidden source authority', () => {
+    const semantics = [
+      { kind: 'type', targetId: 'el_text', startMs: 100, completeMs: 600, stepCount: 5 },
+      { kind: 'select', cursorTargetId: 'el_cursor', selectedTargetId: 'el_target', highlightTargetId: 'el_highlight',
+        approachMs: 100, chooseMs: 300, settleMs: 500 },
+      { kind: 'drag', cursorTargetId: 'el_cursor', draggedTargetId: 'el_target', approachMs: 0, pressMs: 100,
+        moveStartMs: 200, arriveMs: 600, releaseMs: 700, grabOffsetXPpm: 10_000, grabOffsetYPpm: -20_000,
+        waypoints: [{ timeMs: 200, xPpm: 100_000, yPpm: 200_000 }, { timeMs: 600, xPpm: 600_000, yPpm: 500_000 }] },
+      { kind: 'hold', targetIds: ['el_target'], enterMs: 500, durationMs: 300, exitMs: 800 },
+    ] as const;
+    for (const [index, semantic] of semantics.entries()) {
+      const request = { schemaVersion: 'motion.operation-preparation-request.v1' as const, documentId: 'doc', branchId: 'main',
+        expectedRevision: 0, kind: 'motion.cue.create' as const, intent: {
+          kind: 'motion.cue.create' as const, creationKey: `reusable-${index}`, semantic,
+        } };
+      expect(parseOperationPreparationRequest(request)).toEqual(request);
+      expect(() => parseOperationPreparationRequest({ ...request, intent: { ...request.intent, sourceTracks: ['hidden'] } }))
+        .toThrow('PROTOCOL_PREPARATION_REQUEST_INVALID');
+    }
+  });
   test('strictly carries the shared trajectory operation without widening its bundle', () => {
     const operation: TransformWaypointsTranslateOperation = { schemaVersion: 'motion.operation.v1', kind: 'motion.transform-waypoints.translate', operationId: 'trajectory', documentId: 'doc', expectedRevision: 0,
       payload: { targets: [{ elementId: 'a', trackId: 't', keyframeId: 'k', expectedTransform: 'translate(0px, 0px)' }], deltaXPpm: 1000, deltaYPpm: -1000,

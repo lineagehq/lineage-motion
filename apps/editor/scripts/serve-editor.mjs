@@ -2,7 +2,7 @@ import { createServer as createNetServer } from 'node:net';
 import { createServer as createViteServer } from 'vite';
 
 import { startLocalMotionService } from '../../../packages/local-service/src/index.ts';
-import { createLandingShot1EditorSeed, createPhase3Seed, createPhase4SceneDSeed } from '../../../packages/local-service/src/seed.ts';
+import { createLandingShot1EditorSeed, createPhase3Seed, createPhase4ReusableCueSeed, createPhase4SceneDSeed } from '../../../packages/local-service/src/seed.ts';
 
 const databasePath = process.env.PHASE3_DATABASE_PATH;
 if (!databasePath) throw new Error('PHASE3_DATABASE_PATH_REQUIRED');
@@ -12,7 +12,9 @@ if (!humanCapability || !agentCapability) throw new Error('PHASE3_CAPABILITIES_R
 const requestedEditorPort = Number(process.env.PHASE3_EDITOR_PORT ?? 41739);
 const editorPort = requestedEditorPort === 0 ? await reserveEphemeralPort() : requestedEditorPort;
 const repositoryRoot = new URL('../../..', import.meta.url).pathname;
-const seed = process.env.PHASE4_CURSOR_CLICK_REVEAL === '1'
+const seed = process.env.PHASE4_REUSABLE_CUES === '1'
+  ? createPhase4ReusableCueSeed(repositoryRoot)
+  : process.env.PHASE4_CURSOR_CLICK_REVEAL === '1'
   ? createPhase4SceneDSeed(repositoryRoot, process.env.PHASE4_SCENE_D_DOCUMENT_PATH)
   : process.env.LANDING_SHOT1_WORKSPACE === '1'
   ? createLandingShot1EditorSeed(repositoryRoot, process.env.LANDING_SHOT1_DOCUMENT_PATH)

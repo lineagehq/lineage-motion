@@ -334,6 +334,24 @@ function parseCueSemantic(options: Options): unknown {
     pulseRadiusPpm: positiveInteger(options.read('--pulse-radius-ppm')),
     pulseOpacityPpm: positiveInteger(options.read('--pulse-opacity-ppm')),
     ...(options.read('--reveal-cue-id') ? { revealCueId: options.read('--reveal-cue-id') } : {}) };
+  if (semantic === 'type') return { kind: 'type', targetId: one(options.readAll('--target-id'), '--target-id'),
+    startMs: nonnegativeInteger(options.read('--start-ms')), completeMs: nonnegativeInteger(options.read('--complete-ms')),
+    stepCount: positiveInteger(options.read('--step-count')) };
+  if (semantic === 'select') return { kind: 'select', cursorTargetId: requireText(options.read('--cursor-target-id')),
+    selectedTargetId: requireText(options.read('--selected-target-id')),
+    ...(options.read('--highlight-target-id') ? { highlightTargetId: options.read('--highlight-target-id') } : {}),
+    approachMs: nonnegativeInteger(options.read('--approach-ms')), chooseMs: nonnegativeInteger(options.read('--choose-ms')),
+    settleMs: nonnegativeInteger(options.read('--settle-ms')) };
+  if (semantic === 'drag') return { kind: 'drag', cursorTargetId: requireText(options.read('--cursor-target-id')),
+    draggedTargetId: requireText(options.read('--dragged-target-id')),
+    approachMs: nonnegativeInteger(options.read('--approach-ms')), pressMs: nonnegativeInteger(options.read('--press-ms')),
+    moveStartMs: nonnegativeInteger(options.read('--move-start-ms')), arriveMs: nonnegativeInteger(options.read('--arrive-ms')),
+    releaseMs: nonnegativeInteger(options.read('--release-ms')), grabOffsetXPpm: safeInteger(options.read('--grab-offset-x-ppm')),
+    grabOffsetYPpm: safeInteger(options.read('--grab-offset-y-ppm')),
+    waypoints: many(options.readAll('--waypoint'), '--waypoint').map(parseWaypoint) };
+  if (semantic === 'hold') return { kind: 'hold', targetIds: many(options.readAll('--target-id'), '--target-id'),
+    enterMs: nonnegativeInteger(options.read('--enter-ms')), durationMs: positiveInteger(options.read('--duration-ms')),
+    exitMs: nonnegativeInteger(options.read('--exit-ms')) };
   throw new Error('CLI_SEMANTIC_INVALID');
 }
 function parseWaypoint(value: string): { timeMs: number; xPpm: number; yPpm: number } {

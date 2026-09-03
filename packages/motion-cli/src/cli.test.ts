@@ -8,6 +8,7 @@ import { createTrajectorySeed } from '../../local-service/src/seed.ts';
 import { phase3Seed, temporaryStore } from '../../local-service/src/test-support.ts';
 import { cueTargetSnapshots, deriveCueId, projectCueReplacement,
   type CueAuthoringOperation, type CueSemantic } from '../../domain/src/index.ts';
+import { importMotionHtml } from '../../css-import/src/index.ts';
 
 const capabilities = {
   human: randomBytes(32).toString('base64url'),
@@ -164,6 +165,64 @@ describe('branch and claim CLI', () => {
     expect(code).toBe(0); expect(JSON.parse(stdout)).toMatchObject({ ok: true, resultingRevision: 1,
       receipt: { inventory: { trackCount: expect.any(Number) } } });
     expect(stdout).not.toContain('structuralFingerprint');
+    await service.close(); await temp.cleanup();
+  });
+  test('dispatches Type, Select, Drag, and reusable Hold through the same service preparation path', async () => {
+    const imported = importMotionHtml(`<!doctype html><html><head><style>.source,.source-two{animation:source 2s linear both}
+      @keyframes source{0%{opacity:0}50%{opacity:.5}100%{opacity:1}}</style></head><body>
+      <div class="source"></div><div class="source-two"></div><span></span><i></i><b></b><em></em></body></html>`);
+    if (!imported.document) throw new Error('synthetic import failed');
+    const seed = imported.document; seed.durationMs = 3000;
+    seed.elements.push(
+      { id: 'el_type', selectorHint: '', structuralFingerprint: 'synthetic/type', editableText: 'Synthetic text' },
+      { id: 'el_cursor', selectorHint: '', structuralFingerprint: 'synthetic/cursor' },
+      { id: 'el_selected', selectorHint: '', structuralFingerprint: 'synthetic/selected' },
+      { id: 'el_highlight', selectorHint: '', structuralFingerprint: 'synthetic/highlight' },
+      { id: 'el_dragged', selectorHint: '', structuralFingerprint: 'synthetic/dragged' },
+    );
+    const temp = await temporaryStore();
+    const service = await startLocalMotionService({ databasePath: temp.databasePath, seed, capabilities });
+    const invoke = async (args: string[]) => { let stdout = ''; let stderr = ''; const code = await runCli(args,
+      { stdout: (value) => { stdout += value; }, stderr: (value) => { stderr += value; } });
+      return { code, stdout, stderr, json: stdout ? JSON.parse(stdout) as Record<string, unknown> : null }; };
+    const common = ['--service', service.url, '--document-id', seed.documentId, '--capability', capabilities.human];
+    const calls = [
+      ['--operation-id', 'type', '--expected-revision', '0', '--creation-key', 'type', '--semantic', 'type',
+        '--target-id', 'el_type', '--start-ms', '100', '--complete-ms', '600', '--step-count', '5'],
+      ['--operation-id', 'select', '--expected-revision', '1', '--creation-key', 'select', '--semantic', 'select',
+        '--cursor-target-id', 'el_cursor', '--selected-target-id', 'el_selected', '--highlight-target-id', 'el_highlight',
+        '--approach-ms', '100', '--choose-ms', '300', '--settle-ms', '500'],
+      ['--operation-id', 'drag', '--expected-revision', '2', '--creation-key', 'drag', '--semantic', 'drag',
+        '--cursor-target-id', 'el_cursor', '--dragged-target-id', 'el_dragged', '--approach-ms', '0', '--press-ms', '100',
+        '--move-start-ms', '200', '--arrive-ms', '600', '--release-ms', '700', '--grab-offset-x-ppm', '10000',
+        '--grab-offset-y-ppm', '-20000', '--waypoint', '200:100000:200000', '--waypoint', '600:600000:500000'],
+    ];
+    for (const [index, args] of calls.entries()) {
+      const result = await invoke(['cue-create', ...common, ...args]);
+      expect(result, JSON.stringify(result)).toMatchObject({ code: 0, stderr: '', json: { ok: true, resultingRevision: index + 1 } });
+    }
+    const animatedIds = [...new Set(seed.tracks.map((track) => track.elementId))];
+    const rejectedScopes = [
+      { operationId: 'hold-mixed-invalid', enterMs: '1000', targetIds: [animatedIds[0]!, 'el_selected'],
+        reasonCode: 'CUE_HOLD_TARGET_UNANIMATED' },
+      { operationId: 'hold-boundary-invalid', enterMs: '900', targetIds: animatedIds,
+        reasonCode: 'CUE_HOLD_ENTER_BOUNDARY_MISSING' },
+    ];
+    for (const scope of rejectedScopes) {
+      const result = await invoke(['cue-create', ...common, '--operation-id', scope.operationId, '--expected-revision', '3',
+        '--creation-key', scope.operationId, '--semantic', 'hold', ...scope.targetIds.flatMap((id) => ['--target-id', id]),
+        '--enter-ms', scope.enterMs, '--duration-ms', '300', '--exit-ms', String(Number(scope.enterMs) + 300)]);
+      expect(result).toMatchObject({ code: 2, stderr: '', json: { reasonCode: scope.reasonCode } });
+      const unchanged = await invoke(['workspace', ...common]);
+      expect(unchanged).toMatchObject({ code: 0, stderr: '', json: { revision: 3 } });
+    }
+    const hold = await invoke(['cue-create', ...common, '--operation-id', 'hold', '--expected-revision', '3',
+      '--creation-key', 'hold', '--semantic', 'hold', ...animatedIds.flatMap((id) => ['--target-id', id]),
+      '--enter-ms', '1000', '--duration-ms', '300', '--exit-ms', '1300']);
+    expect(hold).toMatchObject({ code: 0, stderr: '', json: { ok: true, resultingRevision: 4 } });
+    const workspace = await invoke(['workspace', ...common]);
+    expect((workspace.json!.cues as Array<{ semantic: { kind: string } }>).map((cue) => cue.semantic.kind).sort())
+      .toEqual(['drag', 'hold', 'select', 'type']);
     await service.close(); await temp.cleanup();
   });
   test('dispatches a strict local trajectory bundle without echoing its bytes or path', async () => {

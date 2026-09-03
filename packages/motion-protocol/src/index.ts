@@ -67,7 +67,7 @@ const groupEasing = z.object({ ...authorBase, kind: z.literal('motion.keyframe-g
 const settledHold = z.object({ ...authorBase, kind: z.literal('motion.settled-hold.set'), payload: z.object({ targets, sourceTimeMs: z.number().int().min(1).max(2100), settledTimeMs: z.number().int().min(2).max(2099), landingTimeMs: z.number().int().min(1).max(2098), boundaryTimeMs: z.literal(2100) }).strict() }).strict();
 const history = z.object({ ...authorBase, kind: z.enum(['motion.history.undo', 'motion.history.redo']) }).strict();
 const cueSnapshot = z.object({ role: z.string().min(1), ordinal: z.number().int().nonnegative(), elementId: z.string().min(1),
-  structuralFingerprint: z.string().min(1) }).strict();
+  structuralFingerprint: z.string().min(1), contentKind: z.literal('text').optional() }).strict();
 const cursorSemantic = z.object({ kind: z.literal('cursor-path'), cursorTargetId: z.string().min(1), startMs: revision,
   arriveMs: revision, easing: timing, waypoints: z.array(z.object({ timeMs: revision, xPpm: z.number().int().safe(),
     yPpm: z.number().int().safe() }).strict()).min(2) }).strict().superRefine((value, context) => {
@@ -89,10 +89,45 @@ const revealSemantic = z.object({ kind: z.literal('reveal'), targetIds: z.array(
       context.addIssue({ code: 'custom', message: 'CUE_REVEAL_INVALID' });
     }
   });
-const cueSemantic = z.discriminatedUnion('kind', [cursorSemantic, clickSemantic, revealSemantic]);
+const typeSemantic = z.object({ kind: z.literal('type'), targetId: z.string().min(1), startMs: revision,
+  completeMs: revision, stepCount: z.number().int().positive().safe() }).strict().superRefine((value, context) => {
+    if (value.completeMs <= value.startMs) context.addIssue({ code: 'custom', message: 'CUE_MOMENT_ORDER' });
+  });
+const selectSemantic = z.object({ kind: z.literal('select'), cursorTargetId: z.string().min(1),
+  selectedTargetId: z.string().min(1), highlightTargetId: z.string().min(1).optional(), approachMs: revision,
+  chooseMs: revision, settleMs: revision }).strict().superRefine((value, context) => {
+    if (!(value.approachMs < value.chooseMs && value.chooseMs < value.settleMs)) {
+      context.addIssue({ code: 'custom', message: 'CUE_MOMENT_ORDER' });
+    }
+  });
+const dragSemantic = z.object({ kind: z.literal('drag'), cursorTargetId: z.string().min(1), draggedTargetId: z.string().min(1),
+  approachMs: revision, pressMs: revision, moveStartMs: revision, arriveMs: revision, releaseMs: revision,
+  grabOffsetXPpm: z.number().int().safe(), grabOffsetYPpm: z.number().int().safe(), waypoints: z.array(z.object({
+    timeMs: revision, xPpm: z.number().int().safe(), yPpm: z.number().int().safe() }).strict()).min(2) }).strict()
+  .superRefine((value, context) => {
+    if (!(value.approachMs < value.pressMs && value.pressMs <= value.moveStartMs && value.moveStartMs < value.arriveMs
+      && value.arriveMs < value.releaseMs) || value.waypoints[0]?.timeMs !== value.moveStartMs
+      || value.waypoints.at(-1)?.timeMs !== value.arriveMs
+      || value.waypoints.some((point, index) => index > 0 && point.timeMs <= value.waypoints[index - 1]!.timeMs)) {
+      context.addIssue({ code: 'custom', message: 'CUE_MOMENT_ORDER' });
+    }
+  });
+const holdSemantic = z.object({ kind: z.literal('hold'), targetIds: z.array(z.string().min(1)).min(1), enterMs: revision,
+  durationMs: z.number().int().positive().safe(), exitMs: revision }).strict().superRefine((value, context) => {
+    if (value.exitMs !== value.enterMs + value.durationMs || new Set(value.targetIds).size !== value.targetIds.length) {
+      context.addIssue({ code: 'custom', message: 'CUE_HOLD_INVALID' });
+    }
+  });
+const cueSemantic = z.discriminatedUnion('kind', [cursorSemantic, clickSemantic, revealSemantic, typeSemantic,
+  selectSemantic, dragSemantic, holdSemantic]);
 const sanitizedCueSemantic = cueSemantic.superRefine((value, context) => {
-  const ids = value.kind === 'reveal' ? value.targetIds : value.kind === 'cursor-path'
-    ? [value.cursorTargetId] : [value.cursorTargetId, value.pulseTargetId];
+  const ids = value.kind === 'reveal' || value.kind === 'hold' ? value.targetIds
+    : value.kind === 'type' ? [value.targetId]
+      : value.kind === 'cursor-path' ? [value.cursorTargetId]
+        : value.kind === 'click' ? [value.cursorTargetId, value.pulseTargetId]
+          : value.kind === 'select' ? [value.cursorTargetId, value.selectedTargetId,
+            ...(value.highlightTargetId ? [value.highlightTargetId] : [])]
+            : [value.cursorTargetId, value.draggedTargetId];
   if (ids.some((id) => !stableId.safeParse(id).success)) context.addIssue({ code: 'custom', message: 'STABLE_ID' });
 });
 const cueId = z.string().regex(/^cue_[a-f0-9]{24}$/); const digestOrNull = z.string().regex(/^[a-f0-9]{64}$/).nullable();

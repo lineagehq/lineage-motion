@@ -12,7 +12,7 @@
     "dev:editor": "vite --config apps/editor/vite.config.ts",
     "build": "vite build --config apps/editor/vite.config.ts",
     "test:browser": "playwright test --config apps/editor/playwright.config.ts",
-    "test:visual": "vitest run packages/visual-proof/src/visual.test.ts packages/visual-proof/src/hold-ripple.visual.test.ts --sequence.concurrent false",
+    "test:visual": "vitest run packages/visual-proof/src/visual.test.ts packages/visual-proof/src/hold-ripple.visual.test.ts packages/visual-proof/src/reusable-cues.visual.test.ts --sequence.concurrent false",
     "test:private-acceptance": "vitest run packages/css-import/src/landing-shot1.private.test.ts packages/visual-proof/src/landing-shot1.private.visual.test.ts --sequence.concurrent false",
     "verify:receipts": "vitest run packages/visual-proof/src/receipt.private.test.ts",
     "qa:chrome": "node apps/editor/scripts/qa-chrome.mjs && node apps/editor/scripts/qa-chrome.mjs --shot1-spatial-parity-public && node apps/editor/scripts/qa-chrome.mjs --landing-shot1 --workspace-smoke-only && npm run test:phase3:browser",

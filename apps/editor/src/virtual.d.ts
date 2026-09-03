@@ -12,7 +12,7 @@ declare module 'virtual:motion-document' {
       settledMs: 2100;
       targetElementIds: string[];
     };
-    cueWorkspace?: { schemaVersion: 'motion.editor-cue-workspace.v1' };
+    cueWorkspace?: { schemaVersion: 'motion.editor-cue-workspace.v1' | 'motion.editor-cue-workspace.v2' };
   };
   export default payload;
 }
