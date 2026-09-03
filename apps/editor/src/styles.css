@@ -466,22 +466,23 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
 .shot-active .preview-object-target[aria-pressed="true"] { border-color: #facf74; box-shadow: 0 0 0 3px rgba(250,207,116,.18); }
 .shot-active .preview-selection { border-radius: 2px; transition: none; box-shadow: 0 0 0 1px rgba(11,13,18,.8); }
 .shot-active .preview-panel { position: relative; display: grid; grid-template-rows: auto minmax(430px, 1fr) auto; }
-.shot-active .preview-title { grid-row: 1; }
+.shot-active .preview-title { grid-row: 1; grid-column: 1; }
+.shot-active .preview-shot-toolbar { grid-row: 1; grid-column: 1; justify-self: end; align-self: center; z-index: 11; }
 .shot-active .shot-workspace { display: contents; }
 .shot-active .shot-object-bar { position: absolute; z-index: 12; top: 52px; left: 50%; display: flex; gap: 6px; translate: -50% 0; }
 .shot-active .shot-object-bar fieldset { display: flex; align-items: center; min-width: 0; gap: 6px; padding: 0; border: 0; }
 .shot-active .shot-object-bar legend, .shot-active .shot-object-bar .move-together small { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
 .shot-active .shot-object-bar .move-together { display: flex; align-items: center; min-height: 44px; gap: 7px; padding: 6px 10px; border: 1px solid #303949; border-radius: 9px; background: #10151e; cursor: pointer; }
-.shot-active .shot-context-dock { position: relative; z-index: 12; grid-row: 2; align-self: end; margin: 12px; }
-.shot-active .shot-context-dock .moment-editor { margin: 0; }
-.shot-active .preview-stage { grid-row: 2; min-height: 430px; }
-.shot-active .preview-control-rail { grid-row: 3; position: relative; z-index: 11; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid #30394a; }
+.shot-active .shot-context-dock { position: relative; z-index: 12; grid-row: 2; grid-column: 1; align-self: end; margin: 0; }
+.shot-active .shot-context-dock .moment-editor { margin: 12px; }
+.shot-active .preview-stage { grid-row: 2; grid-column: 1; min-height: 430px; }
+.shot-active .preview-control-rail { grid-row: 3; grid-column: 1; position: relative; z-index: 11; display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 8px 12px; border-top: 1px solid #30394a; }
 .shot-active .transport { display: flex; align-items: center; gap: 7px; padding: 0; border: 0; }
 .shot-active .transport label { flex: 1 1 220px; }
 .shot-active .shot-moments:not([hidden]) { display: flex; min-width: 0; margin: 0; padding: 0; border: 0; }
-.shot-active .shot-history-slot { position: relative; z-index: 13; grid-row: 3; align-self: center; justify-self: end; margin: 0; }
+.shot-active .shot-history-slot { position: relative; z-index: 13; grid-row: 3; grid-column: 1; align-self: center; justify-self: end; margin: 0; }
 .shot-active [data-shot-status] { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
-.shot-active .shot-recovery { grid-row: 2; z-index: 14; margin: 18px; }
+.shot-active .shot-recovery { grid-row: 2; grid-column: 1; z-index: 14; margin: 18px; }
 .preview-transform-handle { position: absolute; z-index: 4; display: grid; margin: 0; padding: 0; place-items: center; pointer-events: auto;
   touch-action: none; border: 0; background: transparent; color: #0b0d12; cursor: grab; }
 .preview-transform-handle::before { z-index: 1; display: grid; width: 14px; height: 14px; content: ""; place-items: center; border: 2px solid #0b0d12;
@@ -517,6 +518,6 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
   .shot-active .advanced-content { inset: auto 9px 9px; width: auto; max-height: 72vh; }
   .shot-active .preview-shot-toolbar:not([hidden]) { position: static; display: none; }
   .shot-active .shot-object-bar { top: 52px; max-width: calc(100% - 18px); flex-wrap: wrap; justify-content: center; }
-  .shot-active .shot-context-dock { margin: 9px; }
+  .shot-active .shot-context-dock .moment-editor { margin: 9px; }
   .shot-active .preview-control-rail { grid-template-columns: 1fr; }
 }

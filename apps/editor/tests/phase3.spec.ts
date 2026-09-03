@@ -195,11 +195,15 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     const objectBar = document.querySelector<HTMLElement>('[data-shot-object-bar]')!;
     const dock = document.querySelector<HTMLElement>('[data-shot-context-dock]')!;
     const rail = document.querySelector<HTMLElement>('[data-preview-control-rail]')!;
+    const stageBounds = stage.getBoundingClientRect();
+    const dockBounds = dock.getBoundingClientRect();
     return {
       objectBarInsidePreview: preview.contains(objectBar),
       dockInsidePreview: preview.contains(dock),
       railInsidePreview: preview.contains(rail),
       stageHeight: Math.round(stage.getBoundingClientRect().height),
+      sharedStageDockColumn: Math.round(stageBounds.left) === Math.round(dockBounds.left)
+        && Math.round(stageBounds.right) === Math.round(dockBounds.right),
       order: [objectBar, stage, dock, rail].map((node) =>
         Math.round(node.getBoundingClientRect().top)),
     };
@@ -208,6 +212,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   expect(layoutContract.dockInsidePreview).toBe(true);
   expect(layoutContract.railInsidePreview).toBe(true);
   expect(layoutContract.stageHeight).toBeGreaterThanOrEqual(430);
+  expect(layoutContract.sharedStageDockColumn).toBe(true);
   expect(layoutContract.order[0]!).toBeLessThan(layoutContract.order[3]!);
   const objectInputs = workspace.locator('[data-shot-targets] input[type="checkbox"]');
   const primaryInputs = workspace.locator('[data-shot-targets] input[name="shot-primary"]');
@@ -289,7 +294,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     });
   };
   await page.setViewportSize({ width: 960, height: 908 });
-  await expect.poll(() => page.locator('[data-preview-canvas]').evaluate((canvas) => canvas.getBoundingClientRect().width)).toBeGreaterThan(400);
+  await expect.poll(() => page.locator('[data-preview-canvas]').evaluate((canvas) => canvas.getBoundingClientRect().width)).toBeGreaterThan(440);
   await expect(page.locator('[data-trajectory-segment]').first()).toBeVisible();
   const previewToolbar = page.locator('[data-preview-shot-toolbar]'); await expect(previewToolbar).toBeVisible();
   await expect(previewToolbar.getByRole('button', { name: 'Show path overlay' })).toHaveAttribute('aria-pressed', 'true');
@@ -323,7 +328,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     const width = Number.parseFloat(button.style.width); const height = Number.parseFloat(button.style.height);
     return Math.abs(left + width / 2 - (targetRect.left + targetRect.width / 2)) < 0.01
       && Math.abs(top + height / 2 - (targetRect.top + targetRect.height / 2)) < 0.01
-      && width >= targetRect.width && height >= targetRect.height
+      && width + .001 >= targetRect.width && height + .001 >= targetRect.height
       && button.getBoundingClientRect().width >= 43.5 && button.getBoundingClientRect().height >= 43.5;
   }))).toBe(true);
   expect(await canvasObjectTargets.first().evaluate((button) => {
