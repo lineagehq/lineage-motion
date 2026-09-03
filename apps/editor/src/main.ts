@@ -138,30 +138,6 @@ document.body.innerHTML = `
       <output data-cue-status role="status" aria-live="polite">Choose the cursor, then click its object on the canvas.</output>
       <details class="cue-advanced"><summary>Edit completed beats</summary><div data-authored-cues class="authored-cues"></div></details>
     </section>` : ''}
-    <section class="shot-workspace" data-shot-workspace hidden aria-labelledby="shot-workspace-heading">
-      <header><div><p class="eyebrow">Shot 1 · 0–2100 ms</p><h2 id="shot-workspace-heading">Choose an object, then shape each moment</h2><p>The canvas is the editor: drag to move, use the corners to scale, and use the handle above to rotate.</p></div></header>
-      <div class="shot-grid"><fieldset data-shot-targets><legend>Object</legend></fieldset><button class="path-toggle" type="button" data-shot-mode="path" aria-label="Path" aria-pressed="true">Hide path</button><label class="move-together"><input type="checkbox" data-move-together aria-label="Move together"><span><strong>Edit together</strong><small>Position changes apply to both selected objects.</small></span></label></div>
-      <p class="shot-guidance" data-shot-guidance role="note"></p>
-      <section class="moment-editor" aria-labelledby="moment-editor-heading">
-        <div class="moment-heading"><div><strong id="moment-editor-heading">Moments</strong><span>Select a moment. Use + to add a point.</span></div><button type="button" data-shot-remove-moment disabled>Remove point</button></div>
-        <fieldset class="shot-moments" data-shot-moments><legend>Animation moments</legend><div data-shot-moment-sequence></div></fieldset>
-        <div class="moment-transition" data-shot-moment-transition>
-          <label><span>When this moment happens</span><input data-shot-moment-time type="range" min="1" max="2099" step="1"><output data-shot-moment-time-output></output></label>
-          <label><span>Movement after this moment</span><select data-shot-easing><option value="custom" disabled>Custom</option><option value="ease">Smooth</option><option value="ease-out">Glide in</option><option value="ease-in">Build speed</option><option value="ease-in-out">Soft in &amp; out</option><option value="linear">Constant speed</option></select></label>
-          <button type="button" data-shot-apply-easing>Apply movement</button>
-        </div>
-      </section>
-      <details class="shot-advanced" data-shot-advanced><summary>Inspect &amp; fine-tune</summary><div class="advanced-content">
-        <form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form>
-        <div class="shot-timing"><label>Hold begins (ms)<input data-shot-settled type="number" min="2" max="2099" value="1820"></label><button type="button" data-shot-hold>Hold final pose through Settle</button></div>
-      </div></details>
-      <div class="shot-history-slot" data-shot-history-slot></div>
-      <output data-shot-status role="status" aria-live="polite"></output>
-      <section class="shot-recovery" data-shot-recovery hidden aria-labelledby="shot-recovery-heading">
-        <div><strong id="shot-recovery-heading">Manual Shot editing is unavailable</strong><span data-shot-recovery-copy></span></div>
-        <div><button type="button" data-shot-retry>Retry Shot workspace</button><button type="button" data-shot-inspect>Open track inspector</button></div>
-      </section>
-    </section>
     <div class="primary-layout">
       <div class="workflow" aria-label="Animation workflow">
         <section class="workflow-card choose-create" aria-labelledby="choose-create-heading">
@@ -207,12 +183,28 @@ document.body.innerHTML = `
           <div class="preview-shot-context"><strong data-preview-shot-object>Object 1</strong><output data-preview-shot-state>Editing 700 ms</output></div>
           <div class="preview-shot-actions" data-preview-shot-actions role="group" aria-label="Preview-side Shot controls"></div>
         </div>
-      <div class="preview-stage"><div class="preview-canvas" data-preview-canvas><iframe data-preview title="Compiled motion preview"></iframe><div class="preview-object-overlay" data-preview-object-overlay aria-label="Selectable preview objects"></div><div class="cue-target-overlay" data-cue-target-overlay hidden aria-label="Choose a cue target on the canvas"></div><div class="cue-path-overlay" data-cue-path-overlay aria-label="Cursor path handles"></div><div class="preview-selection" data-preview-selection hidden><span>Selected element</span></div><div class="trajectory-overlay" data-trajectory-overlay aria-label="Compiler-native trajectory waypoints"></div></div></div>
-        <div class="transport" aria-label="Preview transport">
-          <button type="button" data-play>Play</button><button type="button" data-pause>Pause</button>
-          <label>Preview time <input data-scrub type="range" min="0" max="${authoring.document.durationMs}" step="1" value="0"></label>
-          <output data-playhead>0 ms</output>
-        </div>
+        <section class="shot-workspace" data-shot-workspace data-active="false" aria-labelledby="shot-workspace-heading">
+          <h2 class="visually-hidden" id="shot-workspace-heading">Shape motion directly on the canvas</h2>
+          <div class="shot-object-bar" data-shot-object-bar><fieldset data-shot-targets><legend>Object</legend></fieldset><button class="path-toggle" type="button" data-shot-mode="path" aria-label="Path" aria-pressed="true">Hide path</button><label class="move-together"><input type="checkbox" data-move-together aria-label="Edit together"><span><strong>Edit together</strong><small>Position changes apply to both selected objects.</small></span></label></div>
+          <p class="shot-guidance visually-hidden" data-shot-guidance role="note"></p>
+          <div class="preview-stage"><div class="preview-canvas" data-preview-canvas><iframe data-preview title="Compiled motion preview"></iframe><div class="preview-object-overlay" data-preview-object-overlay aria-label="Selectable preview objects"></div><div class="cue-target-overlay" data-cue-target-overlay hidden aria-label="Choose a cue target on the canvas"></div><div class="cue-path-overlay" data-cue-path-overlay aria-label="Cursor path handles"></div><div class="preview-selection" data-preview-selection hidden><span>Selected element</span></div><div class="trajectory-overlay" data-trajectory-overlay aria-label="Compiler-native trajectory waypoints"></div></div></div>
+          <div class="preview-control-rail" data-preview-control-rail>
+            <div class="transport" aria-label="Preview transport"><button type="button" data-play>Play</button><button type="button" data-pause>Pause</button><label>Preview time <input data-scrub type="range" min="0" max="${authoring.document.durationMs}" step="1" value="0"></label><output data-playhead>0 ms</output></div>
+            <fieldset class="shot-moments" data-shot-moments hidden><legend>Animation moments</legend><div data-shot-moment-sequence></div></fieldset>
+          </div>
+          <section class="shot-context-dock" data-shot-context-dock aria-label="Selected moment controls">
+            <section class="moment-editor" aria-labelledby="moment-editor-heading">
+              <div class="moment-heading"><div><strong id="moment-editor-heading" data-shot-context-name>Moments</strong><span>Select a moment. Use + to add a point.</span></div><button type="button" data-shot-context-remove data-shot-remove-moment disabled>Remove point</button></div>
+              <div class="moment-transition" data-shot-moment-transition><label><span>When this moment happens</span><input data-shot-context-time data-shot-moment-time type="range" min="1" max="2099" step="1"><output data-shot-moment-time-output></output></label><label><span>Movement after this moment</span><select data-shot-context-easing data-shot-easing><option value="custom" disabled>Custom</option><option value="ease">Smooth</option><option value="ease-out">Glide in</option><option value="ease-in">Build speed</option><option value="ease-in-out">Soft in &amp; out</option><option value="linear">Constant speed</option></select></label><button type="button" data-shot-apply-easing>Apply movement</button></div>
+            </section>
+            <div class="shot-advanced" data-shot-advanced><button type="button" data-shot-advanced-toggle aria-controls="shot-advanced-drawer" aria-expanded="false">Advanced motion controls</button></div>
+            <output class="shot-control-feedback" data-shot-control-feedback role="status" aria-live="polite" hidden></output>
+          </section>
+          <aside class="shot-advanced-drawer" id="shot-advanced-drawer" data-shot-advanced-drawer hidden aria-label="Advanced motion controls"><header><strong>Advanced motion controls</strong><button type="button" data-shot-advanced-close>Close</button></header><details><summary>Exact pose</summary><form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form></details><details><summary>Settled hold</summary><div class="shot-timing"><label>Hold begins (ms)<input data-shot-settled type="number" min="2" max="2099" value="1820"></label><button type="button" data-shot-hold>Hold final pose through Settle</button></div></details><div data-shot-advanced-technical></div></aside>
+          <div class="shot-history-slot" data-shot-history-slot></div>
+          <output data-shot-status role="status" aria-live="polite"></output>
+          <section class="shot-recovery" data-shot-recovery hidden aria-labelledby="shot-recovery-heading"><div><strong id="shot-recovery-heading">Manual Shot editing is unavailable</strong><span data-shot-recovery-copy></span></div><div><button type="button" data-shot-retry>Retry Shot workspace</button><button type="button" data-shot-inspect>Open track inspector</button></div></section>
+        </section>
       </section>
     </div>
     <section class="draft-conflict" data-draft-conflict hidden role="alert"><div><strong>Remote revision available</strong><span>Your unsubmitted draft is still here and has not been applied. Choose how to resolve it.</span></div><button type="button" data-keep-draft>Keep draft</button><button type="button" data-discard-draft>Discard draft</button></section>
@@ -266,7 +258,10 @@ const shotTargets = required<HTMLFieldSetElement>('[data-shot-targets]');
 const shotMoments = required<HTMLFieldSetElement>('[data-shot-moments]');
 const shotOverlay = required<HTMLElement>('[data-trajectory-overlay]');
 const shotPoseForm = required<HTMLFormElement>('[data-pose-form]');
+const shotAdvancedToggle = required<HTMLButtonElement>('[data-shot-advanced-toggle]');
+const shotAdvancedDrawer = required<HTMLElement>('[data-shot-advanced-drawer]');
 const shotStatus = required<HTMLOutputElement>('[data-shot-status]');
+const shotControlFeedback = required<HTMLOutputElement>('[data-shot-control-feedback]');
 const shotGuidance = required<HTMLElement>('[data-shot-guidance]');
 const shotRecovery = required<HTMLElement>('[data-shot-recovery]');
 const cueWorkspace = document.querySelector<HTMLElement>('[data-cue-workspace]');
@@ -320,7 +315,20 @@ let waypointReleasePhase: 'idle' | 'flushing-latest' | 'committing' | 'publishin
 let playbackFeedbackFrame: number | null = null;
 let lastPreviewCommitPromotion: { schemaVersion: 'motion.preview-css-commit-promotion.v1'; attempted: boolean;
   promoted: boolean; fallbackCode: string | null } = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: false,
-    promoted: false, fallbackCode: null };
+  promoted: false, fallbackCode: null };
+function setShotAdvancedOpen(open: boolean, returnFocus = false): void {
+  shotAdvancedDrawer.hidden = !open;
+  shotAdvancedToggle.setAttribute('aria-expanded', String(open));
+  document.querySelector('.editor-shell')?.classList.toggle('shot-advanced-open', open);
+  if (open) required<HTMLButtonElement>('[data-shot-advanced-close]').focus();
+  else if (returnFocus) shotAdvancedToggle.focus();
+}
+
+shotAdvancedToggle.addEventListener('click', () => setShotAdvancedOpen(shotAdvancedDrawer.hidden));
+required<HTMLButtonElement>('[data-shot-advanced-close]').addEventListener('click', () => setShotAdvancedOpen(false, true));
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !shotAdvancedDrawer.hidden) setShotAdvancedOpen(false, true);
+});
 required<HTMLButtonElement>('[data-keep-draft]').addEventListener('click', () => resolveDraftConflict(true));
 required<HTMLButtonElement>('[data-discard-draft]').addEventListener('click', () => resolveDraftConflict(false));
 for (const button of shotWorkspace.querySelectorAll<HTMLButtonElement>('[data-shot-mode]')) button.addEventListener('click', () => {
@@ -337,6 +345,7 @@ required<HTMLButtonElement>('[data-shot-remove-moment]').addEventListener('click
 required<HTMLButtonElement>('[data-shot-hold]').addEventListener('click', () => void applyShotHold());
 required<HTMLButtonElement>('[data-shot-retry]').addEventListener('click', () => initializeSeedWorkspace());
 required<HTMLButtonElement>('[data-shot-inspect]').addEventListener('click', () => {
+  setShotAdvancedOpen(true);
   const inspector = required<HTMLDetailsElement>('.inspect-panel'); inspector.open = true; inspector.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
 const shotMomentTime = required<HTMLInputElement>('[data-shot-moment-time]');
@@ -584,7 +593,10 @@ window.__motionEditor = {
   retryPublication: async () => {
     if (!serviceClient || publicationState !== 'failed') return false;
     const immutable = await serviceClient.head(authoring.document.documentId, activeBranchId);
+    clearShotControlFeedback();
     await applyImmutable(immutable, true);
+    status.value = `Change applied. Revision ${authoring.document.revision}.`;
+    status.dataset.kind = 'success';
     return true;
   },
 };
@@ -785,12 +797,13 @@ async function prepareAndDispatchIntent(
     const prepared: PreparedOperationIntent = { schemaVersion: 'motion.operation-intent.v1', operationId: nextOperationId(),
       documentId: preparation.documentId, expectedRevision: preparation.revision, kind: preparation.kind,
       derivationDigest: preparation.derivationDigest, intent: preparation.normalizedIntent };
-    return dispatch(prepared, focusSelector, historyAnchor, previewPromotion);
+    return await dispatch(prepared, focusSelector, historyAnchor, previewPromotion);
   } catch (error) {
     if (error instanceof MotionPreparationError) {
       publishServiceDiagnostic(error.response.diagnostic);
       return { ok: false, code: error.response.diagnostic.code };
     }
+    if (publicationState === 'failed') return { ok: false, code: 'PUBLICATION_FAILED' };
     publishClientDiagnostic('SERVICE_PREPARATION_FAILED', 'storage', true);
     return { ok: false, code: 'SERVICE_PREPARATION_FAILED' };
   }
@@ -861,6 +874,22 @@ function setPublicationState(state: PublicationState, failureCode: string | null
   const main = document.querySelector('main')!;
   main.dataset.publicationPending = String(state === 'pending');
   main.dataset.publicationState = state;
+  if (state === 'failed' && shotConfig) shotStatus.value = 'Change could not be published. Your previous motion is still active.';
+}
+
+type ShotControlAction = 'Pose' | 'Position' | 'Timing' | 'Movement' | 'Point' | 'Hold';
+
+function clearShotControlFeedback(): void {
+  shotControlFeedback.hidden = true;
+  shotControlFeedback.value = '';
+}
+
+function showShotControlFailure(action: ShotControlAction, code?: string | null): void {
+  const publicationFailed = code === 'PUBLICATION_FAILED' || publicationState === 'failed';
+  const actionVerb = action === 'Pose' ? 'applied' : 'changed';
+  const preserved = action === 'Timing' ? 'moment' : 'motion';
+  shotControlFeedback.value = `${action} could not be ${publicationFailed ? 'published' : actionVerb}. Your previous ${preserved} is still active.`;
+  shotControlFeedback.hidden = false;
 }
 
 function publishServiceDiagnostic(diagnostic: MotionDiagnostic): void {
@@ -1020,10 +1049,10 @@ async function applyImmutable(immutable: ImmutableHead, remote: boolean, preview
     }
     setPublicationState('settled');
   } catch (error) {
-    if (controller.readCompilerCommitState().committedHtml !== previousCompiled.html) {
-      try { await mountPreview(previousCompiled.html, previousCompiled.css); } catch { /* preserve explicit failed state */ }
-    }
+    compiled = previousCompiled;
+    try { await mountPreview(previousCompiled.html, previousCompiled.css); } catch { /* preserve explicit failed state */ }
     setPublicationState('failed', error instanceof Error ? error.message : 'PUBLICATION_FAILED');
+    publishClientDiagnostic('PUBLICATION_FAILED', 'storage', true);
     throw error;
   }
 }
@@ -1948,7 +1977,12 @@ function configurePreviewCanvas(): void {
   const runway = shotConfig ? 72 : 0;
   const previewPanel = required<HTMLElement>('.preview-panel');
   const panelTop = previewPanel.getBoundingClientRect().top;
-  const chromeHeight = required<HTMLElement>('.preview-title').offsetHeight + required<HTMLElement>('.transport').offsetHeight;
+  const chromeHeight = required<HTMLElement>('.preview-title').offsetHeight + (shotConfig
+    ? required<HTMLElement>('[data-shot-object-bar]').offsetHeight
+      + required<HTMLElement>('[data-shot-context-dock]').offsetHeight
+      + required<HTMLElement>('[data-preview-control-rail]').offsetHeight
+      + required<HTMLElement>('[data-shot-history-slot]').offsetHeight
+    : required<HTMLElement>('.transport').offsetHeight);
   const visiblePanelTop = getComputedStyle(previewPanel).position === 'static' || panelTop >= window.innerHeight ? 0 : Math.max(0, panelTop);
   const availableHeight = Math.max(240, window.innerHeight - visiblePanelTop - chromeHeight - 48);
   const scale = Math.min((availableWidth - runway * 2) / source.widthCssPixels,
@@ -2099,10 +2133,11 @@ function openShotWorkspace(config: { startMs: number; landedMs: number; settledM
     return { ok: false, code };
   }
   shotConfig = { ...config, targetElementIds: [...config.targetElementIds].sort() };
-  shotWorkspace.removeAttribute('aria-disabled'); shotWorkspace.dataset.editable = 'true'; shotRecovery.hidden = true; shotStatus.setAttribute('role', 'status');
-  for (const control of shotWorkspace.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>('input, button, select')) control.disabled = false;
+  shotWorkspace.removeAttribute('aria-disabled'); shotWorkspace.dataset.active = 'true'; shotWorkspace.dataset.editable = 'true';
+  shotRecovery.hidden = true; shotStatus.setAttribute('role', 'status');
+  forEachShotControl((control) => { control.disabled = false; });
   shotPrimaryElementId = shotConfig.targetElementIds[0]!;
-  shotSelection = [shotPrimaryElementId]; shotMomentMs = config.landedMs; shotWorkspace.hidden = false;
+  shotSelection = [shotPrimaryElementId]; shotMomentMs = config.landedMs; shotWorkspace.hidden = false; shotMoments.hidden = false;
   activateShotLayout(); configurePreviewCanvas();
   scrubber.max = String(shotConfig.settledMs + 1);
   if (!alignShotPreviewToMoment(shotMomentMs)) return { ok: false, code: 'PREVIEW_MOMENT_ALIGNMENT_INVALID' };
@@ -2111,13 +2146,26 @@ function openShotWorkspace(config: { startMs: number; landedMs: number; settledM
 
 function activateShotLayout(): void {
   const shell = required<HTMLElement>('.editor-shell');
-  const layout = required<HTMLElement>('.primary-layout');
-  const workflow = required<HTMLElement>('.workflow');
-  layout.insertBefore(shotWorkspace, workflow);
   required<HTMLElement>('[data-shot-history-slot]').append(required<HTMLElement>('.workflow-footer'));
+  mountShotAdvancedSurfaces();
   shell.classList.add('shot-active');
   required<HTMLElement>('.topbar h1').textContent = 'Shape motion directly on the canvas';
   required<HTMLElement>('.purpose').textContent = 'Choose an object and a moment. Add points when the path needs another beat.';
+}
+
+function mountShotAdvancedSurfaces(): void {
+  const technical = required<HTMLElement>('[data-shot-advanced-technical]');
+  const collaboration = document.querySelector<HTMLElement>('.collaboration-bar');
+  const inspector = required<HTMLDetailsElement>('.inspect-panel');
+  if (collaboration) technical.append(collaboration);
+  technical.append(inspector);
+}
+
+function forEachShotControl(callback: (control: HTMLInputElement | HTMLButtonElement | HTMLSelectElement) => void): void {
+  for (const root of [required<HTMLElement>('[data-shot-object-bar]'), required<HTMLElement>('[data-shot-context-dock]'),
+    shotAdvancedDrawer, shotMoments]) {
+    root.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>('input, button, select').forEach(callback);
+  }
 }
 
 function initializeSeedWorkspace(): void {
@@ -2144,11 +2192,9 @@ function showSeedWorkspaceFailure(code: string): void {
   shotConfig = null;
   shotSelection = [];
   shotPrimaryElementId = null;
-  shotWorkspace.hidden = false;
+  shotWorkspace.hidden = false; shotWorkspace.dataset.active = 'true'; shotMoments.hidden = true;
   shotWorkspace.removeAttribute('aria-disabled'); shotWorkspace.dataset.editable = 'false';
-  for (const control of shotWorkspace.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>('input, button, select')) {
-    control.disabled = true;
-  }
+  forEachShotControl((control) => { control.disabled = true; });
   shotRecovery.hidden = false;
   required<HTMLElement>('[data-shot-recovery-copy]').textContent = `${code}. The committed document was not changed. Restore a compatible Shot 1 revision or source, then retry; you can still inspect every track now.`;
   required<HTMLButtonElement>('[data-shot-retry]').disabled = false;
@@ -2197,6 +2243,11 @@ function selectShotMode(nextMode: 'pose' | 'path'): void {
 function selectShotMoment(timeMs: number): void {
   if (!alignShotPreviewToMoment(timeMs)) return;
   shotMomentMs = timeMs; renderShotWorkspace();
+}
+
+function focusShotMoment(timeMs: number): void {
+  requestAnimationFrame(() => document.querySelector<HTMLInputElement>(
+    `input[name="shot-moment"][value="${timeMs}"]`)?.focus());
 }
 
 function shotMomentLabel(timeMs: number): string {
@@ -2279,6 +2330,7 @@ function renderShotWorkspace(): void {
     .sort((left, right) => Math.abs(left - shotMomentMs) - Math.abs(right - shotMomentMs) || left - right)[0]!;
   if (shotMode === 'path' && shotMomentMs !== momentBeforeReconciliation && !alignShotPreviewToMoment(shotMomentMs)) return;
   moveTogether.disabled = !moveTogether.checked && !sharedTimes.includes(shotMomentMs);
+  renderShotContextDock(inventories);
   const displayedWaypoints = primaryInventory.waypoints.filter((waypoint) => requestedTimes.includes(waypoint.timeMs));
   const displayedPaths = inventories.map((inventory, objectIndex) => ({ elementId: inventory.elementId, objectIndex,
     waypoints: inventory.waypoints.map(({ keyframeId, timeMs }) => ({ keyframeId, timeMs })) }));
@@ -2327,7 +2379,6 @@ function renderShotWorkspace(): void {
   for (const control of shotPoseForm.querySelectorAll<HTMLInputElement>('input')) control.disabled = !selected;
   if (selected) { controls.x!.value = String(selected.pose.translateXMicrounits / 1_000_000); controls.y!.value = String(selected.pose.translateYMicrounits / 1_000_000);
     controls.scale!.value = String(selected.pose.scalePpm / 1_000_000); controls.rotate!.value = String(selected.pose.rotateMicrodegrees / 1_000_000); }
-  syncShotTimingControls(inventories);
   shotOverlay.dataset.mode = shotMode;
   previewObjectOverlay.dataset.mode = shotMode;
   shotOverlay.toggleAttribute('inert', shotMode !== 'path');
@@ -2337,11 +2388,13 @@ function renderShotWorkspace(): void {
   }
   const currentGeometry = committedShotGeometryKey === geometryKey;
   shotOverlay.setAttribute('aria-busy', String(!currentGeometry));
-  shotStatus.value = currentGeometry ? `${primaryLabel} · ${momentLabel} ready.` : 'Updating canvas…';
+  shotStatus.value = publicationState === 'failed'
+    ? 'Change could not be published. Your previous motion is still active.'
+    : currentGeometry ? `${primaryLabel} · ${momentLabel} ready.` : 'Updating canvas…';
   schedulePreviewSelection();
 }
 
-function syncShotTimingControls(inventories: NonNullable<ReturnType<typeof canonicalShotInventory>>): void {
+function renderShotContextDock(inventories: NonNullable<ReturnType<typeof canonicalShotInventory>>): void {
   if (!shotConfig) return;
   const editTogether = required<HTMLInputElement>('[data-move-together]').checked;
   const sharedTimes = inventories[0]!.waypoints.map((waypoint) => waypoint.timeMs)
@@ -2352,18 +2405,22 @@ function syncShotTimingControls(inventories: NonNullable<ReturnType<typeof canon
   const editableTimes = editTogether ? sharedTimes : primaryTimes;
   const selectedIndex = editableTimes.indexOf(shotMomentMs);
   const protectedMoment = shotMomentMs === shotConfig.startMs || shotMomentMs === shotConfig.settledMs;
-  const timeInput = required<HTMLInputElement>('[data-shot-moment-time]');
+  const noFollowingEditableSegment = selectedIndex < 0 || selectedIndex === editableTimes.length - 1;
+  required<HTMLElement>('[data-shot-context-name]').textContent = shotMomentLabel(shotMomentMs);
+  const timeInput = required<HTMLInputElement>('[data-shot-context-time]');
   const timeOutput = required<HTMLOutputElement>('[data-shot-moment-time-output]');
   timeInput.min = String((editableTimes[selectedIndex - 1] ?? shotMomentMs - 1) + 1);
   timeInput.max = String((editableTimes[selectedIndex + 1] ?? shotMomentMs + 1) - 1);
   timeInput.value = String(shotMomentMs); timeOutput.value = `${shotMomentMs} ms`;
   timeInput.disabled = protectedMoment || selectedIndex < 0;
-  required<HTMLButtonElement>('[data-shot-remove-moment]').disabled = protectedMoment || editableTimes.length <= 3;
+  const remove = required<HTMLButtonElement>('[data-shot-context-remove]');
+  remove.hidden = timeInput.disabled;
+  remove.disabled = timeInput.disabled || editableTimes.length <= 3;
   const editingElementIds = editTogether ? shotConfig.targetElementIds : shotPrimaryElementId ? [shotPrimaryElementId] : [];
   const selected = projectTrajectorySelection(authoring.document, editingElementIds, shotMomentMs);
-  const easing = required<HTMLSelectElement>('[data-shot-easing]');
+  const easing = required<HTMLSelectElement>('[data-shot-context-easing]');
   const applyEasing = required<HTMLButtonElement>('[data-shot-apply-easing]');
-  easing.disabled = !selected.eligible || shotMomentMs === shotConfig.settledMs;
+  easing.disabled = !selected.eligible || noFollowingEditableSegment;
   applyEasing.disabled = easing.disabled;
   if (!selected.eligible) return;
   const timings = effectiveShotTimings(selected.targets);
@@ -2585,7 +2642,9 @@ async function processShotGeometryRequest(request: ShotGeometryRequest): Promise
     committedShotGeometryKey = request.geometryKey;
     shotOverlay.setAttribute('aria-busy', 'false');
     const objectLabel = `Object ${shotConfig!.targetElementIds.indexOf(request.primaryElementId) + 1}`;
-    shotStatus.value = `${objectLabel} · ${shotMomentLabel(shotMomentMs)} ready.`;
+    shotStatus.value = publicationState === 'failed'
+      ? 'Change could not be published. Your previous motion is still active.'
+      : `${objectLabel} · ${shotMomentLabel(shotMomentMs)} ready.`;
   } catch (error) {
     if (!isCurrentShotGeometryRequest(request)) return;
     shotProjection = null; shotGeometry = []; shotOverlay.replaceChildren(); shotOverlay.setAttribute('aria-busy', 'false');
@@ -2693,16 +2752,19 @@ function beginDirectPoseGesture(event: PointerEvent, kind: DirectPoseKind): void
     shotStatus.value = `Draft cancelled · revision ${authoring.document.revision} unchanged.`; schedulePreviewSelection(); }); };
   const escape = (keyboard: KeyboardEvent) => { if (keyboard.key !== 'Escape') return; keyboard.preventDefault(); cancel(); };
   const finish = () => { cleanup(); const draft = latest; if (!moved || !draft) { latest = null; return; }
+    clearShotControlFeedback();
     void controller.applyCompilerCssDraft(draft.css).then(() => prepareAndDispatchIntent(draft.intent, undefined, undefined, {
       schemaVersion: 'motion.preview-css-commit-promotion.v1', oldCommittedHtml: committedAtGestureStart.html,
       oldCompilerCss: committedAtGestureStart.css, newCommittedHtml: draft.html, newCompilerCss: draft.css,
     })).then((result) => { shotStatus.value = result.ok ? `${kind} applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`;
+      if (!result.ok) showShotControlFailure('Pose', result.code);
       renderShotWorkspace(); }).catch(async () => { await controller.restoreCommittedCompilerCss(); }); };
   window.addEventListener('pointermove', move); window.addEventListener('pointerup', finish, { once: true });
   window.addEventListener('pointercancel', cancel, { once: true }); window.addEventListener('keydown', escape);
 }
 
 async function handleDirectPoseKeyboard(event: KeyboardEvent, kind: 'body' | 'scale' | 'rotate'): Promise<void> {
+  const surface = event.currentTarget as HTMLElement;
   const selected = selectedShotPose(); if (!selected) return;
   if ((event.key === 'Enter' || event.key === ' ') && kind !== 'body') {
     event.preventDefault(); const value = kind === 'scale' ? `${selected.pose.scalePpm / 1_000_000} uniform scale`
@@ -2721,21 +2783,30 @@ async function handleDirectPoseKeyboard(event: KeyboardEvent, kind: 'body' | 'sc
     const next = event.key === 'Home' ? -180 : event.key === 'End' ? 180 : normalizeRotation(current + (event.key === 'ArrowRight' || event.key === 'ArrowUp' ? step : -step));
     pose.rotateMicrodegrees = Math.round(next * 1_000_000); }
   const intent = directPoseIntent(pose, operationKind); if (!intent) return;
+  clearShotControlFeedback();
   const result = await prepareAndDispatchIntent(intent); shotStatus.value = result.ok ? `${operationKind} applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`;
-  renderShotWorkspace(); (event.currentTarget as HTMLElement).focus({ preventScroll: true });
+  if (!result.ok) showShotControlFailure('Pose', result.code);
+  renderShotWorkspace(); surface.focus({ preventScroll: true });
 }
 
 async function applyShotPose(): Promise<void> {
   if (!shotConfig || !shotPrimaryElementId) return; const primary = shotPrimaryElementId;
+  clearShotControlFeedback();
   const selected = projectTrajectorySelection(authoring.document, [primary], shotMomentMs);
-  if (!selected.eligible) { shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; return; }
+  if (!selected.eligible) { shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; showShotControlFailure('Pose', selected.code); return; }
   const controls = shotPoseForm.elements as unknown as Record<string, HTMLInputElement>;
   const nextPose = { translateXMicrounits: Math.round(Number(controls.x!.value) * 1_000_000),
     translateYMicrounits: Math.round(Number(controls.y!.value) * 1_000_000),
     scalePpm: Math.round(Number(controls.scale!.value) * 1_000_000),
     rotateMicrodegrees: Math.round(Number(controls.rotate!.value) * 1_000_000) };
-  const intent = directPoseIntent(nextPose, 'move'); if (!intent) { shotStatus.value = 'TRAJECTORY_SELECTION_INVALID · unchanged.'; return; }
-  const result = await prepareAndDispatchIntent(intent); shotStatus.value = result.ok ? `Pose applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`; renderShotWorkspace();
+  const intent = directPoseIntent(nextPose, 'move'); if (!intent) { shotStatus.value = 'TRAJECTORY_SELECTION_INVALID · unchanged.';
+    showShotControlFailure('Pose', 'TRAJECTORY_SELECTION_INVALID'); return; }
+  const result = await prepareAndDispatchIntent(intent); renderShotWorkspace();
+  if (!result.ok) showShotControlFailure('Pose', result.code);
+  shotStatus.value = result.ok ? `Pose applied at revision ${authoring.document.revision}.`
+    : result.code === 'SERVICE_PREPARATION_FAILED' || result.code === 'PUBLICATION_FAILED'
+      ? 'Pose could not be published. Your previous motion is still active.'
+      : 'Pose could not be applied. Your previous motion is still active.';
 }
 
 function buildWaypointTranslateOperation(momentMs: number, nextXMicrounits: number, nextYMicrounits: number): AuthoringOperation | null {
@@ -2773,6 +2844,7 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
   activeWaypointDraft = null; waypointDraftMoveCount = 0; waypointDraftAppliedCount = 0; waypointDraftFailure = null;
   if (waypointDraftFrame !== null) { cancelAnimationFrame(waypointDraftFrame); waypointDraftFrame = null; }
   const envelope = operationEnvelope();
+  clearShotControlFeedback();
   event.preventDefault(); const surface = event.currentTarget as HTMLButtonElement; surface.setPointerCapture(event.pointerId);
   const feedbackHandle = surface.matches('[data-keyframe-id]') ? surface
     : shotOverlay.querySelector<HTMLElement>(`[data-element-id="${primaryElementId}"][data-time-ms="${momentMs}"]`);
@@ -2806,6 +2878,7 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
         waypointDraftFailure = error instanceof Error ? error.message : 'PREVIEW_DRAFT_INVALID'; activeWaypointDraft = null;
         await controller.restoreCommittedCompilerCss();
         shotStatus.value = `${waypointDraftFailure} · revision ${authoring.document.revision} unchanged.`;
+        showShotControlFailure('Position', waypointDraftFailure);
       });
     });
     shotStatus.value = `Trajectory draft · ${primaryElementId}/${current.keyframeId} · release to commit or press Escape to cancel.`;
@@ -2839,12 +2912,16 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
           oldCompilerCss: committedAtGestureStart.css, newCommittedHtml: releasedDraft.compiledHtml,
           newCompilerCss: releasedDraft.compiledCss,
         });
-        if (!result.ok) await controller.restoreCommittedCompilerCss();
+        if (!result.ok) {
+          await controller.restoreCommittedCompilerCss();
+          showShotControlFailure('Position', result.code);
+        }
         else { waypointReleasePhase = 'publishing-geometry'; await awaitShotGeometryCommit(); }
       }).catch(async (error: unknown) => {
         waypointDraftFailure = error instanceof Error ? error.message : 'PREVIEW_DRAFT_INVALID';
         await controller.restoreCommittedCompilerCss();
         shotStatus.value = `${waypointDraftFailure} · revision ${authoring.document.revision} unchanged.`;
+        showShotControlFailure('Position', waypointDraftFailure);
       }).finally(() => { if (releaseGeneration === waypointGestureGeneration) activeWaypointDraft = null;
         waypointReleasePhase = 'idle'; clearTerminalFeedback(); });
     } else if (moved) { restoreCommitted(); }
@@ -2857,6 +2934,7 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
 
 async function addShotMoment(beforeMs: number, afterMs: number): Promise<void> {
   if (!shotConfig || !shotPrimaryElementId) return;
+  clearShotControlFeedback();
   const timeMs = Math.floor((beforeMs + afterMs) / 2);
   if (!(beforeMs < timeMs && timeMs < afterMs)) return;
   const editTogether = required<HTMLInputElement>('[data-move-together]').checked;
@@ -2866,11 +2944,13 @@ async function addShotMoment(beforeMs: number, afterMs: number): Promise<void> {
   if (result.ok) { shotMomentMs = timeMs; alignShotPreviewToMoment(timeMs); }
   shotStatus.value = result.ok ? `Point added at ${timeMs} ms · revision ${authoring.document.revision}.`
     : `${result.code} · no point added.`;
-  renderShotWorkspace();
+  if (!result.ok) showShotControlFailure('Point', result.code);
+  if (result.ok) { renderShotWorkspace(); focusShotMoment(timeMs); }
 }
 
 async function removeShotMoment(): Promise<void> {
   if (!shotConfig || !shotPrimaryElementId || shotMomentMs === shotConfig.startMs || shotMomentMs === shotConfig.settledMs) return;
+  clearShotControlFeedback();
   const inventory = canonicalShotInventory()?.find((candidate) => candidate.elementId === shotPrimaryElementId);
   const previous = inventory?.waypoints.filter((point) => point.timeMs < shotMomentMs).at(-1)?.timeMs ?? shotConfig.startMs;
   const removing = shotMomentMs;
@@ -2880,7 +2960,9 @@ async function removeShotMoment(): Promise<void> {
   const result = await prepareAndDispatchIntent(intent);
   if (result.ok) { shotMomentMs = previous; alignShotPreviewToMoment(previous); }
   shotStatus.value = result.ok ? `Point removed · revision ${authoring.document.revision}.` : `${result.code} · unchanged.`;
+  if (!result.ok) showShotControlFailure('Point', result.code);
   renderShotWorkspace();
+  if (result.ok) focusShotMoment(previous);
 }
 
 async function applyShotMomentTime(targetTimeMs: number): Promise<void> {
@@ -2888,6 +2970,9 @@ async function applyShotMomentTime(targetTimeMs: number): Promise<void> {
   if (!config || shotMomentMs === config.startMs || shotMomentMs === config.settledMs
     || !Number.isSafeInteger(targetTimeMs) || targetTimeMs === shotMomentMs) return;
   const sourceTimeMs = shotMomentMs;
+  clearShotControlFeedback();
+  alignShotPreviewToMoment(sourceTimeMs);
+  renderShotWorkspace();
   const inventory = canonicalShotInventory()?.find((candidate) => candidate.elementId === shotPrimaryElementId);
   const intermediate = inventory?.waypoints.map((point) => point.timeMs)
     .filter((timeMs) => timeMs > config.startMs && timeMs < config.settledMs) ?? [];
@@ -2898,6 +2983,7 @@ async function applyShotMomentTime(targetTimeMs: number): Promise<void> {
     sourceTimeMs, targetTimeMs, landingTimeMs, settledTimeMs: config.settledMs };
   const result = await prepareAndDispatchIntent(intent);
   if (result.ok) { shotMomentMs = targetTimeMs; alignShotPreviewToMoment(targetTimeMs); }
+  else { shotMomentMs = sourceTimeMs; alignShotPreviewToMoment(sourceTimeMs); showShotControlFailure('Timing', result.code); }
   shotStatus.value = result.ok ? `Point moved to ${targetTimeMs} ms · revision ${authoring.document.revision}.`
     : `${result.code} · timing unchanged.`;
   renderShotWorkspace();
@@ -2921,22 +3007,27 @@ function effectiveShotTimings(targets: Array<{ trackId: string; elementId: strin
 
 async function applyShotEasing(): Promise<void> {
   if (!shotConfig || shotMomentMs === shotConfig.settledMs) return;
+  clearShotControlFeedback();
   const editTogether = required<HTMLInputElement>('[data-move-together]').checked;
   const elementIds = editTogether ? shotConfig.targetElementIds : shotPrimaryElementId ? [shotPrimaryElementId] : [];
   const selected = projectTrajectorySelection(authoring.document, elementIds, shotMomentMs);
-  if (!selected.eligible) { shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; return; }
+  if (!selected.eligible) { shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; showShotControlFailure('Movement', selected.code); return; }
   const effectiveTimings = effectiveShotTimings(selected.targets);
-  if (!effectiveTimings) { shotStatus.value = 'AUTHORING_TRAJECTORY_EASING_MISSING · unchanged.'; return; }
+  if (!effectiveTimings) { shotStatus.value = 'AUTHORING_TRAJECTORY_EASING_MISSING · unchanged.';
+    showShotControlFailure('Movement', 'AUTHORING_TRAJECTORY_EASING_MISSING'); return; }
   const expectedEasing = effectiveTimings[0]!;
   if (effectiveTimings.some((timing) => canonicalJson(timing) !== canonicalJson(expectedEasing))) {
-    shotStatus.value = 'AUTHORING_TRAJECTORY_EASING_NON_UNIFORM · unchanged.'; return;
+    shotStatus.value = 'AUTHORING_TRAJECTORY_EASING_NON_UNIFORM · unchanged.';
+    showShotControlFailure('Movement', 'AUTHORING_TRAJECTORY_EASING_NON_UNIFORM'); return;
   }
   const draft = required<HTMLSelectElement>('[data-shot-easing]').value;
-  if (draft === 'custom') { shotStatus.value = 'Choose an easing preset to replace the source curve.'; return; }
+  if (draft === 'custom') { shotStatus.value = 'Choose an easing preset to replace the source curve.';
+    showShotControlFailure('Movement', 'AUTHORING_TRAJECTORY_EASING_CUSTOM'); return; }
   const value = draft as 'linear' | 'ease' | 'ease-in' | 'ease-out' | 'ease-in-out';
   const intent: OperationIntentPayload = { kind: 'motion.keyframe-group-easing.set', elementIds: [...elementIds],
     momentMs: shotMomentMs, expectedEasing, easing: { kind: 'keyword', value } };
   const result = await prepareAndDispatchIntent(intent);
+  if (!result.ok) showShotControlFailure('Movement', result.code);
   shotStatus.value = result.ok ? `Movement after ${shotMomentLabel(shotMomentMs)} updated · revision ${authoring.document.revision}.`
     : `${result.code} · unchanged.`; renderShotWorkspace();
 }
@@ -2944,19 +3035,23 @@ async function applyShotEasing(): Promise<void> {
 async function applyShotHold(): Promise<void> {
   const config = shotConfig;
   if (!config) return;
+  clearShotControlFeedback();
   const settledInput = required<HTMLInputElement>('[data-shot-settled]');
   const settled = Number(settledInput.value);
   if (!Number.isSafeInteger(settled) || settled <= 1 || settled >= config.settledMs) {
     settledInput.setAttribute('aria-invalid', 'true'); settledInput.focus();
-    shotStatus.value = `Hold must begin between 2 and ${config.settledMs - 1} ms · unchanged.`; return;
+    shotStatus.value = `Hold must begin between 2 and ${config.settledMs - 1} ms · unchanged.`;
+    showShotControlFailure('Hold', 'AUTHORING_TRAJECTORY_HOLD_INVALID'); return;
   }
   const inventory = canonicalShotInventory()?.[0];
   const landing = inventory?.waypoints.map((point) => point.timeMs)
     .filter((timeMs) => timeMs > config.startMs && timeMs < settled).at(-1) ?? config.landedMs;
-  const selected = projectTrajectorySelection(authoring.document, config.targetElementIds, 2100); if (!selected.eligible) { shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; return; }
+  const selected = projectTrajectorySelection(authoring.document, config.targetElementIds, 2100); if (!selected.eligible) {
+    shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; showShotControlFailure('Hold', selected.code); return; }
   const intent: OperationIntentPayload = { kind: 'motion.settled-hold.set', elementIds: [...config.targetElementIds],
     sourceTimeMs: 2100, settledTimeMs: settled, landingTimeMs: landing, boundaryTimeMs: 2100 };
   const result = await prepareAndDispatchIntent(intent);
+  if (!result.ok) showShotControlFailure('Hold', result.code);
   shotStatus.value = result.ok ? `Settled hold applied at revision ${authoring.document.revision}.` : `${result.code} · unchanged.`; renderShotWorkspace();
 }
 

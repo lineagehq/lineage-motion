@@ -143,6 +143,96 @@ test('durable chrome, canonical state, and compiler preview publish atomically a
   expect(commandBodies).toHaveLength(commandsWhileFailed);
 });
 
+test('rejected retimes stay coherent and failed waypoint publication is visibly recoverable', async ({ page }) => {
+  processHandle?.kill('SIGTERM');
+  if (processHandle?.exitCode === null) await new Promise((resolveExit) => processHandle!.once('exit', resolveExit));
+  const root = resolve(import.meta.dirname, '../../..'); const seed = createTrajectorySeed(root);
+  const runtimeSeedPath = join(directory, 'retime-failure-seed.json'); await writeFile(runtimeSeedPath, `${JSON.stringify(seed)}\n`);
+  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'retime-failure.sqlite'), PHASE3_EDITOR_PORT: '0',
+      PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
+      LANDING_SHOT1_DOCUMENT_PATH: runtimeSeedPath }, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  const addresses = await new Promise<{ editorUrl: string }>((resolveAddress, reject) => {
+    let output = ''; const timer = setTimeout(() => reject(new Error('RETIME_FAILURE_SERVER_TIMEOUT')), 10_000);
+    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
+      if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); } });
+    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`RETIME_FAILURE_SERVER_EXIT_${code}`)); });
+  });
+  let commandCount = 0; page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) commandCount += 1; });
+  await page.goto(addresses.editorUrl); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await page.evaluate(() => window.__motionEditor.disconnectEvents());
+  const readState = () => page.evaluate(() => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
+    const feedback = document.querySelector<HTMLOutputElement>('[data-shot-control-feedback]');
+    return { revision: window.__motionEditor.inspectAuthoring().revision, compiler: window.__motionEditor.compiledHtml,
+      iframe: frame.srcdoc, selectedMoment: window.__motionEditor.inspectShotWorkspace().momentMs,
+      selectedChip: Number(document.querySelector<HTMLInputElement>('input[name="shot-moment"]:checked')?.value),
+      dockTime: Number(document.querySelector<HTMLInputElement>('[data-shot-context-time]')?.value),
+      scrubber: Number(document.querySelector<HTMLInputElement>('[data-scrub]')?.value),
+      playhead: document.querySelector<HTMLOutputElement>('[data-playhead]')?.value,
+      native: window.__motionEditor.readState(), publicationState: window.__motionEditor.inspectAuthoring().publicationState,
+      feedback: feedback ? { value: feedback.value, hidden: feedback.hidden, visible: feedback.getClientRects().length > 0
+        && getComputedStyle(feedback).visibility !== 'hidden' } : null,
+      diagnostic: document.querySelector<HTMLOutputElement>('[data-service-diagnostic]')?.value ?? null,
+      diagnosticVisible: Boolean(document.querySelector<HTMLOutputElement>('[data-service-diagnostic]')?.getClientRects().length),
+      drawerHidden: document.querySelector<HTMLElement>('[data-shot-advanced-drawer]')!.hidden,
+    }; });
+  const baseline = await readState();
+
+  await page.route('**/operations/prepare', async (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({
+    ok: false, code: 'VALIDATION', diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'REJECTED_RETIME', category: 'domain', retryable: false },
+  }) }));
+  await page.locator('[data-shot-context-time]').fill('840');
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectCollaboration().diagnostic?.code)).toBe('REJECTED_RETIME');
+  const rejected = await readState(); await page.unroute('**/operations/prepare');
+  await page.locator('[data-scrub]').fill('700');
+
+  await page.evaluate(() => window.__motionEditor.failNextPublication());
+  await page.locator('[data-shot-context-time]').fill('840');
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('failed');
+  await expect.poll(() => page.locator('[data-shot-control-feedback]').evaluate((output) => (output as HTMLOutputElement).value)).toContain('Timing');
+  const failed = await readState();
+  expect(await page.evaluate(() => window.__motionEditor.retryPublication())).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('settled');
+  const retried = await readState();
+
+  const oldTuple = { selectedMoment: 700, selectedChip: 700, dockTime: 700, scrubber: 700, playhead: '700 ms',
+    native: { playheadMs: 700, currentTimes: [700, 700], playStates: ['paused', 'paused'] } };
+  expect({ rejected, failed, retried, commandCount }).toMatchObject({
+    rejected: { revision: 0, compiler: baseline.compiler, iframe: baseline.iframe, ...oldTuple,
+      publicationState: 'settled', feedback: { hidden: false, visible: true,
+        value: 'Timing could not be changed. Your previous moment is still active.' },
+      diagnostic: 'REJECTED_RETIME · domain · not retryable', diagnosticVisible: false, drawerHidden: true },
+    failed: { revision: 0, compiler: baseline.compiler, iframe: baseline.iframe, ...oldTuple,
+      publicationState: 'failed', feedback: { hidden: false, visible: true,
+        value: 'Timing could not be published. Your previous moment is still active.' },
+      diagnostic: 'PUBLICATION_FAILED · storage · retryable', diagnosticVisible: false, drawerHidden: true },
+    retried: { revision: 1, selectedMoment: 840, selectedChip: 840, dockTime: 840, scrubber: 840, playhead: '840 ms',
+      native: { playheadMs: 840, currentTimes: [840, 840], playStates: ['paused', 'paused'] },
+      publicationState: 'settled', feedback: { hidden: true, visible: false }, drawerHidden: true },
+    commandCount: 1,
+  });
+  expect(`${failed.feedback?.value} ${rejected.feedback?.value}`).not.toContain('Pose');
+
+  const waypoint = page.locator('.trajectory-waypoint[data-time-ms="840"]');
+  const waypointBox = await waypoint.boundingBox();
+  expect(waypointBox).not.toBeNull();
+  await page.evaluate(() => window.__motionEditor.failNextPublication());
+  await page.mouse.move(waypointBox!.x + waypointBox!.width / 2, waypointBox!.y + waypointBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(waypointBox!.x + waypointBox!.width / 2 + 12, waypointBox!.y + waypointBox!.height / 2 + 6, { steps: 3 });
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('failed');
+  await expect(page.locator('[data-shot-advanced-drawer]')).toBeHidden();
+  await expect(page.locator('[data-shot-control-feedback]')).toBeVisible();
+  await expect.poll(() => page.locator('[data-shot-control-feedback]')
+    .evaluate((output) => (output as HTMLOutputElement).value))
+    .toBe('Position could not be published. Your previous motion is still active.');
+  await expect(page.locator('[data-service-diagnostic]')).toBeHidden();
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
+  expect(commandCount).toBe(2);
+});
+
 test('Shot 1 workspace commits five durable operations and exact undo/redo through compiler-native preview', async ({ page }) => {
   await page.setViewportSize({ width: 1183, height: 900 });
   processHandle?.kill('SIGTERM');
@@ -187,8 +277,50 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   });
   const consoleErrors: string[] = []; page.on('console', (message) => { if (message.type() === 'error') consoleErrors.push(message.text()); });
   await page.goto(editorUrl); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await page.evaluate(() => window.__motionEditor.disconnectEvents());
   const workspace = page.locator('[data-shot-workspace]');
   await expect(workspace).toBeVisible();
+  const layoutContract = await page.evaluate(() => {
+    const preview = document.querySelector<HTMLElement>('.preview-panel')!;
+    const stage = document.querySelector<HTMLElement>('.preview-stage')!;
+    const objectBar = document.querySelector<HTMLElement>('[data-shot-object-bar]')!;
+    const dock = document.querySelector<HTMLElement>('[data-shot-context-dock]')!;
+    const rail = document.querySelector<HTMLElement>('[data-preview-control-rail]')!;
+    const stageBounds = stage.getBoundingClientRect();
+    const dockBounds = dock.getBoundingClientRect();
+    return {
+      objectBarInsidePreview: preview.contains(objectBar),
+      dockInsidePreview: preview.contains(dock),
+      railInsidePreview: preview.contains(rail),
+      stageHeight: Math.round(stage.getBoundingClientRect().height),
+      sharedStageDockColumn: Math.round(stageBounds.left) === Math.round(dockBounds.left)
+        && Math.round(stageBounds.right) === Math.round(dockBounds.right),
+      order: [objectBar, stage, dock, rail].map((node) =>
+        Math.round(node.getBoundingClientRect().top)),
+    };
+  });
+  expect(layoutContract.objectBarInsidePreview).toBe(true);
+  expect(layoutContract.dockInsidePreview).toBe(true);
+  expect(layoutContract.railInsidePreview).toBe(true);
+  expect(layoutContract.stageHeight).toBeGreaterThanOrEqual(430);
+  expect(layoutContract.sharedStageDockColumn).toBe(true);
+  expect(layoutContract.order[0]!).toBeLessThan(layoutContract.order[3]!);
+  const readGeometry = () => page.evaluate(() => {
+    const selectors = ['.preview-stage', '[data-preview-canvas]', '[data-preview-object-overlay]', '[data-trajectory-overlay]'];
+    return Object.fromEntries(selectors.map((selector) => {
+      const rect = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+      return [selector, [rect.x, rect.y, rect.width, rect.height].map((value) => Math.round(value * 10) / 10)];
+    }));
+  });
+  const closedGeometry = await readGeometry();
+  const advancedMotion = page.getByRole('button', { name: 'Advanced motion controls' });
+  await advancedMotion.click();
+  await expect(page.locator('[data-shot-advanced-drawer]')).toBeVisible();
+  expect(await readGeometry()).toEqual(closedGeometry);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-shot-advanced-drawer]')).toBeHidden();
+  await expect(advancedMotion).toBeFocused();
+  expect(await readGeometry()).toEqual(closedGeometry);
   const objectInputs = workspace.locator('[data-shot-targets] input[type="checkbox"]');
   const primaryInputs = workspace.locator('[data-shot-targets] input[name="shot-primary"]');
   await expect(objectInputs).toHaveCount(0);
@@ -197,16 +329,15 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   await expect(workspace.locator('[data-move-together]')).not.toBeChecked();
   const focusedLayout = await page.evaluate(() => { const workspace = document.querySelector<HTMLElement>('[data-shot-workspace]')!;
     const preview = document.querySelector<HTMLElement>('.preview-panel')!; const workflow = document.querySelector<HTMLElement>('.workflow')!;
-    const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!; const workspaceRect = workspace.getBoundingClientRect();
-    const previewRect = preview.getBoundingClientRect(); const frameRect = frame.getBoundingClientRect(); return {
+    const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!; const frameRect = frame.getBoundingClientRect(); return {
       shotActive: document.querySelector('.editor-shell')!.classList.contains('shot-active'), workflowDisplay: getComputedStyle(workflow).display,
-      aligned: Math.abs(workspaceRect.bottom - previewRect.top) < 2, controlsVisible: workspaceRect.top >= 0 && workspaceRect.top < innerHeight,
+      workspaceInsidePreview: preview.contains(workspace), controlsVisible: frameRect.top >= 0 && frameRect.top < innerHeight,
       nativeStageVisible: frameRect.top >= 0 && frameRect.bottom <= innerHeight, runway: document.querySelector<HTMLElement>('.preview-stage')!.dataset.runwayCssPixels,
     }; });
-  expect(focusedLayout).toEqual({ shotActive: true, workflowDisplay: 'none', aligned: true, controlsVisible: true, nativeStageVisible: true, runway: '72' });
-  await expect(workspace.locator('input[name="shot-moment"]')).toHaveCount(3);
-  expect(await workspace.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number((input as HTMLInputElement).value)))).toEqual([0, 700, 2100]);
-  await expect(workspace.locator('input[name="shot-moment"][value="700"]')).toBeChecked();
+  expect(focusedLayout).toEqual({ shotActive: true, workflowDisplay: 'none', workspaceInsidePreview: true, controlsVisible: true, nativeStageVisible: true, runway: '72' });
+  await expect(page.locator('input[name="shot-moment"]')).toHaveCount(3);
+  expect(await page.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number((input as HTMLInputElement).value)))).toEqual([0, 700, 2100]);
+  await expect(page.locator('input[name="shot-moment"][value="700"]')).toBeChecked();
   await expect(workspace.locator('[data-pose-form] input[name="x"]')).toBeEnabled();
   expect(await page.evaluate(() => window.__motionEditor.inspectShotWorkspace())).toMatchObject({ open: true, momentMs: 700, previewMatchesCompiler: true });
   const beforePathAlignment = await page.evaluate(() => ({ authoring: window.__motionEditor.inspectAuthoring(), native: window.__motionEditor.readState(),
@@ -304,7 +435,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     const width = Number.parseFloat(button.style.width); const height = Number.parseFloat(button.style.height);
     return Math.abs(left + width / 2 - (targetRect.left + targetRect.width / 2)) < 0.01
       && Math.abs(top + height / 2 - (targetRect.top + targetRect.height / 2)) < 0.01
-      && width >= targetRect.width && height >= targetRect.height
+      && width + .001 >= targetRect.width && height + .001 >= targetRect.height
       && button.getBoundingClientRect().width >= 43.5 && button.getBoundingClientRect().height >= 43.5;
   }))).toBe(true);
   expect(await canvasObjectTargets.first().evaluate((button) => {
@@ -404,11 +535,11 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   expect(commandBytes).toHaveLength(0);
   await page.setViewportSize({ width: 1183, height: 900 });
   await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
-  await expect(page.getByRole('checkbox', { name: /Move together/ })).not.toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /Edit together/ })).not.toBeChecked();
   expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: 700, currentTimes: [700, 700],
     playStates: ['paused', 'paused'] }, slider: 700, visibleTime: '700 ms', selectedMoment: 700 });
   expect(commandBytes).toHaveLength(0);
-  await workspace.locator('input[name="shot-moment"][value="0"]').check();
+  await page.locator('input[name="shot-moment"][value="0"]').check();
   await expect(workspace.locator('[data-shot-moment-time]')).toBeDisabled();
   await expect(workspace.locator('[data-shot-remove-moment]')).toBeDisabled();
   const rejectedTimingBaseline = await page.evaluate(() => ({ authoring: window.__motionEditor.inspectAuthoring(), native: window.__motionEditor.readState(),
@@ -418,25 +549,36 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     srcdoc: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc,
     undoDisabled: (document.querySelector<HTMLButtonElement>('[data-undo]')!).disabled }))).toEqual(rejectedTimingBaseline);
   expect(commandBytes).toHaveLength(0);
-  await workspace.locator('input[name="shot-moment"][value="700"]').check();
+  await page.locator('input[name="shot-moment"][value="700"]').check();
   await page.evaluate(() => { const handles = [...document.querySelectorAll<HTMLElement>('[data-trajectory-overlay] [data-keyframe-id]')];
     (window as unknown as { __alignmentNodes: Map<string, HTMLElement> }).__alignmentNodes = new Map(handles.map((handle) => [handle.dataset.keyframeId!, handle])); });
+  let priorNativeTimeMs = 700;
   for (const timeMs of [0, 700, 2100, 700]) {
-    await workspace.locator(`input[name="shot-moment"][value="${timeMs}"]`).check();
+    expect(await page.evaluate(({ priorNativeTimeMs, targetTimeMs }) => { const animations = document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument!.getAnimations();
+      return animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation' && animation.effect?.constructor.name === 'KeyframeEffect'
+        && animation.timeline?.constructor.name === 'DocumentTimeline' && animation.playState === 'paused' && typeof animation.currentTime === 'number'
+        && Math.abs(animation.currentTime - priorNativeTimeMs) <= .001 && Math.abs(animation.currentTime - targetTimeMs) > .001);
+    }, { priorNativeTimeMs, targetTimeMs: timeMs })).toBe(true);
+    await page.locator('[data-scrub]').fill(String(timeMs));
     expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: timeMs, currentTimes: [timeMs, timeMs],
-      playStates: ['paused', 'paused'] }, slider: timeMs, visibleTime: `${timeMs} ms`, selectedMoment: timeMs });
+      playStates: ['paused', 'paused'] }, slider: timeMs, visibleTime: `${timeMs} ms`, selectedMoment: 700 });
+    expect(await page.evaluate((requestedTimeMs) => { const animations = document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument!.getAnimations();
+      return animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation' && animation.effect?.constructor.name === 'KeyframeEffect'
+        && animation.timeline?.constructor.name === 'DocumentTimeline' && animation.playState === 'paused'
+        && typeof animation.currentTime === 'number' && Math.abs(animation.currentTime - requestedTimeMs) <= .001); }, timeMs)).toBe(true);
+    priorNativeTimeMs = timeMs;
   }
   await page.locator('[data-trajectory-overlay] [data-keyframe-id][data-time-ms="0"]').click();
   expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: 0, currentTimes: [0, 0],
     playStates: ['paused', 'paused'] }, slider: 0, visibleTime: '0 ms', selectedMoment: 0 });
-  await workspace.locator('input[name="shot-moment"][value="700"]').check();
+  await page.locator('input[name="shot-moment"][value="700"]').check();
   expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: 700, currentTimes: [700, 700],
     playStates: ['paused', 'paused'] }, slider: 700, visibleTime: '700 ms', selectedMoment: 700 });
   expect(await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-trajectory-overlay] [data-keyframe-id]')]
     .every((handle) => (window as unknown as { __alignmentNodes: Map<string, HTMLElement> }).__alignmentNodes.get(handle.dataset.keyframeId!) === handle
       && handle.isConnected))).toBe(true);
   expect(commandBytes).toHaveLength(0);
-  await expect(page.locator('[data-shot-workspace]')).toBeInViewport();
+  await expect(page.locator('[data-shot-object-bar]')).toBeInViewport();
   await expect(page.locator('[data-preview]')).toBeInViewport();
   await expect(page.locator('.transport')).toBeInViewport();
   await expect(page.locator('[data-undo]')).toBeInViewport();
@@ -781,7 +923,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   });
   expect(runway).toEqual({ partial: true, whollyVisible: true, hitTestable: true });
   await page.locator('[data-move-together]').check();
-  await expect(page.getByRole('checkbox', { name: /Move together/ })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /Edit together/ })).toBeChecked();
   await expect(workspace.locator('.move-together small')).toHaveText('Position changes apply to both selected objects.');
   await expect(workspace.locator('[data-shot-guidance]')).toContainText('Object movement translates both objects together.');
   await expect(page.locator('[data-reference-segment][data-selected="true"]')).toHaveCount(4);
@@ -792,12 +934,51 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     { actor: 'human', capability: humanCapability }).revision(seed.documentId, 1);
   const currentGroup = projectTrajectorySelection(revisionOne.document, targetElementIds, 700);
   expect(currentGroup.eligible).toBe(true); if (!currentGroup.eligible) throw new Error(currentGroup.code ?? 'TRAJECTORY_SELECTION_INVALID');
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await workspace.getByRole('button', { name: 'Advanced motion controls' }).click();
+  if (await page.locator('[data-shot-advanced-drawer] > details').first().getAttribute('open') === null) {
+    await page.locator('[data-shot-advanced-drawer] > details').first().locator('summary').click();
+  }
   const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 8));
+  const failedPublicationBaseline = await page.evaluate(() => ({
+    revision: window.__motionEditor.inspectAuthoring().revision,
+    compiler: window.__motionEditor.compiledHtml,
+    selectedMoment: Number((document.querySelector('input[name="shot-moment"]:checked') as HTMLInputElement).value),
+    native: document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument!.getAnimations().map((animation) => ({
+      currentTime: animation.currentTime, playState: animation.playState,
+      animation: animation.constructor.name, effect: animation.effect?.constructor.name,
+    })),
+  }));
+  const failedPublicationGeometry = await readGeometry();
+  await expect(page.locator('[data-shot-advanced-drawer]')).toBeVisible();
+  await page.evaluate(() => window.__motionEditor.failNextPublication());
   await page.getByRole('button', { name: 'Apply pose' }).click();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('failed');
+  await expect.poll(() => page.locator('[data-shot-status]').evaluate((output) => (output as HTMLOutputElement).value))
+    .toBe('Pose could not be published. Your previous motion is still active.');
+  await expect.poll(() => page.locator('[data-service-diagnostic]').evaluate((output) => (output as HTMLOutputElement).value))
+    .toBe('PUBLICATION_FAILED · storage · retryable');
+  expect(await page.evaluate(() => ({
+    revision: window.__motionEditor.inspectAuthoring().revision,
+    previewMatchesCompiler: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc === window.__motionEditor.compiledHtml,
+    compiler: window.__motionEditor.compiledHtml,
+    selectedMoment: Number((document.querySelector('input[name="shot-moment"]:checked') as HTMLInputElement).value),
+    native: document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument!.getAnimations().map((animation) => ({
+      currentTime: animation.currentTime, playState: animation.playState,
+      animation: animation.constructor.name, effect: animation.effect?.constructor.name,
+    })),
+  }))).toEqual({ ...failedPublicationBaseline, previewMatchesCompiler: true });
+  expect(await readGeometry()).toEqual(failedPublicationGeometry);
+  expect(await page.evaluate(() => window.__motionEditor.retryPublication())).toBe(true);
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('settled');
+  expect(await page.evaluate(() => ({
+    revision: window.__motionEditor.inspectAuthoring().revision,
+    previewMatchesCompiler: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc === window.__motionEditor.compiledHtml,
+    selectedMoment: Number((document.querySelector('input[name="shot-moment"]:checked') as HTMLInputElement).value),
+  }))).toEqual({ revision: 2, previewMatchesCompiler: true, selectedMoment: failedPublicationBaseline.selectedMoment });
+  expect(await readGeometry()).toEqual(failedPublicationGeometry);
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
   await awaitShotMutationSettlement(2, 700);
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await page.keyboard.press('Escape');
   expect(commandBytes).toHaveLength(2);
   const groupedCommand = JSON.parse(commandBytes[1]!) as { expectedRevision: number; command: { schemaVersion: string; kind: string;
     expectedRevision: number; intent: { elementIds: string[] } } };
@@ -829,7 +1010,8 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   expect(timingCommands[1]?.command.intent.expectedEasing).toEqual({
     kind: 'cubic-bezier', x1: 0.2, y1: 0.8, x2: 0.3, y2: 1,
   });
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await workspace.getByRole('button', { name: 'Advanced motion controls' }).click();
+  await page.locator('[data-shot-advanced-drawer] > details').nth(1).locator('summary').click();
   await page.locator('[data-shot-settled]').fill('1820'); await page.locator('[data-shot-hold]').click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(5);
   expect(commandBytes.slice(2, 5).map((bytes) => { const wire = JSON.parse(bytes) as { expectedRevision: number;
@@ -1083,12 +1265,12 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
       immediate: sanitizeRaceState(immediateRaceState), settled: sanitizeRaceState(settledRaceState) },
     compiler: { previewMatchesCompiler: true, exportDigest: edited.exportDigest } };
   await writeFile(join(directory, 'controlled-spatial-parity.json'), `${JSON.stringify(controlledReceipt, null, 2)}\n`);
-  const advanced = workspace.locator('[data-shot-advanced]');
-  if (await advanced.getAttribute('open') !== null) await advanced.locator('summary').click();
+  const advanced = workspace.getByRole('button', { name: 'Advanced motion controls' });
+  if (await advanced.getAttribute('aria-expanded') === 'true') await page.keyboard.press('Escape');
   const canvasBeforeAdvanced = await page.locator('[data-preview]').boundingBox();
-  await advanced.locator('summary').click();
+  await advanced.click();
   expect(await page.locator('[data-preview]').boundingBox()).toEqual(canvasBeforeAdvanced);
-  await advanced.locator('summary').click();
+  await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 768, height: 900 });
   await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
   const directTargets = await page.locator('[data-preview-object-id]:visible, [data-transform-handle]:visible').evaluateAll((items) => items.map((item) => {
@@ -1306,7 +1488,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest)).toBe(directBaseline);
   }
   await pathToggle.click(); await expect(pathToggle).toHaveAttribute('aria-pressed', 'true');
-  await workspace.locator('input[name="shot-moment"][value="840"]').check();
+  await page.locator('input[name="shot-moment"][value="840"]').check();
   await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
   const nonCurrent = page.locator('[data-trajectory-overlay] [data-keyframe-id][data-time-ms="0"]');
   const nonCurrentBox = await nonCurrent.boundingBox(); expect(nonCurrentBox).not.toBeNull();
@@ -1316,7 +1498,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   expect(waypointHit).toBe('0');
   const selectionRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
   await nonCurrent.click(); expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(selectionRevision);
-  await workspace.locator('input[name="shot-moment"][value="840"]').check(); await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
+  await page.locator('input[name="shot-moment"][value="840"]').check(); await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
   const dragBox = await page.locator('[data-trajectory-overlay] [data-keyframe-id][data-time-ms="0"]').boundingBox();
   await page.mouse.move(dragBox!.x + dragBox!.width / 2, dragBox!.y + dragBox!.height / 2); await page.mouse.down();
   await page.mouse.move(dragBox!.x + dragBox!.width / 2 + 12, dragBox!.y + dragBox!.height / 2 + 6, { steps: 3 }); await page.mouse.up();
@@ -1477,7 +1659,7 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
   const targets = workspace.locator('[data-shot-targets] input[type="checkbox"]');
   const primaries = workspace.locator('[data-shot-targets] input[name="shot-primary"]');
   await expect(targets).toHaveCount(0); await expect(primaries).toHaveCount(2);
-  const inventory = () => workspace.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number((input as HTMLInputElement).value)));
+  const inventory = () => page.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number((input as HTMLInputElement).value)));
   expect(await inventory()).toEqual([0, 700, 1400, 2100]);
   await expect(page.getByRole('button', { name: 'Path' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
@@ -1491,7 +1673,7 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
       currentTimes: state.currentTimes, playStates: state.playStates, slider: Number((document.querySelector('[data-scrub]') as HTMLInputElement).value),
       visibleTime: document.querySelector<HTMLOutputElement>('[data-playhead]')!.value,
       requestId: (inspected as unknown as { geometryPump: { lastCommittedRequestId: number } }).geometryPump.lastCommittedRequestId }; });
-  await workspace.locator('input[name="shot-moment"][value="1400"]').check();
+  await page.locator('input[name="shot-moment"][value="1400"]').check();
   const primaryReconciliationBaseline = await readAsymmetricAlignment();
   expect(primaryReconciliationBaseline).toMatchObject({ revision: 0, selectedMoment: 1400, playheadMs: 1400,
     currentTimes: [1400, 1400], playStates: ['paused', 'paused'], slider: 1400, visibleTime: '1400 ms' });
@@ -1548,11 +1730,14 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
     expect(proof.status).not.toMatch(/INVALID|MISSING|DIVERGED/);
   };
   await assertGroupedState([0, 700, 2100]);
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await workspace.getByRole('button', { name: 'Advanced motion controls' }).click();
+  if (await page.locator('[data-shot-advanced-drawer] > details').first().getAttribute('open') === null) {
+    await page.locator('[data-shot-advanced-drawer] > details').first().locator('summary').click();
+  }
   const x = workspace.locator('[data-pose-form] input[name="x"]');
   await x.fill(String(Number(await x.inputValue()) + 1)); await workspace.getByRole('button', { name: 'Apply pose' }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await page.keyboard.press('Escape');
   await assertGroupedState([0, 700, 2100]);
   expect(asymmetricCommands).toHaveLength(2); expect(asymmetricCommands[1]?.kind).toBe('motion.transform-waypoints.translate');
   expect(asymmetricCommands[1]).toMatchObject({ schemaVersion: 'motion.operation-intent.v1', intent: { elementIds: targetElementIds } });
@@ -1574,7 +1759,10 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
     await assertGroupedState([...moments]);
   }
   await moveTogether.uncheck(); await expect(moveTogether).not.toBeChecked(); await expect(primaries.nth(1)).toBeChecked();
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await workspace.getByRole('button', { name: 'Advanced motion controls' }).click();
+  if (await page.locator('[data-shot-advanced-drawer] > details').first().getAttribute('open') === null) {
+    await page.locator('[data-shot-advanced-drawer] > details').first().locator('summary').click();
+  }
   await x.fill(String(Number(await x.inputValue()) + 1)); await workspace.getByRole('button', { name: 'Apply pose' }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(11);
   expect(asymmetricCommands.at(-1)?.kind).toBe('motion.transform-pose.set');
@@ -1596,7 +1784,10 @@ test('non-service editor keeps local interaction state but rejects every persist
   });
   await page.goto(url); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
   const baseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
-  await page.locator('[data-shot-advanced] summary').click();
+  await page.getByRole('button', { name: 'Advanced motion controls' }).click();
+  if (await page.locator('[data-shot-advanced-drawer] > details').first().getAttribute('open') === null) {
+    await page.locator('[data-shot-advanced-drawer] > details').first().locator('summary').click();
+  }
   const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 5));
   await page.getByRole('button', { name: 'Apply pose' }).click();
   await expect(page.locator('[data-operation-status]')).toContainText('SERVICE_REQUIRED');
@@ -2011,4 +2202,34 @@ test('a committed local command with a lost response converges once and clears p
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({ revision: 1,
     pendingRevision: null, immutableRefetchCount: 1, draftConflictRevision: null, draftDirty: false });
   await expect(page.locator('[data-draft-conflict]')).toBeHidden();
+});
+
+test('canvas-first installed Chrome emits only the aggregate adversarial receipt', async () => {
+  test.setTimeout(120_000);
+  if (processHandle?.exitCode === null) { processHandle.kill('SIGTERM'); await new Promise((resolveExit) => processHandle!.once('exit', resolveExit)); }
+  const root = resolve(import.meta.dirname, '../../..');
+  const child = spawn('node', [resolve(root, 'apps/editor/scripts/qa-chrome.mjs'), '--canvas-first-ux'], {
+    cwd: root, stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stdout = ''; let stderr = '';
+  child.stdout!.on('data', (chunk) => { stdout += chunk.toString(); });
+  child.stderr!.on('data', (chunk) => { stderr += chunk.toString(); });
+  const exitCode = await new Promise<number | null>((resolveExit, reject) => {
+    const timer = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('CANVAS_FIRST_QA_TIMEOUT')); }, 90_000);
+    child.once('exit', (code) => { clearTimeout(timer); resolveExit(code); });
+  });
+  expect(exitCode, stderr).toBe(0);
+  const lines = stdout.trim().split('\n'); expect(lines).toHaveLength(1);
+  const receipt = JSON.parse(lines[0]!) as Record<string, unknown>;
+  expect(Object.keys(receipt)).toEqual([
+    'schemaVersion', 'passed', 'viewport', 'operationCount', 'momentCount', 'geometryMaxDeltaCssPx',
+    'nativeCssAnimationCount', 'keyboardFlowPassed', 'failurePreservedCompiler', 'consoleErrorCount', 'networkErrorCount',
+  ]);
+  expect(receipt).toMatchObject({ schemaVersion: 'motion.canvas-first-qa.v1', passed: true,
+    viewport: { width: 1440, height: 900, dpr: 1 }, keyboardFlowPassed: true,
+    failurePreservedCompiler: true, consoleErrorCount: 0, networkErrorCount: 0 });
+  expect(receipt.operationCount).toEqual(expect.any(Number)); expect(receipt.operationCount).toBeGreaterThan(0);
+  expect(receipt.momentCount).toEqual(expect.any(Number)); expect(receipt.momentCount).toBeGreaterThanOrEqual(3);
+  expect(receipt.geometryMaxDeltaCssPx).toEqual(expect.any(Number)); expect(receipt.geometryMaxDeltaCssPx).toBeLessThanOrEqual(1);
+  expect(receipt.nativeCssAnimationCount).toEqual(expect.any(Number)); expect(receipt.nativeCssAnimationCount).toBeGreaterThan(0);
 });
