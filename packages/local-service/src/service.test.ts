@@ -144,7 +144,7 @@ describe('loopback sole-writer service', () => {
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
     (service.store as SqliteProjectStore).database
       .prepare('INSERT INTO schema_migrations(version,checksum,applied_order) VALUES(?,?,?)')
-      .run(4, 'future-schema', 4);
+      .run(5, 'future-schema', 5);
     await service.close();
     await expect(startLocalMotionService({ databasePath: temporary.databasePath, seed }))
       .rejects.toThrow('UNSUPPORTED_SCHEMA_VERSION');

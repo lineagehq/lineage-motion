@@ -9,6 +9,11 @@ import { compileMotionDocument } from '../../css-compiler/src/index.ts';
 import { MAIN_BRANCH_ID, PROTOCOL_VERSION, canonicalResponseBytes, type CommandSuccess, type ControlReceipt,
   type ActiveClaimList, type ActivityPage, type BranchList, type CommandFailure, type MotionCommand,
   type MotionDiagnostic, type RevisionReceipt } from '../../motion-protocol/src/index.ts';
+import { canonicalReviewResponseBytes, reviewFailure, type AnnotationList, type ReviewCommand, type ReviewEvent,
+  type ReviewFailure, type ReviewResponse, type ReviewSuccess, type RevisionComparison } from '../../motion-protocol/src/review.ts';
+import { REVIEW_PROTOCOL_VERSION, REVIEW_SERIALIZER_VERSION, annotationSnapshotBytes, annotationSnapshotDigest,
+  createHandoffReceipt, type AnnotationPrivateSnapshotEntry, type HandoffIdentityInput,
+  type HandoffReceipt } from '../../review-domain/src/index.ts';
 import type { AuthContext, CommitResult, ProjectStore } from '../../project-store/src/index.ts';
 import { MIGRATIONS } from './migrations.ts';
 
@@ -84,6 +89,174 @@ export class SqliteProjectStore implements ProjectStore {
       if (!('event' in result)) { this.database.exec('ROLLBACK'); return result; }
       this.fault?.('before-commit'); this.database.exec('COMMIT'); this.fault?.('after-commit'); return result;
     } catch (error) { if (this.database.isTransaction) this.database.exec('ROLLBACK'); throw error; }
+  }
+  executeReview(command: ReviewCommand, auth: AuthContext): { response: ReviewResponse; event?: ReviewEvent; replayed?: boolean } {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      this.fault?.('after-begin');
+      const requestJson = canonicalJson(command);
+      const head = this.readHeadRow(command.documentId, command.branchId);
+      if (!head) { this.database.exec('ROLLBACK'); return { response: reviewFailure('VALIDATION', 'BRANCH_NOT_FOUND', 'target', false) }; }
+      if (auth.actor === 'agent' && !this.authorizedClaim(command.documentId, command.branchId, auth)) {
+        this.database.exec('ROLLBACK'); return { response: reviewFailure('UNAUTHORIZED_CLAIM',
+          this.claimDiagnostic(command.documentId, command.branchId, auth)?.diagnostic.code ?? 'CLAIM_REQUIRED', 'authorization', false) }; }
+      const privateContextDigest = this.reviewAuthDigest(command.documentId, command.branchId, auth);
+      const prior = this.database.prepare(`SELECT private_request_json,private_context_digest,sanitized_response_json FROM review_events
+        WHERE document_id=? AND operation_id=?`).get(command.documentId, command.operationId) as
+        { private_request_json: string; private_context_digest: string; sanitized_response_json: string } | undefined;
+      if (prior) { this.database.exec('ROLLBACK'); return prior.private_request_json === requestJson
+        && prior.private_context_digest === privateContextDigest
+        ? { response: JSON.parse(prior.sanitized_response_json) as ReviewSuccess,
+          event: this.reviewEventFor(command.documentId, command.operationId), replayed: true }
+        : { response: reviewFailure('OPERATION_ID_CONFLICT', 'OPERATION_ID_CONFLICT', 'protocol', false) }; }
+      if (head.revision !== command.expectedBranchRevision) { this.database.exec('ROLLBACK'); return { response:
+        reviewFailure('STALE_BRANCH_REVISION', 'STALE_BRANCH_REVISION', 'revision', true, { currentBranchRevision: head.revision }) }; }
+      const row = this.database.prepare(`SELECT anchor_revision,version,state,private_body FROM review_annotations
+        WHERE document_id=? AND branch_id=? AND annotation_id=?`).get(command.documentId, command.branchId, command.annotationId) as
+        { anchor_revision: number; version: number; state: 'open' | 'resolved' | 'deleted'; private_body: string } | undefined;
+      if (command.kind === 'review.annotation.create') {
+        if (command.expectedAnnotationVersion !== 0 || row) { this.database.exec('ROLLBACK'); return { response:
+          reviewFailure('STALE_ANNOTATION_VERSION', 'STALE_ANNOTATION_VERSION', 'revision', true,
+            { currentAnnotationVersion: row?.version ?? 0 }) }; }
+        if (!this.revisionReachable(command.documentId, head.revision, command.anchorRevision)) { this.database.exec('ROLLBACK'); return { response:
+          reviewFailure('VALIDATION', 'ANCHOR_REVISION_NOT_REACHABLE', 'revision', false) }; }
+        this.database.prepare(`INSERT INTO review_annotations(annotation_id,document_id,branch_id,anchor_revision,version,state,private_body)
+          VALUES(?,?,?,?,1,'open',?)`).run(command.annotationId, command.documentId, command.branchId, command.anchorRevision, command.body);
+      } else {
+        if (!row || row.version !== command.expectedAnnotationVersion) { this.database.exec('ROLLBACK'); return { response:
+          reviewFailure('STALE_ANNOTATION_VERSION', 'STALE_ANNOTATION_VERSION', 'revision', true,
+            { currentAnnotationVersion: row?.version ?? 0 }) }; }
+        if (row.state === 'deleted') { this.database.exec('ROLLBACK'); return { response:
+          reviewFailure('VALIDATION', 'ANNOTATION_DELETED', 'domain', false) }; }
+        const state = command.kind === 'review.annotation.resolve' ? 'resolved'
+          : command.kind === 'review.annotation.reopen' ? 'open'
+            : command.kind === 'review.annotation.delete' ? 'deleted' : row.state;
+        if ((command.kind === 'review.annotation.resolve' && row.state !== 'open')
+          || (command.kind === 'review.annotation.reopen' && row.state !== 'resolved')) {
+          this.database.exec('ROLLBACK'); return { response: reviewFailure('VALIDATION', 'ANNOTATION_STATE_INVALID', 'domain', false) };
+        }
+        this.database.prepare(`UPDATE review_annotations SET version=version+1,state=?,private_body=?
+          WHERE document_id=? AND branch_id=? AND annotation_id=? AND version=?`).run(state,
+            command.kind === 'review.annotation.edit' ? command.body : row.private_body,
+            command.documentId, command.branchId, command.annotationId, row.version);
+      }
+      const annotation = this.annotationProjection(command.documentId, command.branchId, command.annotationId)!;
+      const response: ReviewSuccess = { ok: true, protocolVersion: REVIEW_PROTOCOL_VERSION, operationId: command.operationId,
+        documentId: command.documentId, branchId: command.branchId, annotation, receipt: {
+          schemaVersion: 'review.receipt.v1', protocolVersion: REVIEW_PROTOCOL_VERSION, operationId: command.operationId,
+          documentId: command.documentId, branchId: command.branchId, annotationId: command.annotationId,
+          annotationVersion: annotation.version, kind: command.kind } };
+      const eventId = `review_event_${sha256Hex(`${command.documentId}\0${command.operationId}`).slice(0, 24)}`;
+      this.database.prepare(`INSERT INTO review_events(event_id,document_id,branch_id,operation_id,annotation_id,
+        annotation_version,kind,private_request_json,sanitized_response_json,actor_kind,actor_id,private_context_digest)
+        VALUES(?,?,?,?,?,?,?,?,?,?,?,?)`)
+        .run(eventId, command.documentId, command.branchId, command.operationId, command.annotationId, annotation.version,
+          command.kind, requestJson, canonicalReviewResponseBytes(response), auth.actor, actorId(auth), privateContextDigest);
+      this.fault?.('after-inserts'); this.fault?.('before-commit'); this.database.exec('COMMIT'); this.fault?.('after-commit');
+      return { response, event: this.reviewEventFor(command.documentId, command.operationId), replayed: false };
+    } catch (error) { if (this.database.isTransaction) this.database.exec('ROLLBACK'); throw error; }
+  }
+  listAnnotations(documentId: string, branchId: string): AnnotationList | null {
+    if (!this.readHeadRow(documentId, branchId)) return null;
+    const rows = this.database.prepare(`SELECT annotation_id,anchor_revision,version,state FROM review_annotations
+      WHERE document_id=? AND branch_id=? ORDER BY annotation_id`).all(documentId, branchId) as Array<{
+        annotation_id: string; anchor_revision: number; version: number; state: 'open' | 'resolved' | 'deleted' }>;
+    return { schemaVersion: 'review.annotation-list.v1', documentId, branchId, annotations: rows.map((row) => ({
+      annotationId: row.annotation_id, documentId, branchId, anchorRevision: row.anchor_revision,
+      version: row.version, state: row.state })) };
+  }
+  readReviewEvents(documentId: string, afterReviewSeq: number): ReviewEvent[] {
+    const rows = this.database.prepare(`SELECT review_seq,branch_id,operation_id,annotation_id,annotation_version,kind,actor_kind,actor_id
+      FROM review_events WHERE document_id=? AND review_seq>? ORDER BY review_seq`).all(documentId, afterReviewSeq) as Array<{
+        review_seq: number; branch_id: string; operation_id: string; annotation_id: string; annotation_version: number;
+        kind: ReviewCommand['kind']; actor_kind: 'human' | 'agent'; actor_id: string }>;
+    return rows.map((row) => ({ schemaVersion: 'review.event.v1', protocolVersion: REVIEW_PROTOCOL_VERSION,
+      reviewSeq: row.review_seq, documentId, branchId: row.branch_id, operationId: row.operation_id,
+      annotationId: row.annotation_id, annotationVersion: row.annotation_version, kind: row.kind,
+      actor: { kind: row.actor_kind, actorId: row.actor_id } }));
+  }
+  compareRevisions(documentId: string, left: number, right: number): RevisionComparison | null {
+    const a = this.readRevision(documentId, left); const b = this.readRevision(documentId, right); if (!a || !b) return null;
+    return { schemaVersion: 'review.comparison.v1', documentId,
+      left: { revision: left, canonicalDigest: a.canonicalDigest }, right: { revision: right, canonicalDigest: b.canonicalDigest },
+      changed: a.canonicalDigest !== b.canonicalDigest, unsupported: [], missing: [] };
+  }
+  createHandoff(operationId: string, input: Omit<HandoffIdentityInput, 'annotationSnapshotVersion' | 'annotationSnapshotDigest'>,
+    auth: AuthContext): HandoffReceipt | ReviewFailure {
+    this.database.exec('BEGIN IMMEDIATE');
+    try {
+      const privateRequest = canonicalJson(input);
+      const privateContextDigest = sha256Hex(`${auth.actor}\0${auth.capability}`);
+      const prior = this.database.prepare(`SELECT private_request_json,private_context_digest,sanitized_response_json FROM review_handoffs
+        WHERE document_id=? AND operation_id=?`).get(input.documentId, operationId) as
+        { private_request_json: string; private_context_digest: string; sanitized_response_json: string } | undefined;
+      if (prior) { this.database.exec('ROLLBACK'); return prior.private_request_json === privateRequest
+        && prior.private_context_digest === privateContextDigest
+        ? JSON.parse(prior.sanitized_response_json) as HandoffReceipt
+        : reviewFailure('OPERATION_ID_CONFLICT', 'OPERATION_ID_CONFLICT', 'protocol', false); }
+      const revision = this.readRevision(input.documentId, input.revision); const head = this.readHeadRow(input.documentId, input.branchId);
+      if (!revision || !head || revision.canonicalDigest !== input.canonicalDigest)
+        { this.database.exec('ROLLBACK'); return reviewFailure('VALIDATION', 'HANDOFF_REVISION_INVALID', 'revision', false); }
+      for (const record of input.comparisonRecords) {
+        const left = this.readRevision(input.documentId, record.leftRevision); const right = this.readRevision(input.documentId, record.rightRevision);
+        if (!left || !right || left.canonicalDigest !== record.leftCanonicalDigest || right.canonicalDigest !== record.rightCanonicalDigest)
+          { this.database.exec('ROLLBACK'); return reviewFailure('VALIDATION', 'HANDOFF_COMPARISON_INVALID', 'revision', false); }
+      }
+      for (const record of input.proofRecords) {
+        const found = this.readRevision(input.documentId, record.revision); if (!found) { this.database.exec('ROLLBACK');
+          return reviewFailure('VALIDATION', 'HANDOFF_PROOF_INVALID', 'revision', false); }
+        const compiled = compileMotionDocument(found.document);
+        if (found.canonicalDigest !== record.canonicalDigest || sha256Hex(compiled.html) !== record.htmlDigest
+          || sha256Hex(compiled.css) !== record.cssDigest || compiled.exportDigest !== record.exportDigest) {
+          this.database.exec('ROLLBACK'); return reviewFailure('VALIDATION', 'HANDOFF_PROOF_INVALID', 'domain', false);
+        }
+      }
+      const entries = this.database.prepare(`SELECT annotation_id,anchor_revision,version,state,private_body FROM review_annotations
+        WHERE document_id=? AND branch_id=? ORDER BY annotation_id`).all(input.documentId, input.branchId) as Array<{
+          annotation_id: string; anchor_revision: number; version: number; state: 'open' | 'resolved' | 'deleted'; private_body: string }>;
+      const privateEntries: AnnotationPrivateSnapshotEntry[] = entries.map((row) => ({ annotationId: row.annotation_id,
+        documentId: input.documentId, branchId: input.branchId, anchorRevision: row.anchor_revision, version: row.version,
+        state: row.state, body: row.private_body }));
+      const snapshotJson = annotationSnapshotBytes(privateEntries); const snapshotDigest = annotationSnapshotDigest(privateEntries);
+      this.database.prepare(`INSERT OR IGNORE INTO annotation_snapshots(document_id,branch_id,bound_revision,private_digest,private_snapshot_json)
+        VALUES(?,?,?,?,?)`).run(input.documentId, input.branchId, input.revision, snapshotDigest, snapshotJson);
+      const snapshot = this.database.prepare(`SELECT snapshot_version FROM annotation_snapshots WHERE document_id=? AND branch_id=?
+        AND bound_revision=? AND private_digest=?`).get(input.documentId, input.branchId, input.revision, snapshotDigest) as { snapshot_version: number };
+      const identity: HandoffIdentityInput = { ...input, annotationSnapshotVersion: snapshot.snapshot_version,
+        annotationSnapshotDigest: snapshotDigest, serializerVersion: REVIEW_SERIALIZER_VERSION };
+      let receipt: HandoffReceipt; try { receipt = createHandoffReceipt(identity); }
+      catch (error) { this.database.exec('ROLLBACK'); return reviewFailure('VALIDATION',
+        error instanceof Error ? error.message : 'HANDOFF_INVALID', 'domain', false); }
+      const handoffId = `handoff_${sha256Hex(`${input.documentId}\0${operationId}`).slice(0, 24)}`;
+      this.database.prepare(`INSERT INTO review_handoffs(handoff_id,document_id,operation_id,private_request_json,
+        sanitized_response_json,private_context_digest) VALUES(?,?,?,?,?,?)`).run(handoffId, input.documentId,
+          operationId, privateRequest, canonicalJson(receipt), privateContextDigest);
+      this.database.exec('COMMIT'); return receipt;
+    } catch (error) { if (this.database.isTransaction) this.database.exec('ROLLBACK'); throw error; }
+  }
+  private annotationProjection(documentId: string, branchId: string, annotationId: string) {
+    return this.listAnnotations(documentId, branchId)?.annotations.find((item) => item.annotationId === annotationId) ?? null;
+  }
+  private reviewEventFor(documentId: string, operationId: string): ReviewEvent {
+    const row = this.database.prepare('SELECT review_seq FROM review_events WHERE document_id=? AND operation_id=?')
+      .get(documentId, operationId) as { review_seq: number };
+    return this.readReviewEvents(documentId, row.review_seq - 1)[0]!;
+  }
+  private revisionReachable(documentId: string, headRevision: number, anchorRevision: number): boolean {
+    let cursor: number | null = headRevision;
+    while (cursor !== null) { if (cursor === anchorRevision) return true;
+      const row = this.database.prepare('SELECT parent_revision FROM revisions WHERE document_id=? AND revision=?')
+        .get(documentId, cursor) as { parent_revision: number | null } | undefined; if (!row) return false; cursor = row.parent_revision; }
+    return false;
+  }
+  private reviewAuthDigest(documentId: string, branchId: string, auth: AuthContext): string {
+    if (auth.actor === 'human') return sha256Hex(`${auth.actor}\0${auth.capability}`);
+    const tokenHash = sha256Hex(auth.claimSecret ?? '');
+    const claim = this.database.prepare(`SELECT claim_id,lease_version,expires_at FROM claims WHERE document_id=?
+      AND active=1 AND expires_at>? AND token_hash=? AND (branch_id IS NULL OR branch_id=?) LIMIT 1`)
+      .get(documentId, auth.now, tokenHash, branchId) as { claim_id: string; lease_version: number; expires_at: number } | undefined;
+    if (!claim) throw new Error('REVIEW_AUTH_CONTEXT_MISSING');
+    return sha256Hex(`${auth.actor}\0${auth.capability}\0${claim.claim_id}\0${claim.lease_version}\0${claim.expires_at}\0${tokenHash}`);
   }
   validate(command: MotionCommand, auth: AuthContext): { ok: true } | CommandFailure {
     const materialized = this.materialize(command); if (!materialized.ok) return materialized.response;
@@ -350,7 +523,15 @@ export class SqliteProjectStore implements ProjectStore {
     catch { return null; }
   }
   snapshot(): unknown { const tables = ['documents', 'branches', 'revisions', 'events', 'claims'] as const;
-    return Object.fromEntries(tables.map((table) => [table, this.database.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()])); }
+    return { ...Object.fromEntries(tables.map((table) => [table, this.database.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()])),
+      review_annotations: this.database.prepare(`SELECT annotation_id,document_id,branch_id,anchor_revision,version,state
+        FROM review_annotations ORDER BY rowid`).all(),
+      review_events: this.database.prepare(`SELECT review_seq,event_id,document_id,branch_id,operation_id,annotation_id,
+        annotation_version,kind,sanitized_response_json,actor_kind,actor_id FROM review_events ORDER BY rowid`).all(),
+      annotation_snapshots: this.database.prepare(`SELECT snapshot_version,document_id,branch_id,bound_revision,private_digest
+        FROM annotation_snapshots ORDER BY rowid`).all(),
+      review_handoffs: this.database.prepare(`SELECT handoff_id,document_id,operation_id,sanitized_response_json
+        FROM review_handoffs ORDER BY rowid`).all() }; }
   backup(destinationPath: string): void { if (destinationPath === this.path) throw new Error('BACKUP_PATH_INVALID');
     rmSync(destinationPath, { force: true }); this.database.prepare('VACUUM INTO ?').run(destinationPath); chmodSync(destinationPath, 0o600); }
   close(): void { this.database.close(); }

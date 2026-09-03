@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+export * from './review.ts';
+
 import { canonicalBytes, canonicalJson, isValidAuthoringOperationId, sha256Hex, validateMotionDocument,
   DURABLE_OPERATION_KINDS, type CueAuthoringOperation, type HistoryOperation,
   type MotionDocument, type OperationPreparation, type OperationPreparationRequest, type PreparedOperationIntent,

@@ -54,4 +54,24 @@ ALTER TABLE events ADD COLUMN actor_id TEXT;
 ALTER TABLE events ADD COLUMN affected_ids_json TEXT;
 ALTER TABLE claims ADD COLUMN actor_id TEXT;
 `,
+}, {
+  version: 4,
+  checksum: 'review-handoff-auth-v4',
+  sql: `
+CREATE TABLE review_annotations(annotation_id TEXT NOT NULL, document_id TEXT NOT NULL, branch_id TEXT NOT NULL,
+  anchor_revision INTEGER NOT NULL, version INTEGER NOT NULL, state TEXT NOT NULL CHECK(state IN ('open','resolved','deleted')),
+  private_body TEXT NOT NULL, PRIMARY KEY(document_id,branch_id,annotation_id),
+  FOREIGN KEY(document_id,branch_id) REFERENCES branches(document_id,branch_id));
+CREATE TABLE review_events(review_seq INTEGER PRIMARY KEY AUTOINCREMENT, event_id TEXT NOT NULL UNIQUE,
+  document_id TEXT NOT NULL, branch_id TEXT NOT NULL, operation_id TEXT NOT NULL,
+  annotation_id TEXT NOT NULL, annotation_version INTEGER NOT NULL, kind TEXT NOT NULL,
+  private_request_json TEXT NOT NULL, sanitized_response_json TEXT NOT NULL, actor_kind TEXT NOT NULL,
+  actor_id TEXT NOT NULL, private_context_digest TEXT NOT NULL, UNIQUE(document_id,operation_id));
+CREATE TABLE annotation_snapshots(snapshot_version INTEGER PRIMARY KEY AUTOINCREMENT, document_id TEXT NOT NULL,
+  branch_id TEXT NOT NULL, bound_revision INTEGER NOT NULL, private_digest TEXT NOT NULL, private_snapshot_json TEXT NOT NULL,
+  UNIQUE(document_id,branch_id,bound_revision,private_digest));
+CREATE TABLE review_handoffs(handoff_id TEXT PRIMARY KEY, document_id TEXT NOT NULL, operation_id TEXT NOT NULL,
+  private_request_json TEXT NOT NULL, sanitized_response_json TEXT NOT NULL, private_context_digest TEXT NOT NULL,
+  UNIQUE(document_id,operation_id));
+`,
 }] as const;
