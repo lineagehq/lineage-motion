@@ -138,30 +138,6 @@ document.body.innerHTML = `
       <output data-cue-status role="status" aria-live="polite">Choose the cursor, then click its object on the canvas.</output>
       <details class="cue-advanced"><summary>Edit completed beats</summary><div data-authored-cues class="authored-cues"></div></details>
     </section>` : ''}
-    <section class="shot-workspace" data-shot-workspace hidden aria-labelledby="shot-workspace-heading">
-      <header><div><p class="eyebrow">Shot 1 · 0–2100 ms</p><h2 id="shot-workspace-heading">Choose an object, then shape each moment</h2><p>The canvas is the editor: drag to move, use the corners to scale, and use the handle above to rotate.</p></div></header>
-      <div class="shot-grid"><fieldset data-shot-targets><legend>Object</legend></fieldset><button class="path-toggle" type="button" data-shot-mode="path" aria-label="Path" aria-pressed="true">Hide path</button><label class="move-together"><input type="checkbox" data-move-together aria-label="Move together"><span><strong>Edit together</strong><small>Position changes apply to both selected objects.</small></span></label></div>
-      <p class="shot-guidance" data-shot-guidance role="note"></p>
-      <section class="moment-editor" aria-labelledby="moment-editor-heading">
-        <div class="moment-heading"><div><strong id="moment-editor-heading">Moments</strong><span>Select a moment. Use + to add a point.</span></div><button type="button" data-shot-remove-moment disabled>Remove point</button></div>
-        <fieldset class="shot-moments" data-shot-moments><legend>Animation moments</legend><div data-shot-moment-sequence></div></fieldset>
-        <div class="moment-transition" data-shot-moment-transition>
-          <label><span>When this moment happens</span><input data-shot-moment-time type="range" min="1" max="2099" step="1"><output data-shot-moment-time-output></output></label>
-          <label><span>Movement after this moment</span><select data-shot-easing><option value="custom" disabled>Custom</option><option value="ease">Smooth</option><option value="ease-out">Glide in</option><option value="ease-in">Build speed</option><option value="ease-in-out">Soft in &amp; out</option><option value="linear">Constant speed</option></select></label>
-          <button type="button" data-shot-apply-easing>Apply movement</button>
-        </div>
-      </section>
-      <details class="shot-advanced" data-shot-advanced><summary>Inspect &amp; fine-tune</summary><div class="advanced-content">
-        <form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form>
-        <div class="shot-timing"><label>Hold begins (ms)<input data-shot-settled type="number" min="2" max="2099" value="1820"></label><button type="button" data-shot-hold>Hold final pose through Settle</button></div>
-      </div></details>
-      <div class="shot-history-slot" data-shot-history-slot></div>
-      <output data-shot-status role="status" aria-live="polite"></output>
-      <section class="shot-recovery" data-shot-recovery hidden aria-labelledby="shot-recovery-heading">
-        <div><strong id="shot-recovery-heading">Manual Shot editing is unavailable</strong><span data-shot-recovery-copy></span></div>
-        <div><button type="button" data-shot-retry>Retry Shot workspace</button><button type="button" data-shot-inspect>Open track inspector</button></div>
-      </section>
-    </section>
     <div class="primary-layout">
       <div class="workflow" aria-label="Animation workflow">
         <section class="workflow-card choose-create" aria-labelledby="choose-create-heading">
@@ -207,11 +183,26 @@ document.body.innerHTML = `
           <div class="preview-shot-context"><strong data-preview-shot-object>Object 1</strong><output data-preview-shot-state>Editing 700 ms</output></div>
           <div class="preview-shot-actions" data-preview-shot-actions role="group" aria-label="Preview-side Shot controls"></div>
         </div>
+        <section class="shot-workspace" data-shot-workspace hidden aria-labelledby="shot-workspace-heading">
+          <h2 class="visually-hidden" id="shot-workspace-heading">Shape motion directly on the canvas</h2>
+          <div class="shot-object-bar" data-shot-object-bar><fieldset data-shot-targets><legend>Object</legend></fieldset><button class="path-toggle" type="button" data-shot-mode="path" aria-label="Path" aria-pressed="true">Hide path</button><label class="move-together"><input type="checkbox" data-move-together aria-label="Edit together"><span><strong>Edit together</strong><small>Position changes apply to both selected objects.</small></span></label></div>
+          <p class="shot-guidance visually-hidden" data-shot-guidance role="note"></p>
+          <section class="shot-context-dock" data-shot-context-dock aria-label="Selected moment controls">
+            <section class="moment-editor" aria-labelledby="moment-editor-heading">
+              <div class="moment-heading"><div><strong id="moment-editor-heading">Moments</strong><span>Select a moment. Use + to add a point.</span></div><button type="button" data-shot-remove-moment disabled>Remove point</button></div>
+              <div class="moment-transition" data-shot-moment-transition><label><span>When this moment happens</span><input data-shot-moment-time type="range" min="1" max="2099" step="1"><output data-shot-moment-time-output></output></label><label><span>Movement after this moment</span><select data-shot-easing><option value="custom" disabled>Custom</option><option value="ease">Smooth</option><option value="ease-out">Glide in</option><option value="ease-in">Build speed</option><option value="ease-in-out">Soft in &amp; out</option><option value="linear">Constant speed</option></select></label><button type="button" data-shot-apply-easing>Apply movement</button></div>
+            </section>
+            <details class="shot-advanced" data-shot-advanced><summary>Inspect &amp; fine-tune</summary><div class="advanced-content"><form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form><div class="shot-timing"><label>Hold begins (ms)<input data-shot-settled type="number" min="2" max="2099" value="1820"></label><button type="button" data-shot-hold>Hold final pose through Settle</button></div></div></details>
+          </section>
+          <aside class="shot-advanced-drawer" data-shot-advanced-drawer hidden aria-label="Advanced motion controls"></aside>
+          <div class="shot-history-slot" data-shot-history-slot></div>
+          <output data-shot-status role="status" aria-live="polite"></output>
+          <section class="shot-recovery" data-shot-recovery hidden aria-labelledby="shot-recovery-heading"><div><strong id="shot-recovery-heading">Manual Shot editing is unavailable</strong><span data-shot-recovery-copy></span></div><div><button type="button" data-shot-retry>Retry Shot workspace</button><button type="button" data-shot-inspect>Open track inspector</button></div></section>
+        </section>
       <div class="preview-stage"><div class="preview-canvas" data-preview-canvas><iframe data-preview title="Compiled motion preview"></iframe><div class="preview-object-overlay" data-preview-object-overlay aria-label="Selectable preview objects"></div><div class="cue-target-overlay" data-cue-target-overlay hidden aria-label="Choose a cue target on the canvas"></div><div class="cue-path-overlay" data-cue-path-overlay aria-label="Cursor path handles"></div><div class="preview-selection" data-preview-selection hidden><span>Selected element</span></div><div class="trajectory-overlay" data-trajectory-overlay aria-label="Compiler-native trajectory waypoints"></div></div></div>
-        <div class="transport" aria-label="Preview transport">
-          <button type="button" data-play>Play</button><button type="button" data-pause>Pause</button>
-          <label>Preview time <input data-scrub type="range" min="0" max="${authoring.document.durationMs}" step="1" value="0"></label>
-          <output data-playhead>0 ms</output>
+        <div class="preview-control-rail" data-preview-control-rail>
+          <div class="transport" aria-label="Preview transport"><button type="button" data-play>Play</button><button type="button" data-pause>Pause</button><label>Preview time <input data-scrub type="range" min="0" max="${authoring.document.durationMs}" step="1" value="0"></label><output data-playhead>0 ms</output></div>
+          <fieldset class="shot-moments" data-shot-moments hidden><legend>Animation moments</legend><div data-shot-moment-sequence></div></fieldset>
         </div>
       </section>
     </div>
@@ -2100,9 +2091,9 @@ function openShotWorkspace(config: { startMs: number; landedMs: number; settledM
   }
   shotConfig = { ...config, targetElementIds: [...config.targetElementIds].sort() };
   shotWorkspace.removeAttribute('aria-disabled'); shotWorkspace.dataset.editable = 'true'; shotRecovery.hidden = true; shotStatus.setAttribute('role', 'status');
-  for (const control of shotWorkspace.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>('input, button, select')) control.disabled = false;
+  forEachShotControl((control) => { control.disabled = false; });
   shotPrimaryElementId = shotConfig.targetElementIds[0]!;
-  shotSelection = [shotPrimaryElementId]; shotMomentMs = config.landedMs; shotWorkspace.hidden = false;
+  shotSelection = [shotPrimaryElementId]; shotMomentMs = config.landedMs; shotWorkspace.hidden = false; shotMoments.hidden = false;
   activateShotLayout(); configurePreviewCanvas();
   scrubber.max = String(shotConfig.settledMs + 1);
   if (!alignShotPreviewToMoment(shotMomentMs)) return { ok: false, code: 'PREVIEW_MOMENT_ALIGNMENT_INVALID' };
@@ -2111,13 +2102,16 @@ function openShotWorkspace(config: { startMs: number; landedMs: number; settledM
 
 function activateShotLayout(): void {
   const shell = required<HTMLElement>('.editor-shell');
-  const layout = required<HTMLElement>('.primary-layout');
-  const workflow = required<HTMLElement>('.workflow');
-  layout.insertBefore(shotWorkspace, workflow);
   required<HTMLElement>('[data-shot-history-slot]').append(required<HTMLElement>('.workflow-footer'));
   shell.classList.add('shot-active');
   required<HTMLElement>('.topbar h1').textContent = 'Shape motion directly on the canvas';
   required<HTMLElement>('.purpose').textContent = 'Choose an object and a moment. Add points when the path needs another beat.';
+}
+
+function forEachShotControl(callback: (control: HTMLInputElement | HTMLButtonElement | HTMLSelectElement) => void): void {
+  for (const root of [shotWorkspace, shotMoments]) {
+    root.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>('input, button, select').forEach(callback);
+  }
 }
 
 function initializeSeedWorkspace(): void {
@@ -2144,11 +2138,9 @@ function showSeedWorkspaceFailure(code: string): void {
   shotConfig = null;
   shotSelection = [];
   shotPrimaryElementId = null;
-  shotWorkspace.hidden = false;
+  shotWorkspace.hidden = false; shotMoments.hidden = true;
   shotWorkspace.removeAttribute('aria-disabled'); shotWorkspace.dataset.editable = 'false';
-  for (const control of shotWorkspace.querySelectorAll<HTMLInputElement | HTMLButtonElement | HTMLSelectElement>('input, button, select')) {
-    control.disabled = true;
-  }
+  forEachShotControl((control) => { control.disabled = true; });
   shotRecovery.hidden = false;
   required<HTMLElement>('[data-shot-recovery-copy]').textContent = `${code}. The committed document was not changed. Restore a compatible Shot 1 revision or source, then retry; you can still inspect every track now.`;
   required<HTMLButtonElement>('[data-shot-retry]').disabled = false;

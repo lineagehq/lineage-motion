@@ -189,6 +189,26 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   await page.goto(editorUrl); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
   const workspace = page.locator('[data-shot-workspace]');
   await expect(workspace).toBeVisible();
+  const layoutContract = await page.evaluate(() => {
+    const preview = document.querySelector<HTMLElement>('.preview-panel')!;
+    const stage = document.querySelector<HTMLElement>('.preview-stage')!;
+    const objectBar = document.querySelector<HTMLElement>('[data-shot-object-bar]')!;
+    const dock = document.querySelector<HTMLElement>('[data-shot-context-dock]')!;
+    const rail = document.querySelector<HTMLElement>('[data-preview-control-rail]')!;
+    return {
+      objectBarInsidePreview: preview.contains(objectBar),
+      dockInsidePreview: preview.contains(dock),
+      railInsidePreview: preview.contains(rail),
+      stageHeight: Math.round(stage.getBoundingClientRect().height),
+      order: [objectBar, stage, dock, rail].map((node) =>
+        Math.round(node.getBoundingClientRect().top)),
+    };
+  });
+  expect(layoutContract.objectBarInsidePreview).toBe(true);
+  expect(layoutContract.dockInsidePreview).toBe(true);
+  expect(layoutContract.railInsidePreview).toBe(true);
+  expect(layoutContract.stageHeight).toBeGreaterThanOrEqual(430);
+  expect(layoutContract.order[0]!).toBeLessThan(layoutContract.order[3]!);
   const objectInputs = workspace.locator('[data-shot-targets] input[type="checkbox"]');
   const primaryInputs = workspace.locator('[data-shot-targets] input[name="shot-primary"]');
   await expect(objectInputs).toHaveCount(0);
@@ -197,16 +217,15 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   await expect(workspace.locator('[data-move-together]')).not.toBeChecked();
   const focusedLayout = await page.evaluate(() => { const workspace = document.querySelector<HTMLElement>('[data-shot-workspace]')!;
     const preview = document.querySelector<HTMLElement>('.preview-panel')!; const workflow = document.querySelector<HTMLElement>('.workflow')!;
-    const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!; const workspaceRect = workspace.getBoundingClientRect();
-    const previewRect = preview.getBoundingClientRect(); const frameRect = frame.getBoundingClientRect(); return {
+    const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!; const frameRect = frame.getBoundingClientRect(); return {
       shotActive: document.querySelector('.editor-shell')!.classList.contains('shot-active'), workflowDisplay: getComputedStyle(workflow).display,
-      aligned: Math.abs(workspaceRect.bottom - previewRect.top) < 2, controlsVisible: workspaceRect.top >= 0 && workspaceRect.top < innerHeight,
+      workspaceInsidePreview: preview.contains(workspace), controlsVisible: frameRect.top >= 0 && frameRect.top < innerHeight,
       nativeStageVisible: frameRect.top >= 0 && frameRect.bottom <= innerHeight, runway: document.querySelector<HTMLElement>('.preview-stage')!.dataset.runwayCssPixels,
     }; });
-  expect(focusedLayout).toEqual({ shotActive: true, workflowDisplay: 'none', aligned: true, controlsVisible: true, nativeStageVisible: true, runway: '72' });
-  await expect(workspace.locator('input[name="shot-moment"]')).toHaveCount(3);
-  expect(await workspace.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number((input as HTMLInputElement).value)))).toEqual([0, 700, 2100]);
-  await expect(workspace.locator('input[name="shot-moment"][value="700"]')).toBeChecked();
+  expect(focusedLayout).toEqual({ shotActive: true, workflowDisplay: 'none', workspaceInsidePreview: true, controlsVisible: true, nativeStageVisible: true, runway: '72' });
+  await expect(page.locator('input[name="shot-moment"]')).toHaveCount(3);
+  expect(await page.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number((input as HTMLInputElement).value)))).toEqual([0, 700, 2100]);
+  await expect(page.locator('input[name="shot-moment"][value="700"]')).toBeChecked();
   await expect(workspace.locator('[data-pose-form] input[name="x"]')).toBeEnabled();
   expect(await page.evaluate(() => window.__motionEditor.inspectShotWorkspace())).toMatchObject({ open: true, momentMs: 700, previewMatchesCompiler: true });
   const beforePathAlignment = await page.evaluate(() => ({ authoring: window.__motionEditor.inspectAuthoring(), native: window.__motionEditor.readState(),
@@ -270,7 +289,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     });
   };
   await page.setViewportSize({ width: 960, height: 908 });
-  await expect.poll(() => page.locator('[data-preview-canvas]').evaluate((canvas) => canvas.getBoundingClientRect().width)).toBeGreaterThan(440);
+  await expect.poll(() => page.locator('[data-preview-canvas]').evaluate((canvas) => canvas.getBoundingClientRect().width)).toBeGreaterThan(400);
   await expect(page.locator('[data-trajectory-segment]').first()).toBeVisible();
   const previewToolbar = page.locator('[data-preview-shot-toolbar]'); await expect(previewToolbar).toBeVisible();
   await expect(previewToolbar.getByRole('button', { name: 'Show path overlay' })).toHaveAttribute('aria-pressed', 'true');
@@ -404,11 +423,11 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   expect(commandBytes).toHaveLength(0);
   await page.setViewportSize({ width: 1183, height: 900 });
   await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
-  await expect(page.getByRole('checkbox', { name: /Move together/ })).not.toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /Edit together/ })).not.toBeChecked();
   expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: 700, currentTimes: [700, 700],
     playStates: ['paused', 'paused'] }, slider: 700, visibleTime: '700 ms', selectedMoment: 700 });
   expect(commandBytes).toHaveLength(0);
-  await workspace.locator('input[name="shot-moment"][value="0"]').check();
+  await page.locator('input[name="shot-moment"][value="0"]').check();
   await expect(workspace.locator('[data-shot-moment-time]')).toBeDisabled();
   await expect(workspace.locator('[data-shot-remove-moment]')).toBeDisabled();
   const rejectedTimingBaseline = await page.evaluate(() => ({ authoring: window.__motionEditor.inspectAuthoring(), native: window.__motionEditor.readState(),
@@ -418,25 +437,25 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     srcdoc: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc,
     undoDisabled: (document.querySelector<HTMLButtonElement>('[data-undo]')!).disabled }))).toEqual(rejectedTimingBaseline);
   expect(commandBytes).toHaveLength(0);
-  await workspace.locator('input[name="shot-moment"][value="700"]').check();
+  await page.locator('input[name="shot-moment"][value="700"]').check();
   await page.evaluate(() => { const handles = [...document.querySelectorAll<HTMLElement>('[data-trajectory-overlay] [data-keyframe-id]')];
     (window as unknown as { __alignmentNodes: Map<string, HTMLElement> }).__alignmentNodes = new Map(handles.map((handle) => [handle.dataset.keyframeId!, handle])); });
   for (const timeMs of [0, 700, 2100, 700]) {
-    await workspace.locator(`input[name="shot-moment"][value="${timeMs}"]`).check();
+    await page.locator(`input[name="shot-moment"][value="${timeMs}"]`).check();
     expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: timeMs, currentTimes: [timeMs, timeMs],
       playStates: ['paused', 'paused'] }, slider: timeMs, visibleTime: `${timeMs} ms`, selectedMoment: timeMs });
   }
   await page.locator('[data-trajectory-overlay] [data-keyframe-id][data-time-ms="0"]').click();
   expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: 0, currentTimes: [0, 0],
     playStates: ['paused', 'paused'] }, slider: 0, visibleTime: '0 ms', selectedMoment: 0 });
-  await workspace.locator('input[name="shot-moment"][value="700"]').check();
+  await page.locator('input[name="shot-moment"][value="700"]').check();
   expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: 700, currentTimes: [700, 700],
     playStates: ['paused', 'paused'] }, slider: 700, visibleTime: '700 ms', selectedMoment: 700 });
   expect(await page.evaluate(() => [...document.querySelectorAll<HTMLElement>('[data-trajectory-overlay] [data-keyframe-id]')]
     .every((handle) => (window as unknown as { __alignmentNodes: Map<string, HTMLElement> }).__alignmentNodes.get(handle.dataset.keyframeId!) === handle
       && handle.isConnected))).toBe(true);
   expect(commandBytes).toHaveLength(0);
-  await expect(page.locator('[data-shot-workspace]')).toBeInViewport();
+  await expect(page.locator('[data-shot-object-bar]')).toBeInViewport();
   await expect(page.locator('[data-preview]')).toBeInViewport();
   await expect(page.locator('.transport')).toBeInViewport();
   await expect(page.locator('[data-undo]')).toBeInViewport();
@@ -781,7 +800,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   });
   expect(runway).toEqual({ partial: true, whollyVisible: true, hitTestable: true });
   await page.locator('[data-move-together]').check();
-  await expect(page.getByRole('checkbox', { name: /Move together/ })).toBeChecked();
+  await expect(page.getByRole('checkbox', { name: /Edit together/ })).toBeChecked();
   await expect(workspace.locator('.move-together small')).toHaveText('Position changes apply to both selected objects.');
   await expect(workspace.locator('[data-shot-guidance]')).toContainText('Object movement translates both objects together.');
   await expect(page.locator('[data-reference-segment][data-selected="true"]')).toHaveCount(4);
@@ -1306,7 +1325,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest)).toBe(directBaseline);
   }
   await pathToggle.click(); await expect(pathToggle).toHaveAttribute('aria-pressed', 'true');
-  await workspace.locator('input[name="shot-moment"][value="840"]').check();
+  await page.locator('input[name="shot-moment"][value="840"]').check();
   await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
   const nonCurrent = page.locator('[data-trajectory-overlay] [data-keyframe-id][data-time-ms="0"]');
   const nonCurrentBox = await nonCurrent.boundingBox(); expect(nonCurrentBox).not.toBeNull();
@@ -1316,7 +1335,7 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   expect(waypointHit).toBe('0');
   const selectionRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
   await nonCurrent.click(); expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(selectionRevision);
-  await workspace.locator('input[name="shot-moment"][value="840"]').check(); await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
+  await page.locator('input[name="shot-moment"][value="840"]').check(); await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
   const dragBox = await page.locator('[data-trajectory-overlay] [data-keyframe-id][data-time-ms="0"]').boundingBox();
   await page.mouse.move(dragBox!.x + dragBox!.width / 2, dragBox!.y + dragBox!.height / 2); await page.mouse.down();
   await page.mouse.move(dragBox!.x + dragBox!.width / 2 + 12, dragBox!.y + dragBox!.height / 2 + 6, { steps: 3 }); await page.mouse.up();
@@ -1477,7 +1496,7 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
   const targets = workspace.locator('[data-shot-targets] input[type="checkbox"]');
   const primaries = workspace.locator('[data-shot-targets] input[name="shot-primary"]');
   await expect(targets).toHaveCount(0); await expect(primaries).toHaveCount(2);
-  const inventory = () => workspace.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number((input as HTMLInputElement).value)));
+  const inventory = () => page.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number((input as HTMLInputElement).value)));
   expect(await inventory()).toEqual([0, 700, 1400, 2100]);
   await expect(page.getByRole('button', { name: 'Path' })).toHaveAttribute('aria-pressed', 'true');
   await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
@@ -1491,7 +1510,7 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
       currentTimes: state.currentTimes, playStates: state.playStates, slider: Number((document.querySelector('[data-scrub]') as HTMLInputElement).value),
       visibleTime: document.querySelector<HTMLOutputElement>('[data-playhead]')!.value,
       requestId: (inspected as unknown as { geometryPump: { lastCommittedRequestId: number } }).geometryPump.lastCommittedRequestId }; });
-  await workspace.locator('input[name="shot-moment"][value="1400"]').check();
+  await page.locator('input[name="shot-moment"][value="1400"]').check();
   const primaryReconciliationBaseline = await readAsymmetricAlignment();
   expect(primaryReconciliationBaseline).toMatchObject({ revision: 0, selectedMoment: 1400, playheadMs: 1400,
     currentTimes: [1400, 1400], playStates: ['paused', 'paused'], slider: 1400, visibleTime: '1400 ms' });

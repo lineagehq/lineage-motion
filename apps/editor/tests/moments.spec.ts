@@ -31,9 +31,9 @@ test('the canvas uses repeatable moments through the shared durable operation pa
     expect(new URL(page.url()).hostname).toBe('lineage-motion.localhost');
     const workspace = page.locator('[data-shot-workspace]');
     await expect(workspace).toBeVisible();
-    await expect(workspace.getByRole('heading', { name: 'Choose an object, then shape each moment' })).toBeVisible();
+    await expect(workspace.getByRole('heading', { name: 'Shape motion directly on the canvas' })).toBeAttached();
     await expect(workspace.locator('[data-shot-advanced]')).not.toHaveAttribute('open', '');
-    const momentValues = () => workspace.locator('input[name="shot-moment"]').evaluateAll((inputs) =>
+    const momentValues = () => page.locator('input[name="shot-moment"]').evaluateAll((inputs) =>
       inputs.map((input) => Number((input as HTMLInputElement).value)));
     const canvasMomentLabels = () => page.locator('.trajectory-waypoint').evaluateAll((handles) => handles.map((handle) => ({
       name: handle.querySelector('.trajectory-waypoint-name')?.textContent,
@@ -51,15 +51,15 @@ test('the canvas uses repeatable moments through the shared durable operation pa
       { name: 'Point 1', time: '700 ms', ariaLabel: 'Point 1, 700 ms, compiler-native target bounds' },
       { name: 'Settle', time: '2100 ms', ariaLabel: 'Settle, 2100 ms, compiler-native target bounds' },
     ]);
-    await expect(workspace.locator('.moment-add')).toHaveCount(2);
+    await expect(page.locator('.moment-add')).toHaveCount(2);
     const baseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
 
-    await workspace.locator('.moment-add').first().click();
+    await page.locator('.moment-add').first().click();
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
     expect(await momentValues()).toEqual([0, 350, 700, 2100]);
-    await expect(workspace.locator('input[name="shot-moment"][value="350"]')).toBeChecked();
-    await expect(workspace.getByText('Point 1', { exact: true })).toBeVisible();
-    await expect(workspace.getByText('Point 2', { exact: true })).toBeVisible();
+    await expect(page.locator('input[name="shot-moment"][value="350"]')).toBeChecked();
+    await expect(page.locator('[data-shot-moments]').getByText('Point 1', { exact: true })).toBeVisible();
+    await expect(page.locator('[data-shot-moments]').getByText('Point 2', { exact: true })).toBeVisible();
     await expect.poll(canvasMomentLabels).toEqual([
       { name: 'Start', time: '0 ms', ariaLabel: 'Start, 0 ms, compiler-native target bounds' },
       { name: 'Point 1', time: '350 ms', ariaLabel: 'Point 1, 350 ms, compiler-native target bounds' },
@@ -76,12 +76,12 @@ test('the canvas uses repeatable moments through the shared durable operation pa
     ]);
     await workspace.getByRole('radio', { name: 'Primary Object 1' }).check();
     expect(await momentValues()).toEqual([0, 350, 700, 2100]);
-    await workspace.locator('input[name="shot-moment"][value="350"]').check();
+    await page.locator('input[name="shot-moment"][value="350"]').check();
 
     await workspace.locator('[data-shot-moment-time]').fill('420');
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
     expect(await momentValues()).toEqual([0, 420, 700, 2100]);
-    await expect(workspace.locator('input[name="shot-moment"][value="420"]')).toBeChecked();
+    await expect(page.locator('input[name="shot-moment"][value="420"]')).toBeChecked();
     await workspace.locator('[data-shot-easing]').selectOption('ease-in-out');
     await workspace.locator('[data-shot-apply-easing]').click();
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(3);
