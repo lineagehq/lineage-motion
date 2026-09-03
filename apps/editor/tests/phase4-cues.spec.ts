@@ -1,30 +1,43 @@
 import { expect, test } from '@playwright/test';
 import { spawn, type ChildProcess } from 'node:child_process';
-import { resolve } from 'node:path';
+import { randomBytes } from 'node:crypto';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
-const url = 'http://127.0.0.1:41744'; let server: ChildProcess;
+let processHandle: ChildProcess | undefined; let directory = ''; let editorUrl = '';
 
 test.beforeAll(async () => {
+  directory = await mkdtemp(join(tmpdir(), 'lineage-motion-cursor-cues-'));
   const root = resolve(import.meta.dirname, '../../..');
-  server = spawn('npm', ['exec', 'vite', '--', '--config', resolve(root, 'apps/editor/vite.config.ts'),
-    '--host', '127.0.0.1', '--port', '41744'], {
-    cwd: root, stdio: 'ignore', env: { ...process.env, PHASE4_CURSOR_CLICK_REVEAL: '1' },
+  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+    cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: '0',
+      PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
+      PHASE3_AGENT_CAPABILITY: randomBytes(32).toString('base64url'), PHASE4_CURSOR_CLICK_REVEAL: '1' },
+    stdio: ['ignore', 'pipe', 'pipe'],
   });
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    try { if ((await fetch(url)).ok) return; } catch { /* wait */ }
-    await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
-  }
-  throw new Error('PHASE4_EDITOR_TIMEOUT');
+  editorUrl = await new Promise<string>((resolveAddress, reject) => {
+    let output = ''; const timer = setTimeout(() => reject(new Error('PHASE4_EDITOR_TIMEOUT')), 10000);
+    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString();
+      const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
+      if (line) { clearTimeout(timer); resolveAddress((JSON.parse(line) as { editorUrl: string }).editorUrl); }
+    });
+    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`PHASE4_EDITOR_EXIT_${code}`)); });
+  });
 });
 
-test.afterAll(() => server?.kill('SIGTERM'));
+test.afterAll(async () => {
+  if (processHandle?.exitCode === null) { processHandle.kill('SIGTERM');
+    await new Promise((resolveExit) => processHandle!.once('exit', resolveExit)); }
+  if (directory) await rm(directory, { recursive: true, force: true });
+});
 
 test('authors cursor path, reveal, and click through the native editor lifecycle', async ({ page }) => {
   const errors: string[] = []; const failed: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('requestfailed', (request) => failed.push(request.url()));
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto(url); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await page.goto(editorUrl); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
   await expect(page.locator('[data-cue-workspace]')).toBeVisible();
   await expect(page.locator('[data-cue-workspace]')).toHaveAttribute('data-step', 'pick-cursor');
   await expect(page.locator('[data-cue-form]:visible')).toHaveCount(0);
@@ -238,14 +251,14 @@ test('authors cursor path, reveal, and click through the native editor lifecycle
   await page.locator('[data-authored-cue="click"] [data-cue-edit]').click();
   await expect(page.locator('[data-cue-workspace]')).toHaveAttribute('data-step', 'edit-click');
   await page.locator('[data-cue-form="click"] .cue-timing > summary').click();
-  await page.locator('[data-cue-form="click"] input[name="press"]').fill('1000');
-  await page.locator('[data-cue-form="click"] input[name="release"]').fill('980');
+  const canonicalPulseEnd = await page.locator('[data-cue-form="click"] input[name="pulseEnd"]').inputValue();
+  await page.locator('[data-cue-form="click"] input[name="pulseEnd"]').fill('999999');
   const beforeInvalidRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
-  const canonicalClickValues = await page.locator('[data-cue-form="click"]').evaluate((form) => {
+  const canonicalClickValues = await page.locator('[data-cue-form="click"]').evaluate((form, canonicalPulseEnd) => {
     const data = new FormData(form as HTMLFormElement);
-    return { arrive: data.get('arrive'), press: '800', release: '920', pulseEnd: data.get('pulseEnd'),
+    return { arrive: data.get('arrive'), press: data.get('press'), release: data.get('release'), pulseEnd: canonicalPulseEnd,
       scale: data.get('scale'), radius: data.get('radius') };
-  });
+  }, canonicalPulseEnd);
   await page.locator('[data-cue-form="click"] button[type="submit"]').click();
   await expect(page.locator('[data-cue-status]')).toContainText('Arrive < Press < Release < Pulse end');
   await expect(page.locator('[data-cue-status]')).toHaveAttribute('data-diagnostic-code', 'CUE_UPDATE_INVALID');

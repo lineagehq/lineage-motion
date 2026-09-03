@@ -27,6 +27,8 @@
     "verify:determinism": "vitest run packages/css-compiler/src/determinism.test.ts",
     "test:private-import:legacy-negative": "vitest run packages/css-import/src/private.private.test.ts --sequence.concurrent false",
     "test:private-import": "vitest run packages/css-import/src/landing-shot1.private.test.ts --sequence.concurrent false",
+    "test:phase4:five-scene": "vitest run packages/css-import/src/five-scene.test.ts packages/phase3-proof/src/five-scene.test.ts --sequence.concurrent false",
+    "verify:phase4:five-scene": "vitest run packages/css-import/src/five-scene.private.test.ts --sequence.concurrent false --testTimeout=120000",
     "check:private-ignore": "node scripts/check-private-ignore.mjs",
     "check:sensitive": "node scripts/check-sensitive.mjs",
     "typecheck": "tsc --noEmit"
