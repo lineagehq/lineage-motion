@@ -877,7 +877,7 @@ function setPublicationState(state: PublicationState, failureCode: string | null
   if (state === 'failed' && shotConfig) shotStatus.value = 'Change could not be published. Your previous motion is still active.';
 }
 
-type ShotControlAction = 'Pose' | 'Timing' | 'Movement' | 'Point' | 'Hold';
+type ShotControlAction = 'Pose' | 'Position' | 'Timing' | 'Movement' | 'Point' | 'Hold';
 
 function clearShotControlFeedback(): void {
   shotControlFeedback.hidden = true;
@@ -2844,6 +2844,7 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
   activeWaypointDraft = null; waypointDraftMoveCount = 0; waypointDraftAppliedCount = 0; waypointDraftFailure = null;
   if (waypointDraftFrame !== null) { cancelAnimationFrame(waypointDraftFrame); waypointDraftFrame = null; }
   const envelope = operationEnvelope();
+  clearShotControlFeedback();
   event.preventDefault(); const surface = event.currentTarget as HTMLButtonElement; surface.setPointerCapture(event.pointerId);
   const feedbackHandle = surface.matches('[data-keyframe-id]') ? surface
     : shotOverlay.querySelector<HTMLElement>(`[data-element-id="${primaryElementId}"][data-time-ms="${momentMs}"]`);
@@ -2877,6 +2878,7 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
         waypointDraftFailure = error instanceof Error ? error.message : 'PREVIEW_DRAFT_INVALID'; activeWaypointDraft = null;
         await controller.restoreCommittedCompilerCss();
         shotStatus.value = `${waypointDraftFailure} · revision ${authoring.document.revision} unchanged.`;
+        showShotControlFailure('Position', waypointDraftFailure);
       });
     });
     shotStatus.value = `Trajectory draft · ${primaryElementId}/${current.keyframeId} · release to commit or press Escape to cancel.`;
@@ -2910,12 +2912,16 @@ function beginWaypointDrag(event: PointerEvent, momentMs: number): void {
           oldCompilerCss: committedAtGestureStart.css, newCommittedHtml: releasedDraft.compiledHtml,
           newCompilerCss: releasedDraft.compiledCss,
         });
-        if (!result.ok) await controller.restoreCommittedCompilerCss();
+        if (!result.ok) {
+          await controller.restoreCommittedCompilerCss();
+          showShotControlFailure('Position', result.code);
+        }
         else { waypointReleasePhase = 'publishing-geometry'; await awaitShotGeometryCommit(); }
       }).catch(async (error: unknown) => {
         waypointDraftFailure = error instanceof Error ? error.message : 'PREVIEW_DRAFT_INVALID';
         await controller.restoreCommittedCompilerCss();
         shotStatus.value = `${waypointDraftFailure} · revision ${authoring.document.revision} unchanged.`;
+        showShotControlFailure('Position', waypointDraftFailure);
       }).finally(() => { if (releaseGeneration === waypointGestureGeneration) activeWaypointDraft = null;
         waypointReleasePhase = 'idle'; clearTerminalFeedback(); });
     } else if (moved) { restoreCommitted(); }

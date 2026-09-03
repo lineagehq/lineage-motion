@@ -143,7 +143,7 @@ test('durable chrome, canonical state, and compiler preview publish atomically a
   expect(commandBodies).toHaveLength(commandsWhileFailed);
 });
 
-test('rejected and failed retimes preserve one visible coherent moment before retry', async ({ page }) => {
+test('rejected retimes stay coherent and failed waypoint publication is visibly recoverable', async ({ page }) => {
   processHandle?.kill('SIGTERM');
   if (processHandle?.exitCode === null) await new Promise((resolveExit) => processHandle!.once('exit', resolveExit));
   const root = resolve(import.meta.dirname, '../../..'); const seed = createTrajectorySeed(root);
@@ -213,6 +213,24 @@ test('rejected and failed retimes preserve one visible coherent moment before re
     commandCount: 1,
   });
   expect(`${failed.feedback?.value} ${rejected.feedback?.value}`).not.toContain('Pose');
+
+  const waypoint = page.locator('.trajectory-waypoint[data-time-ms="840"]');
+  const waypointBox = await waypoint.boundingBox();
+  expect(waypointBox).not.toBeNull();
+  await page.evaluate(() => window.__motionEditor.failNextPublication());
+  await page.mouse.move(waypointBox!.x + waypointBox!.width / 2, waypointBox!.y + waypointBox!.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(waypointBox!.x + waypointBox!.width / 2 + 12, waypointBox!.y + waypointBox!.height / 2 + 6, { steps: 3 });
+  await page.mouse.up();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('failed');
+  await expect(page.locator('[data-shot-advanced-drawer]')).toBeHidden();
+  await expect(page.locator('[data-shot-control-feedback]')).toBeVisible();
+  await expect.poll(() => page.locator('[data-shot-control-feedback]')
+    .evaluate((output) => (output as HTMLOutputElement).value))
+    .toBe('Position could not be published. Your previous motion is still active.');
+  await expect(page.locator('[data-service-diagnostic]')).toBeHidden();
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
+  expect(commandCount).toBe(2);
 });
 
 test('Shot 1 workspace commits five durable operations and exact undo/redo through compiler-native preview', async ({ page }) => {
