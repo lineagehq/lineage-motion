@@ -466,6 +466,10 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     await page.locator(`input[name="shot-moment"][value="${timeMs}"]`).check();
     expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: timeMs, currentTimes: [timeMs, timeMs],
       playStates: ['paused', 'paused'] }, slider: timeMs, visibleTime: `${timeMs} ms`, selectedMoment: timeMs });
+    expect(await page.evaluate((requestedTimeMs) => { const animations = document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument!.getAnimations();
+      return animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation' && animation.effect?.constructor.name === 'KeyframeEffect'
+        && animation.timeline?.constructor.name === 'DocumentTimeline' && animation.playState === 'paused'
+        && typeof animation.currentTime === 'number' && Math.abs(animation.currentTime - requestedTimeMs) <= .001); }, timeMs)).toBe(true);
   }
   await page.locator('[data-trajectory-overlay] [data-keyframe-id][data-time-ms="0"]').click();
   expect(await readMomentAlignment()).toMatchObject({ authoring: { revision: 0 }, native: { playheadMs: 0, currentTimes: [0, 0],

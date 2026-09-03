@@ -1145,14 +1145,24 @@ async function runCanvasFirstUxQa(repositoryRoot) {
     const together = page.locator('[data-move-together]'); await together.check(); await together.uncheck();
     await page.locator('[data-play]').click(); await page.waitForTimeout(80); await page.locator('[data-pause]').click();
     const visibleMoments = await page.locator('input[name="shot-moment"]').evaluateAll((inputs) => inputs.map((input) => Number(input.value)));
+    let nativeScrubSynchronized = true;
     for (const moment of visibleMoments) {
       await page.locator(`input[name="shot-moment"][value="${moment}"]`).check();
       await page.locator('[data-scrub]').fill(String(moment));
+      nativeScrubSynchronized &&= await page.evaluate((requestedTimeMs) => { const frame = document.querySelector('[data-preview]');
+        const animations = frame.contentDocument.getAnimations();
+        return animations.length > 0 && animations.every((animation) => animation.constructor.name === 'CSSAnimation'
+          && animation.effect?.constructor.name === 'KeyframeEffect' && animation.timeline?.constructor.name === 'DocumentTimeline'
+          && animation.playState === 'paused' && typeof animation.currentTime === 'number'
+          && Math.abs(animation.currentTime - requestedTimeMs) <= .001);
+      }, moment);
     }
 
-    const geometry = () => page.evaluate(() => ['[data-preview]', '[data-preview-canvas]', '[data-preview-object-overlay]',
+    const geometry = () => page.evaluate(() => ['.preview-stage', '[data-preview]', '[data-preview-canvas]', '[data-preview-object-overlay]',
       '[data-trajectory-overlay]'].map((selector) => { const rect = document.querySelector(selector).getBoundingClientRect();
       return [rect.left + scrollX, rect.top + scrollY, rect.width, rect.height]; }));
+    const geometryDelta = (left, right) => Math.max(0, ...left.flatMap((values, index) =>
+      values.map((value, offset) => Math.abs(value - right[index][offset]))));
     let responsiveDrawerPassed = true;
     for (const viewport of [{ width: 1440, height: 900 }, { width: 680, height: 900 }]) {
       await page.setViewportSize(viewport); await page.evaluate(() => new Promise((resolveFrame) =>
@@ -1160,9 +1170,7 @@ async function runCanvasFirstUxQa(repositoryRoot) {
       await page.locator('[data-trajectory-overlay][aria-busy="false"]').waitFor();
       const beforeAdvanced = await geometry();
       await page.locator('[data-shot-advanced-toggle]').click(); await page.locator('[data-shot-advanced-drawer]').waitFor();
-      const afterAdvanced = await geometry();
-      receipt.geometryMaxDeltaCssPx = Math.max(receipt.geometryMaxDeltaCssPx, ...beforeAdvanced.flatMap((values, index) =>
-        values.map((value, offset) => Math.abs(value - afterAdvanced[index][offset]))));
+      const openAdvanced = await geometry();
       responsiveDrawerPassed &&= await page.locator('[data-shot-advanced-drawer]').evaluate((drawer, narrow) => {
         const rect = drawer.getBoundingClientRect();
         const container = drawer.closest('.preview-panel').getBoundingClientRect();
@@ -1170,6 +1178,9 @@ async function runCanvasFirstUxQa(repositoryRoot) {
           && Math.abs(container.right - rect.right - 8) <= 1 && Math.abs(container.bottom - rect.bottom - 8) <= 1);
       }, viewport.width <= 700);
       await page.locator('[data-shot-advanced-close]').click();
+      const closedAdvanced = await geometry();
+      receipt.geometryMaxDeltaCssPx = Math.max(receipt.geometryMaxDeltaCssPx,
+        geometryDelta(beforeAdvanced, openAdvanced), geometryDelta(openAdvanced, closedAdvanced));
     }
     await page.setViewportSize({ width: 1440, height: 900 });
 
@@ -1219,7 +1230,7 @@ async function runCanvasFirstUxQa(repositoryRoot) {
     receipt.consoleErrorCount = diagnostics.consoleErrors.length + diagnostics.pageErrors.length;
     receipt.networkErrorCount = diagnostics.failedRequests.length + diagnostics.unexpectedNetwork.length + diagnostics.httpErrors.length;
     receipt.passed = receipt.operationCount > 0 && receipt.momentCount >= 3 && receipt.geometryMaxDeltaCssPx <= 1 && responsiveDrawerPassed
-      && receipt.nativeCssAnimationCount > 0 && receipt.keyboardFlowPassed && receipt.failurePreservedCompiler
+      && receipt.nativeCssAnimationCount > 0 && nativeScrubSynchronized && receipt.keyboardFlowPassed && receipt.failurePreservedCompiler
       && finalEvidence.previewMatchesCompiler && receipt.consoleErrorCount === 0 && receipt.networkErrorCount === 0;
   } catch {
     receipt.passed = false;
