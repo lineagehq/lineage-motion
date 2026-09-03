@@ -36,6 +36,7 @@ import {
 import { MotionPreparationError, MotionServiceClient, commandSchema, makeBranchCreateCommand, makeClaimControlCommand,
   makeOperationIntentCommand, makeTrajectoryCommand,
   type CommitMetadata, type MotionCommand, type MotionDiagnostic } from '../../../packages/motion-protocol/src/index.ts';
+import { mountReviewHandoff } from './review-handoff.ts';
 import './styles.css';
 
 let authoring = createAuthoringState(payload.document);
@@ -237,6 +238,11 @@ document.body.innerHTML = `
 
 const iframe = required<HTMLIFrameElement>('[data-preview]');
 const controller = new NativePreviewController(iframe);
+const reviewHandoff = serviceClient && payload.humanCapability && new URLSearchParams(location.search).has('review-handoff') ? mountReviewHandoff({
+  root: required<HTMLElement>('.editor-shell'), serviceUrl: '', capability: payload.humanCapability,
+  documentId: authoring.document.documentId, branchId: () => activeBranchId, revision: () => authoring.document.revision,
+  canonicalDigest: () => durableWorkspace?.canonicalDigest ?? sha256Hex(canonicalJson(authoring.document)), compiled: () => compiled,
+}) : null;
 const scrubber = required<HTMLInputElement>('[data-scrub]');
 const playhead = required<HTMLOutputElement>('[data-playhead]');
 const status = required<HTMLOutputElement>('[data-operation-status]');
@@ -610,6 +616,7 @@ window.__motionEditor = {
   inspectCollaboration: () => ({ workspace: durableWorkspace && structuredClone(durableWorkspace),
     branches: durableBranches && structuredClone(durableBranches), claims: durableClaims && structuredClone(durableClaims),
     activity: durableActivity && structuredClone(durableActivity), diagnostic: lastServiceDiagnostic && structuredClone(lastServiceDiagnostic) }),
+  inspectReviewHandoff: () => reviewHandoff?.inspect() ?? null,
   dispatch,
   openShotWorkspace,
   inspectShotWorkspace,

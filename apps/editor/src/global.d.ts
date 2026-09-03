@@ -44,6 +44,7 @@ declare global {
         activity: import('../../../packages/motion-protocol/src/index.ts').ActivityPage | null;
         diagnostic: import('../../../packages/motion-protocol/src/index.ts').MotionDiagnostic | null;
       };
+      inspectReviewHandoff: () => import('./review-handoff.ts').ReviewInspector | null;
       switchBranch: (branchId: string) => Promise<void>;
       disconnectEvents: () => void;
       reconnectEvents: () => void;

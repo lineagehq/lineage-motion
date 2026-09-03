@@ -4,6 +4,7 @@ import { canonicalJson, sha256Hex, type MotionDocument } from '../../domain/src/
 import { compileMotionDocument } from '../../css-compiler/src/index.ts';
 import { parseCommandDetailed, parseOperationPreparationRequest, type CommandFailure,
   type CommitMetadata } from '../../motion-protocol/src/index.ts';
+import { parseHandoffRequest, parseReviewCommand, reviewFailure, type ReviewEvent } from '../../motion-protocol/src/review.ts';
 import type { ProjectStore } from '../../project-store/src/index.ts';
 import { acquireStoreLock, type StoreLock } from './lock-runner.ts';
 import { prepareStorePath } from './paths.ts';
@@ -29,11 +30,60 @@ export async function startLocalMotionService(options: { databasePath: string; s
     store.initialize(options.seed);
   } catch (error) { store?.close(); await lock?.release(); throw error; }
   const subscribers = new Map<string, Set<ServerResponse>>();
+  const reviewSubscribers = new Map<string, Set<ServerResponse>>();
   const server = createServer(async (request, response) => {
     response.setHeader('cache-control', 'no-store');
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     try {
       if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { ok: true });
+      if (request.method === 'POST' && url.pathname === '/api/review/v1/commands') {
+        const auth = authenticate(request, capabilities);
+        if (!auth) return json(response, 403, reviewFailure('UNAUTHORIZED_CLAIM', 'ACTOR_FORBIDDEN', 'authorization', false));
+        let input: unknown; try { input = await readJson(request); }
+        catch { return json(response, 422, reviewFailure('VALIDATION', 'PROTOCOL_REVIEW_COMMAND_INVALID', 'protocol', false)); }
+        const parsed = parseReviewCommand(input); if (!parsed.ok) return json(response,
+          parsed.response.code === 'UNSUPPORTED_VERSION' ? 400 : 422, parsed.response);
+        let result; try { result = store!.executeReview(parsed.command, { ...auth, now: options.now?.() ?? Date.now() }); }
+        catch { return json(response, 500, reviewFailure('STORAGE_FAILURE', 'STORAGE_FAILURE', 'storage', true)); }
+        if (result.event && !result.replayed) publishReview(reviewSubscribers.get(result.event.documentId), result.event);
+        return json(response, result.response.ok ? 200 : result.response.code === 'UNAUTHORIZED_CLAIM' ? 403
+          : result.response.code.startsWith('STALE_') ? 409 : 422, result.response);
+      }
+      const annotations = url.pathname.match(/^\/api\/review\/v1\/documents\/([^/]+)\/branches\/([^/]+)\/annotations$/);
+      if (request.method === 'GET' && annotations) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        const found = store!.listAnnotations(decodeURIComponent(annotations[1]!), decodeURIComponent(annotations[2]!));
+        return json(response, found ? 200 : 404, found ?? { ok: false });
+      }
+      const comparison = url.pathname.match(/^\/api\/review\/v1\/documents\/([^/]+)\/compare$/);
+      if (request.method === 'GET' && comparison) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        const left = parseNonnegative(url.searchParams.get('left'), -1); const right = parseNonnegative(url.searchParams.get('right'), -1);
+        if (left === null || right === null || left < 0 || right < 0) return json(response, 400, { ok: false, code: 'VALIDATION' });
+        const found = store!.compareRevisions(decodeURIComponent(comparison[1]!), left, right);
+        return json(response, found ? 200 : 404, found ?? { ok: false });
+      }
+      if (request.method === 'POST' && url.pathname === '/api/review/v1/handoffs') {
+        const auth = authenticate(request, capabilities);
+        if (!auth) return json(response, 403, reviewFailure('UNAUTHORIZED_CLAIM', 'ACTOR_FORBIDDEN', 'authorization', false));
+        let input: unknown; try { input = await readJson(request); } catch { return json(response, 422, { ok: false, code: 'VALIDATION' }); }
+        const parsed = parseHandoffRequest(input); if (!parsed.ok) return json(response, 422, parsed.response);
+        let result; try { result = store!.createHandoff(parsed.operationId, parsed.identity, { ...auth, now: options.now?.() ?? Date.now() }); }
+        catch { return json(response, 500, reviewFailure('STORAGE_FAILURE', 'STORAGE_FAILURE', 'storage', true)); }
+        return json(response, 'ok' in result && !result.ok ? 422 : 200, result);
+      }
+      const reviewEvents = url.pathname.match(/^\/api\/review\/v1\/documents\/([^/]+)\/events$/);
+      if (request.method === 'GET' && reviewEvents) {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        const documentId = decodeURIComponent(reviewEvents[1]!); const rawCursor = request.headers['last-event-id'];
+        if (Array.isArray(rawCursor) || (rawCursor !== undefined && !/^\d+$/.test(rawCursor)))
+          return json(response, 400, { ok: false, code: 'VALIDATION' });
+        const cursor = rawCursor === undefined ? 0 : Number(rawCursor);
+        response.writeHead(200, { 'content-type': 'text/event-stream', connection: 'keep-alive', 'cache-control': 'no-store' });
+        const set = reviewSubscribers.get(documentId) ?? new Set<ServerResponse>(); set.add(response); reviewSubscribers.set(documentId, set);
+        for (const event of store!.readReviewEvents(documentId, cursor)) publishReview(new Set([response]), event);
+        response.write(': connected\n\n'); request.on('close', () => set.delete(response)); return;
+      }
       if (request.method === 'POST' && url.pathname === '/api/v1/commands') {
         let input: unknown; try { input = await readJson(request); }
         catch { return json(response, 422, commandFailure('VALIDATION', 'PROTOCOL_COMMAND_INVALID', 'protocol', false, '$')); }
@@ -160,6 +210,7 @@ export async function startLocalMotionService(options: { databasePath: string; s
   let shutdown: Promise<void> | undefined;
   const close = (releaseLock: boolean): Promise<void> => shutdown ??= (async () => {
     for (const set of subscribers.values()) for (const subscriber of set) subscriber.end();
+    for (const set of reviewSubscribers.values()) for (const subscriber of set) subscriber.end();
     server.closeAllConnections(); await closeServer(server); store.close(); if (releaseLock) await lock.release();
   })();
   void lock.lost.then(() => close(false));
@@ -169,6 +220,9 @@ export async function startLocalMotionService(options: { databasePath: string; s
 
 function publish(subscribers: Set<ServerResponse> | undefined, event: CommitMetadata): void {
   for (const response of subscribers ?? []) response.write(`id: ${event.commitSeq}\nevent: commit\ndata: ${canonicalJson(event).trim()}\n\n`);
+}
+function publishReview(subscribers: Set<ServerResponse> | undefined, event: ReviewEvent): void {
+  for (const response of subscribers ?? []) response.write(`id: ${event.reviewSeq}\nevent: review\ndata: ${canonicalJson(event).trim()}\n\n`);
 }
 function json(response: ServerResponse, status: number, value: unknown): void {
   response.writeHead(status, { 'content-type': 'application/json; charset=utf-8' }); response.end(canonicalJson(value));

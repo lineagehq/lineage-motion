@@ -5,6 +5,7 @@ import { MotionServiceClient, commandSchema, makeBranchCreateCommand, makeClaimA
   makeClaimControlCommand, makeOperationIntentCommand, makeTrackCreateCommand, MotionPreparationError,
   parseCommandDetailed, type ActorKind, type CommandFailure, type CommandResponse,
   type MotionCommand } from '../../motion-protocol/src/index.ts';
+import { ReviewServiceClient, parseHandoffRequest, parseReviewCommand, type ReviewResponse } from '../../motion-protocol/src/review.ts';
 
 type Io = { stdout(value: string): void; stderr(value: string): void };
 class IneligiblePreparation extends Error { constructor(readonly preparation: unknown) { super('CLI_PREPARATION_INELIGIBLE'); } }
@@ -73,6 +74,21 @@ export async function runCli(argv: string[], io: Io = {
     const client = new MotionServiceClient(options.service, (...args) => fetch(...args), {
       actor: options.actor, capability: options.capability, ...(options.claimSecret ? { claimSecret: options.claimSecret } : {}),
     });
+    const reviewClient = new ReviewServiceClient(options.service, (...args) => fetch(...args), {
+      actor: options.actor, capability: options.capability, ...(options.claimSecret ? { claimSecret: options.claimSecret } : {}),
+    });
+    if (argv[0] === 'review-dispatch') {
+      const parsed = parseReviewCommand(readJsonFile(requireText(options.commandFile)));
+      if (!parsed.ok) { io.stdout(canonicalJson(parsed.response)); return reviewExitCode(parsed.response); }
+      const response = await reviewClient.dispatch(parsed.command); io.stdout(canonicalJson(response)); return reviewExitCode(response);
+    }
+    if (argv[0] === 'review-annotations') { io.stdout(canonicalJson(await reviewClient.annotations(
+      requireText(options.documentId), options.branchId))); return 0; }
+    if (argv[0] === 'review-compare') { io.stdout(canonicalJson(await reviewClient.compare(requireText(options.documentId),
+      nonnegativeInteger(options.read('--left-revision')), nonnegativeInteger(options.read('--right-revision'))))); return 0; }
+    if (argv[0] === 'review-handoff') { const parsed = parseHandoffRequest(readJsonFile(requireText(options.commandFile)));
+      if (!parsed.ok) { io.stdout(canonicalJson(parsed.response)); return reviewExitCode(parsed.response); }
+      io.stdout(canonicalJson(await reviewClient.handoff({ operationId: parsed.operationId, ...parsed.identity }))); return 0; }
     const read = await runRead(argv[0]!, options, client);
     if (read !== undefined) { io.stdout(canonicalJson(read)); return 0; }
     let command: MotionCommand;
@@ -398,6 +414,10 @@ function integerOption(value: string | undefined, fallback: number): number { re
 function exitCode(response: CommandResponse): number { if (response.ok) return 0; return {
   VALIDATION: 2, STALE_REVISION: 3, UNAUTHORIZED_CLAIM: 4, OPERATION_ID_CONFLICT: 5,
   UNSUPPORTED_VERSION: 6, STORAGE_FAILURE: 7,
+}[response.code]; }
+function reviewExitCode(response: ReviewResponse): number { if (response.ok) return 0; return {
+  VALIDATION: 2, STALE_BRANCH_REVISION: 3, STALE_ANNOTATION_VERSION: 3, UNAUTHORIZED_CLAIM: 4,
+  OPERATION_ID_CONFLICT: 5, UNSUPPORTED_VERSION: 6, STORAGE_FAILURE: 7,
 }[response.code]; }
 
 function canonicalJson(value: unknown): string { return `${JSON.stringify(sortJson(value))}\n`; }

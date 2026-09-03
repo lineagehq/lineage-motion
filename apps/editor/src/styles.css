@@ -544,3 +544,7 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
   .shot-active .moment-transition button { width: 100%; }
   .shot-active .preview-control-rail { grid-template-columns: 1fr; }
 }
+.review-handoff { margin: 1rem; padding: 1rem; border: 1px solid var(--line, #d9d9df); border-radius: 12px; background: #fff; }
+.review-handoff header, .review-actions, .review-handoff form { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; }
+.review-handoff label { display: grid; gap: .25rem; }
+.review-handoff textarea { min-width: 20rem; min-height: 4rem; }

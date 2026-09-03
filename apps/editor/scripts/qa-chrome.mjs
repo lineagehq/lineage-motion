@@ -75,6 +75,22 @@ if (process.argv[2] === '--landing-shot1') {
 if (process.argv[2] === '--canvas-first-ux') {
   process.exit(await runCanvasFirstUxQa(resolve(import.meta.dirname, '../../..')));
 }
+if (process.argv[2] === '--phase4-review-handoff') {
+  const qaRoot = resolve(import.meta.dirname, '../../..');
+  const proof = spawn('npm', ['exec', 'playwright', 'test', '--', 'apps/editor/tests/review-handoff.spec.ts',
+    '--config', 'apps/editor/playwright.config.ts', '--workers=1'], { cwd: qaRoot, stdio: ['ignore', 'pipe', 'pipe'] });
+  proof.stdout.on('data', (chunk) => process.stderr.write(chunk)); proof.stderr.on('data', (chunk) => process.stderr.write(chunk));
+  const exitCode = await new Promise((resolveExit, reject) => { proof.once('error', reject);
+    proof.once('exit', (code) => resolveExit(code ?? 1)); });
+  const browserProof = exitCode === 0 ? JSON.parse(await readFile(resolve(qaRoot,
+    '.motion/receipts/phase4-review-handoff-browser.json'), 'utf8')) : null;
+  const receipt = { schemaVersion: 'review.installed-chrome-receipt.v1', passed: exitCode === 0,
+    browser: 'Google Chrome', namedSubdomain: 'lineage-motion.localhost', proof: browserProof, commandExitCode: exitCode };
+  await mkdir(resolve(qaRoot, '.motion/receipts'), { recursive: true });
+  await writeFile(resolve(qaRoot, '.motion/receipts/phase4-review-handoff-installed-chrome.json'),
+    `${JSON.stringify(receipt, null, 2)}\n`);
+  process.stdout.write(`${JSON.stringify(receipt)}\n`); process.exit(exitCode);
+}
 if (process.argv[2] === '--phase4-reusable-cues') {
   const qaRoot = resolve(import.meta.dirname, '../../..');
   const proof = spawn('npm', ['exec', 'playwright', 'test', '--',
