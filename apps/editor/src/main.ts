@@ -192,9 +192,9 @@ document.body.innerHTML = `
               <div class="moment-heading"><div><strong id="moment-editor-heading" data-shot-context-name>Moments</strong><span>Select a moment. Use + to add a point.</span></div><button type="button" data-shot-context-remove data-shot-remove-moment disabled>Remove point</button></div>
               <div class="moment-transition" data-shot-moment-transition><label><span>When this moment happens</span><input data-shot-context-time data-shot-moment-time type="range" min="1" max="2099" step="1"><output data-shot-moment-time-output></output></label><label><span>Movement after this moment</span><select data-shot-context-easing data-shot-easing><option value="custom" disabled>Custom</option><option value="ease">Smooth</option><option value="ease-out">Glide in</option><option value="ease-in">Build speed</option><option value="ease-in-out">Soft in &amp; out</option><option value="linear">Constant speed</option></select></label><button type="button" data-shot-apply-easing>Apply movement</button></div>
             </section>
-            <details class="shot-advanced" data-shot-advanced><summary data-shot-advanced-toggle>Inspect &amp; fine-tune</summary><div class="advanced-content"><form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form><div class="shot-timing"><label>Hold begins (ms)<input data-shot-settled type="number" min="2" max="2099" value="1820"></label><button type="button" data-shot-hold>Hold final pose through Settle</button></div></div></details>
+            <div class="shot-advanced" data-shot-advanced><button type="button" data-shot-advanced-toggle aria-controls="shot-advanced-drawer" aria-expanded="false">Advanced motion controls</button></div>
           </section>
-          <aside class="shot-advanced-drawer" data-shot-advanced-drawer hidden aria-label="Advanced motion controls"></aside>
+          <aside class="shot-advanced-drawer" id="shot-advanced-drawer" data-shot-advanced-drawer hidden aria-label="Advanced motion controls"><header><strong>Advanced motion controls</strong><button type="button" data-shot-advanced-close>Close</button></header><details><summary>Exact pose</summary><form class="pose-fields" data-pose-form><label>X (px)<input name="x" type="number" step="0.000001" required></label><label>Y (px)<input name="y" type="number" step="0.000001" required></label><label>Scale<input name="scale" type="number" step="0.000001" min="0.25" max="3" required></label><label>Rotation (deg)<input name="rotate" type="number" step="0.000001" min="-180" max="180" required></label><button type="submit">Apply pose</button></form></details><details><summary>Settled hold</summary><div class="shot-timing"><label>Hold begins (ms)<input data-shot-settled type="number" min="2" max="2099" value="1820"></label><button type="button" data-shot-hold>Hold final pose through Settle</button></div></details><div data-shot-advanced-technical></div></aside>
           <div class="shot-history-slot" data-shot-history-slot></div>
           <output data-shot-status role="status" aria-live="polite"></output>
           <section class="shot-recovery" data-shot-recovery hidden aria-labelledby="shot-recovery-heading"><div><strong id="shot-recovery-heading">Manual Shot editing is unavailable</strong><span data-shot-recovery-copy></span></div><div><button type="button" data-shot-retry>Retry Shot workspace</button><button type="button" data-shot-inspect>Open track inspector</button></div></section>
@@ -257,6 +257,8 @@ const shotTargets = required<HTMLFieldSetElement>('[data-shot-targets]');
 const shotMoments = required<HTMLFieldSetElement>('[data-shot-moments]');
 const shotOverlay = required<HTMLElement>('[data-trajectory-overlay]');
 const shotPoseForm = required<HTMLFormElement>('[data-pose-form]');
+const shotAdvancedToggle = required<HTMLButtonElement>('[data-shot-advanced-toggle]');
+const shotAdvancedDrawer = required<HTMLElement>('[data-shot-advanced-drawer]');
 const shotStatus = required<HTMLOutputElement>('[data-shot-status]');
 const shotGuidance = required<HTMLElement>('[data-shot-guidance]');
 const shotRecovery = required<HTMLElement>('[data-shot-recovery]');
@@ -311,7 +313,20 @@ let waypointReleasePhase: 'idle' | 'flushing-latest' | 'committing' | 'publishin
 let playbackFeedbackFrame: number | null = null;
 let lastPreviewCommitPromotion: { schemaVersion: 'motion.preview-css-commit-promotion.v1'; attempted: boolean;
   promoted: boolean; fallbackCode: string | null } = { schemaVersion: 'motion.preview-css-commit-promotion.v1', attempted: false,
-    promoted: false, fallbackCode: null };
+  promoted: false, fallbackCode: null };
+function setShotAdvancedOpen(open: boolean, returnFocus = false): void {
+  shotAdvancedDrawer.hidden = !open;
+  shotAdvancedToggle.setAttribute('aria-expanded', String(open));
+  document.querySelector('.editor-shell')?.classList.toggle('shot-advanced-open', open);
+  if (open) required<HTMLButtonElement>('[data-shot-advanced-close]').focus();
+  else if (returnFocus) shotAdvancedToggle.focus();
+}
+
+shotAdvancedToggle.addEventListener('click', () => setShotAdvancedOpen(shotAdvancedDrawer.hidden));
+required<HTMLButtonElement>('[data-shot-advanced-close]').addEventListener('click', () => setShotAdvancedOpen(false, true));
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && !shotAdvancedDrawer.hidden) setShotAdvancedOpen(false, true);
+});
 required<HTMLButtonElement>('[data-keep-draft]').addEventListener('click', () => resolveDraftConflict(true));
 required<HTMLButtonElement>('[data-discard-draft]').addEventListener('click', () => resolveDraftConflict(false));
 for (const button of shotWorkspace.querySelectorAll<HTMLButtonElement>('[data-shot-mode]')) button.addEventListener('click', () => {
@@ -328,6 +343,7 @@ required<HTMLButtonElement>('[data-shot-remove-moment]').addEventListener('click
 required<HTMLButtonElement>('[data-shot-hold]').addEventListener('click', () => void applyShotHold());
 required<HTMLButtonElement>('[data-shot-retry]').addEventListener('click', () => initializeSeedWorkspace());
 required<HTMLButtonElement>('[data-shot-inspect]').addEventListener('click', () => {
+  setShotAdvancedOpen(true);
   const inspector = required<HTMLDetailsElement>('.inspect-panel'); inspector.open = true; inspector.scrollIntoView({ block: 'start', behavior: 'smooth' });
 });
 const shotMomentTime = required<HTMLInputElement>('[data-shot-moment-time]');
@@ -2103,9 +2119,18 @@ function openShotWorkspace(config: { startMs: number; landedMs: number; settledM
 function activateShotLayout(): void {
   const shell = required<HTMLElement>('.editor-shell');
   required<HTMLElement>('[data-shot-history-slot]').append(required<HTMLElement>('.workflow-footer'));
+  mountShotAdvancedSurfaces();
   shell.classList.add('shot-active');
   required<HTMLElement>('.topbar h1').textContent = 'Shape motion directly on the canvas';
   required<HTMLElement>('.purpose').textContent = 'Choose an object and a moment. Add points when the path needs another beat.';
+}
+
+function mountShotAdvancedSurfaces(): void {
+  const technical = required<HTMLElement>('[data-shot-advanced-technical]');
+  const collaboration = document.querySelector<HTMLElement>('.collaboration-bar');
+  const inspector = required<HTMLDetailsElement>('.inspect-panel');
+  if (collaboration) technical.append(collaboration);
+  technical.append(inspector);
 }
 
 function forEachShotControl(callback: (control: HTMLInputElement | HTMLButtonElement | HTMLSelectElement) => void): void {

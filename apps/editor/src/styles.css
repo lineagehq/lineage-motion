@@ -445,17 +445,25 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
 .shot-active .moment-transition input[type="range"] { min-width: 0; width: 100%; margin: 0; accent-color: #facf74; }
 .shot-active .moment-transition output { min-width: 56px; color: #ffe3a6; text-align: right; }
 .shot-active .moment-transition button { min-height: 38px; white-space: nowrap; }
-.shot-active .shot-advanced { position: absolute; top: 12px; right: 14px; }
-.shot-active .shot-advanced > summary { min-height: 40px; padding: 9px 12px; border: 1px solid #3c4659; border-radius: 9px;
-  background: #171c26; cursor: pointer; list-style: none; }
-.shot-active .shot-advanced > summary::-webkit-details-marker { display: none; }
-.shot-active .shot-advanced > summary::after { content: "  ···"; color: #81d8c9; }
-.shot-active .shot-advanced[open] > summary { border-color: #81d8c9; }
-.shot-active .advanced-content { position: fixed; z-index: 20; top: 180px; right: max(18px, calc((100vw - min(1320px, 100vw)) / 2 + 18px));
-  width: min(390px, calc(100vw - 36px)); max-height: calc(100vh - 202px); padding: 14px; overflow: auto;
-  border: 1px solid #53677c; border-radius: 14px; background: #111722; box-shadow: 0 24px 80px rgba(0,0,0,.62); }
-.shot-active .advanced-content .pose-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-.shot-active .advanced-content .shot-timing { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.shot-active .shot-advanced { position: absolute; z-index: 13; top: 12px; right: 14px; }
+.shot-active [data-shot-advanced-toggle] { min-height: 40px; padding: 9px 12px; border-color: #3c4659; background: #171c26; }
+.shot-active [data-shot-advanced-toggle][aria-expanded="true"] { border-color: #81d8c9; color: #bff2e8; }
+.shot-active .shot-advanced-drawer { position: absolute; z-index: 20; top: 44px; right: 10px; bottom: 58px;
+  width: min(360px, calc(100% - 20px)); padding: 14px; overflow: auto; border: 1px solid #53677c; border-radius: 14px;
+  background: #111722; box-shadow: 0 24px 80px rgba(0,0,0,.62); }
+.shot-active .shot-advanced-drawer[hidden] { display: none; }
+.shot-active .shot-advanced-drawer > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.shot-active .shot-advanced-drawer > details { margin-top: 8px; border: 1px solid #30394a; border-radius: 9px; background: #10151e; }
+.shot-active .shot-advanced-drawer > details > summary { padding: 9px 11px; cursor: pointer; }
+.shot-active .shot-advanced-drawer > details > form, .shot-active .shot-advanced-drawer > details > div { padding: 0 11px 11px; }
+.shot-active .shot-advanced-drawer details:not([open]) > :not(summary) { display: none; }
+.shot-active .shot-advanced-drawer .pose-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.shot-active .shot-advanced-drawer .shot-timing { display: grid; grid-template-columns: minmax(0, 1fr) auto; }
+.shot-active .shot-advanced-drawer [data-shot-advanced-technical] { display: grid; gap: 10px; margin-top: 12px; }
+.shot-active .shot-advanced-drawer .collaboration-bar { display: grid; gap: 9px; }
+.shot-active .shot-advanced-drawer .inspect-panel { margin-top: 0; opacity: 1; }
+.shot-active .preview-stage,
+.shot-active .preview-canvas { inline-size: 100%; }
 .shot-active .shot-history-slot { position: absolute; right: 205px; top: 12px; margin: 0; }
 .shot-active .shot-history-slot .workflow-footer { display: flex; align-items: center; gap: 8px; padding: 0; border: 0; }
 .shot-active .shot-history-slot .operation-status { display: none; }
@@ -516,7 +524,6 @@ iframe { position: absolute; inset: 0; display: block; border: 0; background: #1
   .shot-active .moment-transition { grid-template-columns: 1fr; }
   .shot-active .moment-transition button { width: 100%; }
   .shot-active .shot-history-slot { position: static; margin-top: 7px; }
-  .shot-active .advanced-content { inset: auto 9px 9px; width: auto; max-height: 72vh; }
   .shot-active .preview-shot-toolbar:not([hidden]) { position: static; display: none; }
   .shot-active .shot-object-bar { top: 52px; max-width: calc(100% - 18px); flex-wrap: wrap; justify-content: center; }
   .shot-active .shot-context-dock .moment-editor { margin: 9px; }

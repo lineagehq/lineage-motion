@@ -214,6 +214,22 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   expect(layoutContract.stageHeight).toBeGreaterThanOrEqual(430);
   expect(layoutContract.sharedStageDockColumn).toBe(true);
   expect(layoutContract.order[0]!).toBeLessThan(layoutContract.order[3]!);
+  const readGeometry = () => page.evaluate(() => {
+    const selectors = ['.preview-stage', '[data-preview-canvas]', '[data-preview-object-overlay]', '[data-trajectory-overlay]'];
+    return Object.fromEntries(selectors.map((selector) => {
+      const rect = document.querySelector<HTMLElement>(selector)!.getBoundingClientRect();
+      return [selector, [rect.x, rect.y, rect.width, rect.height].map((value) => Math.round(value * 10) / 10)];
+    }));
+  });
+  const closedGeometry = await readGeometry();
+  const advancedMotion = page.getByRole('button', { name: 'Advanced motion controls' });
+  await advancedMotion.click();
+  await expect(page.locator('[data-shot-advanced-drawer]')).toBeVisible();
+  expect(await readGeometry()).toEqual(closedGeometry);
+  await page.keyboard.press('Escape');
+  await expect(page.locator('[data-shot-advanced-drawer]')).toBeHidden();
+  await expect(advancedMotion).toBeFocused();
+  expect(await readGeometry()).toEqual(closedGeometry);
   const objectInputs = workspace.locator('[data-shot-targets] input[type="checkbox"]');
   const primaryInputs = workspace.locator('[data-shot-targets] input[name="shot-primary"]');
   await expect(objectInputs).toHaveCount(0);
@@ -816,12 +832,15 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     { actor: 'human', capability: humanCapability }).revision(seed.documentId, 1);
   const currentGroup = projectTrajectorySelection(revisionOne.document, targetElementIds, 700);
   expect(currentGroup.eligible).toBe(true); if (!currentGroup.eligible) throw new Error(currentGroup.code ?? 'TRAJECTORY_SELECTION_INVALID');
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await workspace.getByRole('button', { name: 'Advanced motion controls' }).click();
+  if (await page.locator('[data-shot-advanced-drawer] > details').first().getAttribute('open') === null) {
+    await page.locator('[data-shot-advanced-drawer] > details').first().locator('summary').click();
+  }
   const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 8));
   await page.getByRole('button', { name: 'Apply pose' }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
   await awaitShotMutationSettlement(2, 700);
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await page.keyboard.press('Escape');
   expect(commandBytes).toHaveLength(2);
   const groupedCommand = JSON.parse(commandBytes[1]!) as { expectedRevision: number; command: { schemaVersion: string; kind: string;
     expectedRevision: number; intent: { elementIds: string[] } } };
@@ -853,7 +872,8 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   expect(timingCommands[1]?.command.intent.expectedEasing).toEqual({
     kind: 'cubic-bezier', x1: 0.2, y1: 0.8, x2: 0.3, y2: 1,
   });
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await workspace.getByRole('button', { name: 'Advanced motion controls' }).click();
+  await page.locator('[data-shot-advanced-drawer] > details').nth(1).locator('summary').click();
   await page.locator('[data-shot-settled]').fill('1820'); await page.locator('[data-shot-hold]').click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(5);
   expect(commandBytes.slice(2, 5).map((bytes) => { const wire = JSON.parse(bytes) as { expectedRevision: number;
@@ -1107,12 +1127,12 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
       immediate: sanitizeRaceState(immediateRaceState), settled: sanitizeRaceState(settledRaceState) },
     compiler: { previewMatchesCompiler: true, exportDigest: edited.exportDigest } };
   await writeFile(join(directory, 'controlled-spatial-parity.json'), `${JSON.stringify(controlledReceipt, null, 2)}\n`);
-  const advanced = workspace.locator('[data-shot-advanced]');
-  if (await advanced.getAttribute('open') !== null) await advanced.locator('summary').click();
+  const advanced = workspace.getByRole('button', { name: 'Advanced motion controls' });
+  if (await advanced.getAttribute('aria-expanded') === 'true') await page.keyboard.press('Escape');
   const canvasBeforeAdvanced = await page.locator('[data-preview]').boundingBox();
-  await advanced.locator('summary').click();
+  await advanced.click();
   expect(await page.locator('[data-preview]').boundingBox()).toEqual(canvasBeforeAdvanced);
-  await advanced.locator('summary').click();
+  await page.keyboard.press('Escape');
   await page.setViewportSize({ width: 768, height: 900 });
   await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
   const directTargets = await page.locator('[data-preview-object-id]:visible, [data-transform-handle]:visible').evaluateAll((items) => items.map((item) => {
@@ -1572,11 +1592,14 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
     expect(proof.status).not.toMatch(/INVALID|MISSING|DIVERGED/);
   };
   await assertGroupedState([0, 700, 2100]);
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await workspace.getByRole('button', { name: 'Advanced motion controls' }).click();
+  if (await page.locator('[data-shot-advanced-drawer] > details').first().getAttribute('open') === null) {
+    await page.locator('[data-shot-advanced-drawer] > details').first().locator('summary').click();
+  }
   const x = workspace.locator('[data-pose-form] input[name="x"]');
   await x.fill(String(Number(await x.inputValue()) + 1)); await workspace.getByRole('button', { name: 'Apply pose' }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await page.keyboard.press('Escape');
   await assertGroupedState([0, 700, 2100]);
   expect(asymmetricCommands).toHaveLength(2); expect(asymmetricCommands[1]?.kind).toBe('motion.transform-waypoints.translate');
   expect(asymmetricCommands[1]).toMatchObject({ schemaVersion: 'motion.operation-intent.v1', intent: { elementIds: targetElementIds } });
@@ -1598,7 +1621,10 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
     await assertGroupedState([...moments]);
   }
   await moveTogether.uncheck(); await expect(moveTogether).not.toBeChecked(); await expect(primaries.nth(1)).toBeChecked();
-  await workspace.locator('[data-shot-advanced] summary').click();
+  await workspace.getByRole('button', { name: 'Advanced motion controls' }).click();
+  if (await page.locator('[data-shot-advanced-drawer] > details').first().getAttribute('open') === null) {
+    await page.locator('[data-shot-advanced-drawer] > details').first().locator('summary').click();
+  }
   await x.fill(String(Number(await x.inputValue()) + 1)); await workspace.getByRole('button', { name: 'Apply pose' }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(11);
   expect(asymmetricCommands.at(-1)?.kind).toBe('motion.transform-pose.set');
@@ -1620,7 +1646,10 @@ test('non-service editor keeps local interaction state but rejects every persist
   });
   await page.goto(url); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
   const baseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
-  await page.locator('[data-shot-advanced] summary').click();
+  await page.getByRole('button', { name: 'Advanced motion controls' }).click();
+  if (await page.locator('[data-shot-advanced-drawer] > details').first().getAttribute('open') === null) {
+    await page.locator('[data-shot-advanced-drawer] > details').first().locator('summary').click();
+  }
   const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 5));
   await page.getByRole('button', { name: 'Apply pose' }).click();
   await expect(page.locator('[data-operation-status]')).toContainText('SERVICE_REQUIRED');
