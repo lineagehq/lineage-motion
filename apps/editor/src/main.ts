@@ -2867,8 +2867,7 @@ async function addShotMoment(beforeMs: number, afterMs: number): Promise<void> {
   if (result.ok) { shotMomentMs = timeMs; alignShotPreviewToMoment(timeMs); }
   shotStatus.value = result.ok ? `Point added at ${timeMs} ms · revision ${authoring.document.revision}.`
     : `${result.code} · no point added.`;
-  renderShotWorkspace();
-  if (result.ok) focusShotMoment(timeMs);
+  if (result.ok) { renderShotWorkspace(); focusShotMoment(timeMs); }
 }
 
 async function removeShotMoment(): Promise<void> {

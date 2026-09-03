@@ -58,6 +58,18 @@ test('the canvas uses repeatable moments through the shared durable operation pa
     await expect(dock.locator('[data-shot-context-time]')).toHaveValue('700');
     await expect(dock.locator('[data-shot-context-easing]')).toHaveValue('ease-out');
 
+    await page.route('**/operations/prepare', async (route) => route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({
+      ok: false, code: 'VALIDATION', diagnostic: { schemaVersion: 'motion.diagnostic.v1', code: 'REJECTED_ADD', category: 'domain', retryable: false },
+    }) }));
+    const rejectedAdd = page.locator('.moment-add').first();
+    await rejectedAdd.focus();
+    await rejectedAdd.click();
+    await expect(page.locator('[data-service-diagnostic]')).toContainText('REJECTED_ADD');
+    expect(await momentValues()).toEqual([0, 700, 2100]);
+    await expect(page.getByRole('radio', { name: 'Point 1 700 ms' })).toBeChecked();
+    await expect(page.locator('.moment-add').first()).toBeFocused();
+    await page.unroute('**/operations/prepare');
+
     await page.locator('.moment-add').first().click();
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
     expect(await momentValues()).toEqual([0, 350, 700, 2100]);
