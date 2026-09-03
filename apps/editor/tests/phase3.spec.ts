@@ -840,8 +840,12 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
   const x = page.locator('[data-pose-form] input[name="x"]'); await x.fill(String(Number(await x.inputValue()) + 8));
   const failedPublicationBaseline = await page.evaluate(() => ({
     revision: window.__motionEditor.inspectAuthoring().revision,
-    preview: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc,
+    compiler: window.__motionEditor.compiledHtml,
     selectedMoment: Number((document.querySelector('input[name="shot-moment"]:checked') as HTMLInputElement).value),
+    native: document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument!.getAnimations().map((animation) => ({
+      currentTime: animation.currentTime, playState: animation.playState,
+      animation: animation.constructor.name, effect: animation.effect?.constructor.name,
+    })),
   }));
   const failedPublicationGeometry = await readGeometry();
   await expect(page.locator('[data-shot-advanced-drawer]')).toBeVisible();
@@ -854,9 +858,14 @@ test('Shot 1 workspace commits five durable operations and exact undo/redo throu
     .toBe('PUBLICATION_FAILED · storage · retryable');
   expect(await page.evaluate(() => ({
     revision: window.__motionEditor.inspectAuthoring().revision,
-    preview: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc,
+    previewMatchesCompiler: document.querySelector<HTMLIFrameElement>('[data-preview]')!.srcdoc === window.__motionEditor.compiledHtml,
+    compiler: window.__motionEditor.compiledHtml,
     selectedMoment: Number((document.querySelector('input[name="shot-moment"]:checked') as HTMLInputElement).value),
-  }))).toEqual(failedPublicationBaseline);
+    native: document.querySelector<HTMLIFrameElement>('[data-preview]')!.contentDocument!.getAnimations().map((animation) => ({
+      currentTime: animation.currentTime, playState: animation.playState,
+      animation: animation.constructor.name, effect: animation.effect?.constructor.name,
+    })),
+  }))).toEqual({ ...failedPublicationBaseline, previewMatchesCompiler: true });
   expect(await readGeometry()).toEqual(failedPublicationGeometry);
   expect(await page.evaluate(() => window.__motionEditor.retryPublication())).toBe(true);
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().publicationState)).toBe('settled');

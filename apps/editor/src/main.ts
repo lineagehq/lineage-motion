@@ -992,8 +992,6 @@ async function applyImmutable(immutable: ImmutableHead, remote: boolean, preview
   const draft = captureDraft();
   const nextAuthoring = createAuthoringState(immutable.document); const nextCompiled = compileMotionDocument(nextAuthoring.document);
   const previousCompiled = compiled;
-  const previousPreviewHtml = iframe.srcdoc;
-  const previousPreviewCss = controller.readCompilerCommitState().committedCompilerCss ?? previousCompiled.css;
   setPublicationState('pending');
   let promoted = false;
   try {
@@ -1032,8 +1030,8 @@ async function applyImmutable(immutable: ImmutableHead, remote: boolean, preview
     }
     setPublicationState('settled');
   } catch (error) {
-    try { await mountPreview(previousPreviewHtml, previousPreviewCss); } catch { /* preserve explicit failed state */ }
-    if (iframe.srcdoc !== previousPreviewHtml) iframe.srcdoc = previousPreviewHtml;
+    compiled = previousCompiled;
+    try { await mountPreview(previousCompiled.html, previousCompiled.css); } catch { /* preserve explicit failed state */ }
     setPublicationState('failed', error instanceof Error ? error.message : 'PUBLICATION_FAILED');
     publishClientDiagnostic('PUBLICATION_FAILED', 'storage', true);
     throw error;
