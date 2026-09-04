@@ -4,8 +4,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
-import { monitorPage, observeGeometryCommit } from './qa-helpers.mjs';
-import { observeServerAddress } from './qa-chrome.mjs';
+import { monitorPage, observeGeometryCommit, observeServerAddress } from './qa-helpers.mjs';
 
 export async function runCanvasFirstUxQa(repositoryRoot) {
   const receipt = {
@@ -271,4 +270,3 @@ export async function runCanvasFirstUxQa(repositoryRoot) {
   process.stdout.write(`${JSON.stringify(receipt)}\n`);
   return receipt.passed ? 0 : 1;
 }
-

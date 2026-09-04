@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { createServer as createNetServer } from 'node:net';
-import { readFile, writeFile } from 'node:fs/promises';
+import { access, readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 export async function startIsolatedQaEditor(repositoryRoot, label) {
@@ -391,3 +391,19 @@ export async function runHitOwnershipQa({ repositoryRoot, directory, browser }) 
   }
 }
 
+export async function observeServerAddress(processHandle, label) {
+  return new Promise((resolveAddress, reject) => {
+    let output = '';
+    const timer = setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), 10000);
+    processHandle.stdout.on('data', (chunk) => {
+      output += chunk.toString();
+      const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
+      if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); }
+    });
+    processHandle.once('exit', (code) => { clearTimeout(timer); reject(new Error(`${label}_EXIT_${code}`)); });
+  });
+}
+
+export async function readable(path) {
+  try { await access(path); return true; } catch { return false; }
+}
