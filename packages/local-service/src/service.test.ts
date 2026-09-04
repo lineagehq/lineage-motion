@@ -5,11 +5,21 @@ import { canonicalContentBytes, canonicalJson, cueTargetSnapshots, deriveCueId, 
   projectTrajectorySelection, sha256Hex, type CueAuthoringOperation, type CueSemantic } from '../../domain/src/index.ts';
 import { makeCueCommand, makeTrajectoryCommand, MotionServiceClient } from '../../motion-protocol/src/index.ts';
 import { startLocalMotionService } from './index.ts';
+import * as lockRunner from './lock-runner.ts';
 import { createTrajectorySeed } from './seed.ts';
 import { SqliteProjectStore } from './sqlite-project-store.ts';
 import { phase3Command, phase3Seed, temporaryStore } from './test-support.ts';
 
 describe('loopback sole-writer service', () => {
+  test('selects advisory lock wrappers for supported host platforms and fails closed elsewhere', () => {
+    const select = (lockRunner as unknown as { lockCommandForPlatform?: (platform: string) => string })
+      .lockCommandForPlatform;
+    expect(select).toBeTypeOf('function');
+    expect(select?.('darwin')).toBe('/usr/bin/lockf');
+    expect(select?.('linux')).toBe('flock');
+    expect(() => select?.('win32')).toThrow('STORE_LOCK_PLATFORM_UNSUPPORTED');
+  });
+
   test('commits one cue revision atomically, retries byte-identically, and allocates nothing for stale intent', async () => {
     const temporary = await temporaryStore(); const seed = phase3Seed();
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });

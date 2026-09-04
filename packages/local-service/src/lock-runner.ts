@@ -2,9 +2,19 @@ import { spawn } from 'node:child_process';
 
 export type StoreLock = { readonly holderPid: number; readonly lost: Promise<void>; release(): Promise<void> };
 
+export function lockCommandForPlatform(platform: string): string {
+  if (platform === 'darwin') return '/usr/bin/lockf';
+  if (platform === 'linux') return 'flock';
+  throw new Error('STORE_LOCK_PLATFORM_UNSUPPORTED');
+}
+
 export async function acquireStoreLock(lockPath: string): Promise<StoreLock> {
   const script = `const owner=${process.pid},locker=process.ppid;process.stdout.write('LOCKED\\n');process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{try{process.kill(owner,0);process.kill(locker,0)}catch{process.exit(0)}},25)`;
-  const child = spawn('/usr/bin/lockf', ['-kn', '-t', '0', lockPath, process.execPath, '-e', script], {
+  const command = lockCommandForPlatform(process.platform);
+  const arguments_ = process.platform === 'darwin'
+    ? ['-kn', '-t', '0', lockPath, process.execPath, '-e', script]
+    : ['--exclusive', '--nonblock', '--no-fork', lockPath, process.execPath, '-e', script];
+  const child = spawn(command, arguments_, {
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   await new Promise<void>((resolve, reject) => {
