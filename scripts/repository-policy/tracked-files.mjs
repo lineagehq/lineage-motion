@@ -1,8 +1,7 @@
-import { execFileSync } from 'node:child_process';
+import { runRepositoryGit } from './git-environment.mjs';
 
 export function trackedFiles(repositoryRoot) {
-  const output = execFileSync('git', ['ls-files', '-z'], {
-    cwd: repositoryRoot,
+  const output = runRepositoryGit(repositoryRoot, ['ls-files', '-z'], {
     encoding: 'utf8',
     maxBuffer: 16 * 1024 * 1024,
   });

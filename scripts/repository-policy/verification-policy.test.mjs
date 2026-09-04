@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -11,6 +10,7 @@ import {
 } from './verification-policy.mjs';
 import { verificationSuites, verificationTiers } from './verification-manifest.mjs';
 import { resolveVerificationTier } from './verification-dag.mjs';
+import { runRepositoryGit } from './git-environment.mjs';
 
 const temporaryRepositories = [];
 
@@ -129,14 +129,14 @@ function suite(files, isPublic = true) {
 function committedRepository(files) {
   const repository = mkdtempSync(join(tmpdir(), 'motion-verification-policy-'));
   temporaryRepositories.push(repository);
-  execFileSync('git', ['init', '--quiet'], { cwd: repository });
-  execFileSync('git', ['config', 'user.email', 'policy@example.invalid'], { cwd: repository });
-  execFileSync('git', ['config', 'user.name', 'Policy Test'], { cwd: repository });
+  runRepositoryGit(repository, ['init', '--quiet']);
+  runRepositoryGit(repository, ['config', 'user.email', 'policy@example.invalid']);
+  runRepositoryGit(repository, ['config', 'user.name', 'Policy Test']);
   for (const [path, contents] of Object.entries(files)) {
     writeFixture(repository, path, contents);
   }
-  execFileSync('git', ['add', '--all'], { cwd: repository });
-  execFileSync('git', ['commit', '--quiet', '-m', 'fixture'], { cwd: repository });
+  runRepositoryGit(repository, ['add', '--all']);
+  runRepositoryGit(repository, ['commit', '--quiet', '-m', 'fixture']);
   return repository;
 }
 
