@@ -238,4 +238,3 @@ test('rejected retimes stay coherent and failed waypoint publication is visibly 
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
   expect(commandCount).toBe(2);
 });
-

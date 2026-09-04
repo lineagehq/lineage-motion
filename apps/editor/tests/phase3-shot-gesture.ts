@@ -401,4 +401,3 @@ export async function runShotGesture(context: Awaited<ReturnType<typeof runShotS
     ]);
   return { ...context, original, committedSrcdoc, landed, box, activeHit, armGestureProjectionProbe, takeGestureProjection, draftBaseline, cancelledPointerStart, cancelledGestureProjection, cancelledPointerEnd, cancelledDraft, cancelledExpectedDelta, cancelledRestoration, pointerCancelDraft, pointerCancelRestoration, iframeBox, offFrameDelta, releasedPointerStart, releasedGestureProjection, releasedPointerEnd, releasedDraft, releasedExpectedDelta, terminalRelease, remountedCommitId, releasedWire, postRelease, paintedFrames, runway, revisionOne, currentGroup, x, failedPublicationBaseline, failedPublicationGeometry, groupedCommand, retimeGeometryRequestId, timingCommands };
 }
-

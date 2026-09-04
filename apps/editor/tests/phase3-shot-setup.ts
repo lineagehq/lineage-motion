@@ -430,4 +430,3 @@ export async function runShotSetup({
   }
   return { page, directory, humanCapability, agentCapability, root, port, seed, targetElementIds, inheritedTargets, runtimeSeedPath, processHandle, addresses, editorUrl, serviceUrl, commandBytes, preparationBytes, commandStatuses, consoleErrors, workspace, layoutContract, readGeometry, closedGeometry, advancedMotion, objectInputs, primaryInputs, focusedLayout, beforePathAlignment, readMomentAlignment, awaitShotMutationSettlement, previewToolbar, referenceSegments, referenceWaypoints, referenceGeometryBeforeSwitch, canvasObjectTargets, selectedReferenceSegments, settledObjectBounds, finishedEndpointBaseline, finishedEndpointArrival, rejectedTimingBaseline, priorNativeTimeMs, readSpatialProof, spatialTargets, initialPrimaryCommitId, changedPrimaryCommitId, readInteractiveInventory, beforeResizeCommitId };
 }
-

@@ -258,4 +258,3 @@ export async function runShotDirectControls(context: Awaited<ReturnType<typeof r
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest)).toBe(directBaseline);
   expect(consoleErrors).toEqual([]);
 }
-

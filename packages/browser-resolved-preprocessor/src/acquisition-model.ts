@@ -27,4 +27,3 @@ export type LockedStylesheet = Readonly<{
   css: string;
   href?: string;
 }>;
-

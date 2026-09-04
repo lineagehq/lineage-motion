@@ -261,4 +261,3 @@ export async function runShotHistory(context: Awaited<ReturnType<typeof runShotG
   await writeFile(join(directory, 'controlled-spatial-parity.json'), `${JSON.stringify(controlledReceipt, null, 2)}\n`);
   return { ...context, edited, preparedKinds, editedInventory, editedTarget1, editedTarget0, atomicSwitchBaseline, editedSpatialTargets, atomicSwitchFrames, readRaceState, immediateRaceState, settledRaceState, committedIdentity, intermediateAlignmentBaseline, momentOnlyState, durableSnapshots, assertDurableHistoryAction, undone, redone, sanitizeRaceState, controlledReceipt };
 }
-
