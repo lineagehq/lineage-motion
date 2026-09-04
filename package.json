@@ -32,6 +32,9 @@
     "verify:phase4:five-scene": "vitest run packages/css-import/src/five-scene.private.test.ts --sequence.concurrent false --testTimeout=120000",
     "check:line-limit": "node scripts/check-line-limit.mjs",
     "check:verification-manifest": "node scripts/check-verification-manifest.mjs",
+    "verify:fast": "node scripts/run-verification.mjs --tier fast",
+    "verify:pr": "node scripts/run-verification.mjs --tier pr",
+    "verify:full": "node scripts/run-verification.mjs --tier full",
     "check:private-ignore": "node scripts/check-private-ignore.mjs",
     "check:sensitive": "node scripts/check-sensitive.mjs",
     "typecheck": "tsc --noEmit"

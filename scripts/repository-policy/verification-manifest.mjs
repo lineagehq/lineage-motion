@@ -15,6 +15,7 @@ export const verificationSuites = {
   'manifest-policy': command('node', ['scripts/check-verification-manifest.mjs'], { fast: true }),
   'policy-tests': nodeTest([
     'scripts/repository-policy/line-limit.test.mjs',
+    'scripts/repository-policy/verification-dag.test.mjs',
     'scripts/repository-policy/verification-policy.test.mjs',
   ]),
   'fast-unit': vitest([
