@@ -4,6 +4,11 @@ Use an adversarial proof standard. Before declaring work complete, state the
 user-facing claim, name the top three realistic failure modes, and gather direct
 evidence with tests, screenshots, traces, compiler receipts, or inspection.
 
+Routine implementation follows the single-pass workflow in
+`docs/agent-workflow.md`. Product plans and historical goal records describe
+requirements and prior decisions; they do not add execution stages, repeated
+test matrices, or per-role receipts unless the user explicitly activates them.
+
 ## Repository boundary
 
 - This is a standalone experimental product, not a Lineage package or Canvas
@@ -55,6 +60,15 @@ evidence with tests, screenshots, traces, compiler receipts, or inspection.
 - Preserve unrelated changes and do not use destructive git commands.
 
 ## Verification
+
+- Run the smallest focused suite while editing.
+- Let pre-push own `npm run verify:fast` and let pull-request CI own the broad
+  public graph. Do not repeat a passing command on an unchanged commit merely
+  because another agent or stage is taking over.
+- Use `npm run verify:pr` only for an offline preflight or to reproduce a CI
+  failure locally.
+- Handoff evidence is one compact claim, three risks, and links or summaries of
+  focused local evidence plus exact-head CI. Do not paste complete command logs.
 
 For import/compiler work, the minimum receipt should include:
 

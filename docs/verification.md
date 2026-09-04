@@ -5,6 +5,9 @@ The manifest in `scripts/repository-policy/verification-manifest.mjs` owns
 every tracked test exactly once. Package aliases, local hooks, and CI select
 those same owners instead of maintaining separate path lists.
 
+`docs/agent-workflow.md` defines who runs each tier. A green result belongs to
+the tested commit and should be reused across agent or reviewer handoffs.
+
 ## Daily development loop
 
 Use `npm run test:unit` while editing ordinary domain, compiler, protocol, or
@@ -40,9 +43,9 @@ conversations, and these checks:
 - `Analyze (javascript-typescript)`
 
 The local runner remains available as `npm run verify:pr` when a complete
-serial reproduction is useful. It is not the default inner-loop command and
-does not need to be repeated independently by every agent role when CI already
-proves the same exact revision.
+serial reproduction is useful. It is not a handoff ritual: do not run it when
+CI already proves the same exact revision, and do not ask each agent or reviewer
+to reproduce another participant's current evidence.
 
 ## File-size ratchet
 
