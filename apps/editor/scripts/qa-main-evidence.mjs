@@ -1,7 +1,10 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
-import { monitorPage, roundTimes, runHitOwnershipQa, startIsolatedQaEditor } from './qa-helpers.mjs';
+import { monitorPage, observeServerAddress, roundTimes, runHitOwnershipQa, runRealCli, startIsolatedQaEditor } from './qa-helpers.mjs';
 
 export async function finishMainQaEvidence(context, root) {
   const { browser, url, mainServiceUrl, page, consoleErrors, pageErrors, failedRequests, unexpectedNetwork, httpErrors, editorCommandRequestCount, initial, renderedTrackIds, timelineRows, renderedProjection, freshWorkflow, everyCueScrubbed, tolerance, beforePlay, duringPlay, afterPause, pausedInterval, advanceMs, pauseDriftMs, playPauseNative, reducedMotionInspectable, selectionOnly, selectionEphemeral, workflowStates, scrollBeforeCreate, createContinuity, shapeFocusEvidence, durationDraftVisible, durationDraftCleared, staleEvidence, expectedStaleConsoleIndex, expectedStaleConsole, expectedStaleHttpIndex, expectedStaleHttp, staleAtomic, invalidBaseline, validationEvidence, atomicState, invalidAtomic, exactHistory, historyUiRehydrated, undoSixClampProven, redoOneReverseContinuity, historySelectionTruth, disabledEditAtomic, historyObservations, historyStartState, anchorPreserved, historyRehydrated } = context;

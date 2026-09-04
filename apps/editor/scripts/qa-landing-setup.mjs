@@ -44,5 +44,5 @@ export async function setupLandingShot1({ authority, workspaceSmokeOnly }) {
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
       ...(authority === 'private' ? { LANDING_SHOT1_DOCUMENT_PATH: privateDocumentPath } : {}) }, stdio: ['ignore', 'pipe', 'pipe'],
   });
-  return { deferred: false, repositoryRoot, privateDocumentPath, targetElementIds, canonicalEasing, directory, processHandle };
+  return { deferred: false, repositoryRoot, privateDirectory, privateDocumentPath, targetElementIds, canonicalEasing, directory, port, processHandle };
 }

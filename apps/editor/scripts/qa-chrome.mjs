@@ -34,7 +34,7 @@ import { startIsolatedQaEditor, ensureAdvancedOpen, reserveEphemeralPort, roundT
 export async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
   const setup = await setupLandingShot1({ authority, workspaceSmokeOnly });
   if (setup.deferred) return;
-  const { repositoryRoot, privateDocumentPath, canonicalEasing, directory, processHandle } = setup;
+  const { repositoryRoot, privateDirectory, privateDocumentPath, canonicalEasing, directory, port, processHandle } = setup;
   let { targetElementIds } = setup;
   let shotBrowser;
   try {
@@ -207,12 +207,12 @@ export async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
     await observeGeometryCommit(page, { sampleCount: groupedInitialMoments.length, previousRequestId: transitionRequestId, moments: groupedInitialMoments });
     await page.locator('[data-shot-advanced-close]').click();
     transitionRequestId = await currentGeometryRequestId(page);
-    const retimeCommandCount = pathAlignmentCommandCount;
+    const retimeCommandCount = pathAlignmentCommandCount.value;
     await page.locator('[data-shot-context-time]').fill('840');
     await observeActionCommit(page, { revision: 3, moments: groupedRetimedMoments, landing: 840,
       settled: baselineTiming.settled, easing: baselineTiming.easing });
     await observeGeometryCommit(page, { sampleCount: groupedRetimedMoments.length, previousRequestId: transitionRequestId, moments: groupedRetimedMoments });
-    if (!exactlyAligned(await readMomentAlignment(), 840, 3) || pathAlignmentCommandCount !== retimeCommandCount + 1
+    if (!exactlyAligned(await readMomentAlignment(), 840, 3) || pathAlignmentCommandCount.value !== retimeCommandCount + 1
       || (await currentGeometryRequestId(page)) <= transitionRequestId) throw new Error('LANDING_SHOT1_RETIME_RECONCILIATION_INVALID');
     transitionRequestId = await currentGeometryRequestId(page);
     await page.locator('[data-shot-easing]').selectOption('ease-in-out'); await page.locator('[data-shot-apply-easing]').click();
@@ -274,13 +274,13 @@ export async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
       return elementIds.map((elementId) => { const target = [...frame.contentDocument.querySelectorAll('[data-motion-id]')]
         .find((item) => item.dataset.motionId === elementId); const rect = target.getBoundingClientRect();
         return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom }; }); }, targetElementIds);
-    const endpointCommandCount = pathAlignmentCommandCount;
+    const endpointCommandCount = pathAlignmentCommandCount.value;
     await scrubber.fill('2088'); await page.locator('[data-play]').click();
     await page.waitForFunction(() => { const state = window.__motionEditor.readState(); return state.playheadMs === 2100
       && state.currentTimes.length > 0 && state.currentTimes.every((time) => time === 2100)
       && state.playStates.every((playState) => playState === 'paused')
       && Number(document.querySelector('[data-scrub]').value) === 2100 && document.querySelector('[data-playhead]').value === '2100 ms'; });
-    const playbackEndpointHold = pathAlignmentCommandCount === endpointCommandCount && await page.evaluate(({ elementIds, expected }) => {
+    const playbackEndpointHold = pathAlignmentCommandCount.value === endpointCommandCount && await page.evaluate(({ elementIds, expected }) => {
       const frame = document.querySelector('[data-preview]'); return elementIds.map((elementId) => {
         const target = [...frame.contentDocument.querySelectorAll('[data-motion-id]')].find((item) => item.dataset.motionId === elementId);
         const rect = target.getBoundingClientRect(); return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
@@ -318,10 +318,10 @@ export async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
     if (!exactRace) throw new Error('LANDING_SHOT1_EXACT_RACE');
     const committedGeometryIdentity = JSON.stringify(settledRaceState.geometryPump);
     const intermediateAlignmentBaseline = { revision: (await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)),
-      commandCount: pathAlignmentCommandCount };
+      commandCount: pathAlignmentCommandCount.value };
     await page.locator('input[name="shot-moment"][value="1820"]').check();
     if (!exactlyAligned(await readMomentAlignment(), 1820, intermediateAlignmentBaseline.revision)
-      || pathAlignmentCommandCount !== intermediateAlignmentBaseline.commandCount
+      || pathAlignmentCommandCount.value !== intermediateAlignmentBaseline.commandCount
       || (await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)) !== intermediateAlignmentBaseline.revision) {
       throw new Error('LANDING_SHOT1_INTERMEDIATE_ALIGNMENT_INVALID');
     }
@@ -404,12 +404,12 @@ export async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
       { revision: 9, moments: groupedInitialMoments, geometryCount: groupedInitialMoments.length, landing: 700, settled: baselineTiming.settled, easing: baselineTiming.easing },
       { revision: 10, moments: groupedInitialMoments, geometryCount: groupedInitialMoments.length, landing: 700, settled: baselineTiming.settled, easing: baselineTiming.easing },
     ];
-    for (const contract of undoContracts) { const priorRequestId = await currentGeometryRequestId(page); const priorCommandCount = pathAlignmentCommandCount;
+    for (const contract of undoContracts) { const priorRequestId = await currentGeometryRequestId(page); const priorCommandCount = pathAlignmentCommandCount.value;
       await page.locator('[data-undo]').click(); await observeActionCommit(page, contract);
       await observeGeometryCommit(page, { sampleCount: contract.geometryCount, previousRequestId: priorRequestId, moments: contract.moments });
       const expectedMoment = contract.moments.includes(840) ? 840 : 700;
       if (!exactlyAligned(await readMomentAlignment(), expectedMoment, contract.revision)
-        || pathAlignmentCommandCount !== priorCommandCount + 1 || (await currentGeometryRequestId(page)) <= priorRequestId) {
+        || pathAlignmentCommandCount.value !== priorCommandCount + 1 || (await currentGeometryRequestId(page)) <= priorRequestId) {
         throw new Error('LANDING_SHOT1_UNDO_RECONCILIATION_INVALID');
       } }
     const undone = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
@@ -421,12 +421,12 @@ export async function runLandingShot1Qa({ authority, workspaceSmokeOnly }) {
       { revision: 14, moments: groupedRetimedMoments, geometryCount: groupedRetimedMoments.length, landing: 840, settled: baselineTiming.settled, easing: 'ease-in-out' },
       { revision: 15, moments: groupedHeldMoments, geometryCount: groupedHeldMoments.length, landing: 840, settled: 1820, easing: 'ease-in-out' },
     ];
-    for (const contract of redoContracts) { const priorRequestId = await currentGeometryRequestId(page); const priorCommandCount = pathAlignmentCommandCount;
+    for (const contract of redoContracts) { const priorRequestId = await currentGeometryRequestId(page); const priorCommandCount = pathAlignmentCommandCount.value;
       await page.locator('[data-redo]').click(); await observeActionCommit(page, contract);
       await observeGeometryCommit(page, { sampleCount: contract.geometryCount, previousRequestId: priorRequestId, moments: contract.moments });
       const expectedMoment = contract.moments.includes(840) ? 840 : 700;
       if (!exactlyAligned(await readMomentAlignment(), expectedMoment, contract.revision)
-        || pathAlignmentCommandCount !== priorCommandCount + 1 || (await currentGeometryRequestId(page)) <= priorRequestId) {
+        || pathAlignmentCommandCount.value !== priorCommandCount + 1 || (await currentGeometryRequestId(page)) <= priorRequestId) {
         throw new Error('LANDING_SHOT1_REDO_RECONCILIATION_INVALID');
       } }
     const redone = await page.evaluate(() => window.__motionEditor.inspectAuthoring());

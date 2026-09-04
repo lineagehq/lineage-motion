@@ -1,7 +1,11 @@
 import { spawn } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { createServer as createNetServer } from 'node:net';
-import { access, readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+
+const root = resolve(import.meta.dirname, '../../..');
 
 export async function startIsolatedQaEditor(repositoryRoot, label) {
   const directory = await mkdtemp(join(tmpdir(), `lineage-motion-chrome-${label}-`));

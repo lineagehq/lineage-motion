@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { isDeepStrictEqual } from 'node:util';
 import { chromium } from '@playwright/test';
 import { runCanvasFirstUxQa } from './qa-canvas.mjs';
 import { assertShot1ProofRouting, materializePublicAsymmetricSeed, monitorPage, observeServerAddress, reserveEphemeralPort } from './qa-helpers.mjs';

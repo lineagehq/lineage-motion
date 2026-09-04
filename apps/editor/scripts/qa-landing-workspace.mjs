@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import { chromium } from '@playwright/test';
 import { currentGeometryRequestId, ensureAdvancedOpen, monitorPage, observeActionCommit, observeGeometryCommit, observeServerAddress } from './qa-helpers.mjs';
 
@@ -153,7 +153,7 @@ export async function prepareLandingWorkspace({ processHandle, authority, worksp
     if (![0, 700, 2100].every((timeMs) => groupedInitialMoments.includes(timeMs))) {
       throw new Error('LANDING_SHOT1_GROUPED_REQUIRED_MOMENTS_MISSING');
     }
-    let pathAlignmentCommandCount = 0; page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) pathAlignmentCommandCount += 1; });
+    const pathAlignmentCommandCount = { value: 0 }; page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) pathAlignmentCommandCount.value += 1; });
     const beforePathAlignment = await page.evaluate(() => ({ revision: window.__motionEditor.inspectAuthoring().revision,
       momentMs: window.__motionEditor.inspectShotWorkspace().momentMs, native: window.__motionEditor.readState(),
       slider: Number(document.querySelector('[data-scrub]').value), visibleTime: document.querySelector('[data-playhead]').value }));
@@ -166,7 +166,7 @@ export async function prepareLandingWorkspace({ processHandle, authority, worksp
     const exactlyAligned = (state, timeMs, revision = beforePathAlignment.revision) => state.revision === revision && state.momentMs === timeMs
       && state.native.playheadMs === timeMs && state.native.currentTimes.length > 0 && state.native.currentTimes.every((time) => time === timeMs)
       && state.native.playStates.every((playState) => playState === 'paused') && state.slider === timeMs && state.visibleTime === `${timeMs} ms`;
-    if (!exactlyAligned(momentAlignment, beforePathAlignment.momentMs) || pathAlignmentCommandCount !== 0) throw new Error('LANDING_SHOT1_PATH_ALIGNMENT_INVALID');
+    if (!exactlyAligned(momentAlignment, beforePathAlignment.momentMs) || pathAlignmentCommandCount.value !== 0) throw new Error('LANDING_SHOT1_PATH_ALIGNMENT_INVALID');
     if (authority === 'public') {
       await page.evaluate(() => { const handles = [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')];
         window.__shotAlignmentNodes = new Map(handles.map((handle) => [handle.dataset.keyframeId, handle])); });
@@ -177,7 +177,7 @@ export async function prepareLandingWorkspace({ processHandle, authority, worksp
       await page.locator('input[name="shot-moment"][value="700"]').check(); momentAlignment = await readMomentAlignment();
       const retained = await page.evaluate(() => [...document.querySelectorAll('[data-trajectory-overlay] [data-keyframe-id]')]
         .every((handle) => window.__shotAlignmentNodes.get(handle.dataset.keyframeId) === handle && handle.isConnected));
-      if (!exactlyAligned(momentAlignment, 700) || !retained || pathAlignmentCommandCount !== 0) throw new Error('LANDING_SHOT1_WAYPOINT_IDENTITY_ALIGNMENT_INVALID');
+      if (!exactlyAligned(momentAlignment, 700) || !retained || pathAlignmentCommandCount.value !== 0) throw new Error('LANDING_SHOT1_WAYPOINT_IDENTITY_ALIGNMENT_INVALID');
     }
     const focusedSurface = await page.evaluate(() => { const visible = (selector) => { const node = document.querySelector(selector);
       if (!(node instanceof HTMLElement)) return false; const rect = node.getBoundingClientRect(); const style = getComputedStyle(node);
