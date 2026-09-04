@@ -22,6 +22,13 @@
 - `verify:fast` starts no browser, service, SQLite store, recovery subprocess, visual proof, or private workflow.
 - Run focused tests while extracting modules; run the complete public DAG only after convergence.
 
+## Execution Order
+
+Execute Tasks 1-4, then Tasks 6-9, then Tasks 5, 10, and 11. Husky is
+deliberately installed only after every current oversized file has been
+refactored; otherwise the new pre-commit policy would correctly block the
+intermediate extraction commits needed to reach the compliant state.
+
 ---
 
 ### Task 1: Tracked-file and 500-line repository policy
