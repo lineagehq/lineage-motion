@@ -165,12 +165,12 @@ export function inspectStructuralAttributes(
     addDiagnostic(diagnostics, inventory, 'IMPORT_EVENT_HANDLER_UNSUPPORTED',
       'Inline event handlers are not supported.', element);
   }
-  const javascriptUrlAttributes = [
+  const executableUrlAttributes = [
     'href', 'xlink:href', 'src', 'srcset', 'poster', 'data', 'action', 'formaction',
     'ping', 'background', 'manifest', 'codebase', 'archive',
   ];
-  if (javascriptUrlAttributes.some((attribute) =>
-    element.attribs[attribute]?.trim().toLowerCase().startsWith('javascript:'))) {
+  if (executableUrlAttributes.some((attribute) =>
+    hasExecutableUrlScheme(element.attribs[attribute]))) {
     addDiagnostic(diagnostics, inventory, 'IMPORT_JAVASCRIPT_URL_UNSUPPORTED',
       'Executable URL attributes are not supported.', element);
   }
@@ -223,6 +223,14 @@ export function inspectStructuralAttributes(
     addDiagnostic(diagnostics, inventory, 'IMPORT_EXTERNAL_RESOURCE',
       'Linked SVG resources are not supported.', element);
   }
+}
+
+function hasExecutableUrlScheme(value: string | undefined): boolean {
+  if (value === undefined) return false;
+  const separator = value.indexOf(':');
+  if (separator < 0) return false;
+  const scheme = value.slice(0, separator).replace(/[\u0000-\u0020]/g, '').toLowerCase();
+  return scheme === 'data' || scheme === 'javascript' || scheme === 'vbscript';
 }
 
 export function containsMotion(atRule: AtRule): boolean {
