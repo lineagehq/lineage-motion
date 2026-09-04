@@ -35,6 +35,9 @@ test('CI exposes stable, non-overlapping verification jobs', async () => {
     'policy-fast',
     'integration',
     'recovery-parity',
+    'determinism',
+    'visual-preprocessor',
+    'visual-proof',
     'determinism-visual',
     'browser',
     'typecheck-build',
@@ -53,7 +56,8 @@ test('CI exposes stable, non-overlapping verification jobs', async () => {
     'recovery',
     'parity',
     'determinism',
-    'public-visual',
+    'public-visual-preprocessor',
+    'public-visual-proof',
     'browser',
     'typecheck',
     'build',
@@ -64,6 +68,16 @@ test('CI exposes stable, non-overlapping verification jobs', async () => {
   assert.doesNotMatch(workflow, /private-acceptance|private\.test|private\.visual/);
   const integrationJob = workflow.match(/^  integration:\n([\s\S]*?)(?=^  [a-z][a-z-]*:\n)/m)?.[1] ?? '';
   assert.match(integrationJob, /npx playwright install --with-deps chromium/);
+
+  const aggregateJob = workflow.match(
+    /^  determinism-visual:\n([\s\S]*?)(?=^  [a-z][a-z-]*:\n)/m,
+  )?.[1] ?? '';
+  assert.match(aggregateJob, /needs: \[determinism, visual-preprocessor, visual-proof\]/);
+  assert.match(aggregateJob, /if: always\(\)/);
+  for (const dependency of ['determinism', 'visual-preprocessor', 'visual-proof']) {
+    assert.match(aggregateJob, new RegExp(`needs\\.${dependency}\\.result`));
+  }
+  assert.doesNotMatch(aggregateJob, /npm ci|playwright install|run-verification/);
 });
 
 test('test servers launch vite-node directly so termination reaches the service process', async () => {

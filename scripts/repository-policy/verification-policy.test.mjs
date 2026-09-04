@@ -115,8 +115,17 @@ test('aggregate selections are deduplicated and reserve private suites for full'
   }
 });
 
-test('browser-heavy visual verification caps worker contention', () => {
-  assert.equal(verificationSuites['public-visual'].args.includes('--maxWorkers=1'), true);
+test('browser-heavy visual verification is isolated into capped shards', () => {
+  const preprocessor = verificationSuites['public-visual-preprocessor'];
+  const proof = verificationSuites['public-visual-proof'];
+
+  assert.equal(preprocessor.args.includes('--maxWorkers=1'), true);
+  assert.equal(proof.args.includes('--maxWorkers=1'), true);
+  assert.deepEqual(preprocessor.files, [
+    'packages/browser-resolved-preprocessor/src/acquisition.visual.test.ts',
+    'packages/browser-resolved-preprocessor/src/conformance.visual.test.ts',
+  ]);
+  assert.equal(proof.files.every((path) => path.startsWith('packages/visual-proof/')), true);
 });
 
 function suite(files, isPublic = true) {
