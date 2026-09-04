@@ -15,10 +15,13 @@ export const verificationSuites = {
   'manifest-policy': command('node', ['scripts/check-verification-manifest.mjs'], { fast: true }),
   'policy-tests': nodeTest([
     'scripts/repository-policy/line-limit.test.mjs',
+    'scripts/repository-policy/test-discovery.test.mjs',
     'scripts/repository-policy/verification-dag.test.mjs',
     'scripts/repository-policy/verification-policy.test.mjs',
   ]),
-  'fast-unit': vitest([
+  'fast-unit': {
+    kind: 'vitest', command: 'npx', args: ['vitest', 'run', '--config', 'vitest.fast.config.ts'],
+    files: [
     'packages/browser-resolved-preprocessor/src/index.test.ts',
     'packages/css-import/src/import.test.ts',
     'packages/css-import/src/materialize.test.ts',
@@ -36,8 +39,11 @@ export const verificationSuites = {
     'packages/preview-runtime/src/index.test.ts',
     'packages/preview-runtime/src/trajectory.test.ts',
     'packages/review-domain/src/index.test.ts',
-    'packages/visual-proof/src/index.test.ts',
-  ], { fast: true }),
+      'packages/visual-proof/src/index.test.ts',
+    ],
+    public: true,
+    fast: true,
+  },
   'repository-safety': vitest([
     'packages/domain/src/repository-safety.test.ts',
   ]),
