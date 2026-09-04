@@ -53,9 +53,21 @@ jobs:
       - run: npm ci
       - run: node scripts/run-verification.mjs --suite recovery --suite parity
 
-  determinism-visual:
+  determinism:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          cache: npm
+      - run: npm ci
+      - run: node scripts/run-verification.mjs --suite determinism
+
+  visual-preprocessor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -64,7 +76,32 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: node scripts/run-verification.mjs --suite determinism --suite public-visual
+      - run: node scripts/run-verification.mjs --suite public-visual-preprocessor
+
+  visual-proof:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.22.0
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: node scripts/run-verification.mjs --suite public-visual-proof
+
+  determinism-visual:
+    if: always()
+    needs: [determinism, visual-preprocessor, visual-proof]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require every determinism and visual shard
+        run: |
+          test "${{ needs.determinism.result }}" = success
+          test "${{ needs.visual-preprocessor.result }}" = success
+          test "${{ needs.visual-proof.result }}" = success
 
   browser:
     runs-on: ubuntu-latest

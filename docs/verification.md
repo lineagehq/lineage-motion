@@ -75,7 +75,9 @@ manifest policy, and every public verification leaf.
 ## Public, Chrome, and private tiers
 
 - `npm run verify:fast`: repository policies and isolated fast tests.
-- `npm run verify:pr`: every public CI leaf exactly once.
+- `npm run verify:pr`: every public CI leaf exactly once. CI runs the two
+  single-worker visual groups on isolated runners and retains
+  `determinism-visual` as their stable aggregate merge gate.
 - `npm run qa:chrome`: installed-Chrome QA only; it does not invoke
   Playwright.
 - `npm run verify:phase3`: public verification plus installed-Chrome QA,
