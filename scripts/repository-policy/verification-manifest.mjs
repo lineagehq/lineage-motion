@@ -26,6 +26,7 @@ export const verificationSuites = {
     'packages/css-import/src/import.test.ts',
     'packages/css-import/src/materialize.test.ts',
     'packages/domain/src/authoring.test.ts',
+    'packages/domain/src/authoring-structural.test.ts',
     'packages/domain/src/css-motion-semantics.test.ts',
     'packages/domain/src/cue-authoring.test.ts',
     'packages/domain/src/domain.test.ts',
@@ -50,6 +51,7 @@ export const verificationSuites = {
   'service-integration': vitest([
     'packages/local-service/src/branch-claim.test.ts',
     'packages/local-service/src/durable-contract.test.ts',
+    'packages/local-service/src/durable-diagnostics.test.ts',
     'packages/local-service/src/review-handoff.test.ts',
     'packages/local-service/src/service.test.ts',
   ]),
@@ -93,6 +95,7 @@ export const verificationSuites = {
     kind: 'playwright', command: 'npx', args: ['playwright', 'test', '--config', 'apps/editor/playwright.config.ts'],
     files: [
       'apps/editor/tests/editor.spec.ts',
+      'apps/editor/tests/editor-authoring.spec.ts',
       'apps/editor/tests/integrated-dogfood.spec.ts',
       'apps/editor/tests/moments.spec.ts',
       'apps/editor/tests/phase3.spec.ts',
