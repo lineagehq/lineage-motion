@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, test } from 'vitest';
 
@@ -18,6 +19,22 @@ describe('loopback sole-writer service', () => {
     expect(select?.('darwin')).toBe('/usr/bin/lockf');
     expect(select?.('linux')).toBe('flock');
     expect(() => select?.('win32')).toThrow('STORE_LOCK_PLATFORM_UNSUPPORTED');
+  });
+
+  test('lock holder exits when its launching process disappears', async () => {
+    const build = (lockRunner as unknown as {
+      lockHolderScript?: (ownerPid: number, launcherPid: number) => string;
+    }).lockHolderScript;
+    expect(build).toBeTypeOf('function');
+    if (!build) return;
+    const child = spawn(process.execPath, ['-e', build(process.pid, 999_999_999)], {
+      stdio: ['ignore', 'pipe', 'inherit'],
+    });
+    let stdout = '';
+    child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString(); });
+    const exitCode = await new Promise<number | null>((resolveExit) => child.once('exit', resolveExit));
+    expect(stdout).toBe('LOCKED\n');
+    expect(exitCode).toBe(0);
   });
 
   test('commits one cue revision atomically, retries byte-identically, and allocates nothing for stale intent', async () => {

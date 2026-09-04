@@ -8,8 +8,12 @@ export function lockCommandForPlatform(platform: string): string {
   throw new Error('STORE_LOCK_PLATFORM_UNSUPPORTED');
 }
 
+export function lockHolderScript(ownerPid: number, launcherPid: number): string {
+  return `const owner=${ownerPid},launcher=${launcherPid};process.stdout.write('LOCKED\\n');process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{try{process.kill(owner,0);process.kill(launcher,0)}catch{process.exit(0)}},25)`;
+}
+
 export async function acquireStoreLock(lockPath: string): Promise<StoreLock> {
-  const script = `const owner=${process.pid},locker=process.ppid;process.stdout.write('LOCKED\\n');process.on('SIGTERM',()=>process.exit(0));setInterval(()=>{try{process.kill(owner,0);process.kill(locker,0)}catch{process.exit(0)}},25)`;
+  const script = lockHolderScript(process.pid, process.ppid);
   const command = lockCommandForPlatform(process.platform);
   const arguments_ = process.platform === 'darwin'
     ? ['-kn', '-t', '0', lockPath, process.execPath, '-e', script]

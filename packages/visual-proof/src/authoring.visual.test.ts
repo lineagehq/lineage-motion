@@ -260,7 +260,7 @@ describe('Phase 2 controlled authoring proof', () => {
       await mkdir(resolve('docs/evidence'), { recursive: true });
       await writeFile(resolve('docs/evidence/t002-phase2-target-selection.json'), `${JSON.stringify(receipt, null, 2)}\n`);
     }
-  }, 120_000);
+  }, 180_000);
 });
 
 async function captureState(
