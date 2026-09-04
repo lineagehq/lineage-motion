@@ -138,7 +138,7 @@ if (process.argv[2] === '--phase4-reusable-cues') {
 }
 if (process.argv[2] === '--phase4-cursor-click-reveal') {
   const qaRoot = resolve(import.meta.dirname, '../../..');
-  const qaServer = spawn('npm', ['exec', 'vite-node', '--', resolve(qaRoot, 'apps/editor/scripts/qa-chrome.mjs'),
+  const qaServer = spawn(process.execPath, [resolve(qaRoot, 'node_modules/vite-node/vite-node.mjs'), resolve(qaRoot, 'apps/editor/scripts/qa-chrome.mjs'),
     '--vite-listen-ready', '0'], { cwd: qaRoot, stdio: ['ignore', 'pipe', 'pipe'],
     env: { ...process.env, PHASE4_CURSOR_CLICK_REVEAL: '1' } });
   let qaBrowser;

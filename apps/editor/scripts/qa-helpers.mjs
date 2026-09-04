@@ -9,7 +9,7 @@ const root = resolve(import.meta.dirname, '../../..');
 
 export async function startIsolatedQaEditor(repositoryRoot, label) {
   const directory = await mkdtemp(join(tmpdir(), `lineage-motion-chrome-${label}-`));
-  const processHandle = spawn('npm', ['exec', 'vite-node', '--',
+  const processHandle = spawn(process.execPath, [resolve(repositoryRoot, 'node_modules/vite-node/vite-node.mjs'),
     resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: repositoryRoot, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env,
       PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: '0',
@@ -76,7 +76,7 @@ export function monitorPage(page, allowedBaseUrls, diagnostics) {
 
 export async function runRealCli(args) {
   const encoded = Buffer.from(JSON.stringify(args)).toString('base64url');
-  const child = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/qa-chrome.mjs'), '--real-cli', encoded],
+  const child = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/qa-chrome.mjs'), '--real-cli', encoded],
     { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
   let stdout = ''; let stderr = ''; child.stdout.on('data', (chunk) => { stdout += chunk.toString(); });
   child.stderr.on('data', (chunk) => { stderr += chunk.toString(); });
@@ -193,13 +193,13 @@ export async function materializePublicAsymmetricSeed(repositoryRoot, seedPath) 
 
 export async function runAsymmetricAlternatePrimaryQa({ repositoryRoot, directory, browser, port }) {
   const seedPath = resolve(directory, 'public-asymmetric.json');
-  const seedProcess = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/qa-chrome.mjs'),
+  const seedProcess = spawn(process.execPath, [resolve(repositoryRoot, 'node_modules/vite-node/vite-node.mjs'), resolve(repositoryRoot, 'apps/editor/scripts/qa-chrome.mjs'),
     '--materialize-public-asymmetric-seed', seedPath], { cwd: repositoryRoot, stdio: ['ignore', 'pipe', 'pipe'] });
   const { targetElementIds } = await observeServerAddress(seedProcess, 'ASYMMETRIC_SEED');
   const seedExitCode = seedProcess.exitCode ?? await new Promise((resolveExit) => seedProcess.once('exit', resolveExit));
   if (seedExitCode !== 0) throw new Error('ASYMMETRIC_SEED_EXIT');
   const humanCapability = randomBytes(32).toString('base64url'); const agentCapability = randomBytes(32).toString('base64url');
-  const processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
+  const processHandle = spawn(process.execPath, [resolve(repositoryRoot, 'node_modules/vite-node/vite-node.mjs'), resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: repositoryRoot, env: { ...process.env, PHASE3_DATABASE_PATH: resolve(directory, 'public-asymmetric.sqlite'),
       PHASE3_EDITOR_PORT: String(port), PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability,
       LANDING_SHOT1_WORKSPACE: '1', LANDING_SHOT1_DOCUMENT_PATH: seedPath }, stdio: ['ignore', 'pipe', 'pipe'],
@@ -303,7 +303,7 @@ export async function runAsymmetricAlternatePrimaryQa({ repositoryRoot, director
 
 export async function runHitOwnershipQa({ repositoryRoot, directory, browser }) {
   const humanCapability = randomBytes(32).toString('base64url'); const agentCapability = randomBytes(32).toString('base64url');
-  const processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
+  const processHandle = spawn(process.execPath, [resolve(repositoryRoot, 'node_modules/vite-node/vite-node.mjs'), resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: repositoryRoot, env: { ...process.env, PHASE3_DATABASE_PATH: resolve(directory, 'hit-ownership.sqlite'),
       PHASE3_EDITOR_PORT: '0', PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability,
       LANDING_SHOT1_WORKSPACE: '1' }, stdio: ['ignore', 'pipe', 'pipe'],

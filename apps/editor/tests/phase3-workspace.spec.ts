@@ -20,7 +20,7 @@ test.beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'lineage-motion-browser-'));
   humanCapability = randomBytes(32).toString('base64url'); agentCapability = randomBytes(32).toString('base64url');
   const root = resolve(import.meta.dirname, '../../..'); const port = 42000 + Math.floor(Math.random() * 1000);
-  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -58,7 +58,7 @@ test('exact-duration Shot workspace retains a post-endpoint native inspection po
   }
   const runtimeSeedPath = join(directory, 'trajectory-exact-duration.json');
   await writeFile(runtimeSeedPath, `${JSON.stringify(seed)}\n`);
-  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'trajectory-exact-duration.sqlite'),
       PHASE3_EDITOR_PORT: String(port), PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability,
       LANDING_SHOT1_WORKSPACE: '1', LANDING_SHOT1_DOCUMENT_PATH: runtimeSeedPath },
@@ -124,7 +124,7 @@ test('an incompatible Shot revision stays fail-closed and offers non-destructive
     }
   }
   const seedPath = join(directory, 'trajectory-incompatible.json'); await writeFile(seedPath, `${JSON.stringify(seed)}\n`);
-  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'incompatible.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
       LANDING_SHOT1_DOCUMENT_PATH: seedPath }, stdio: ['ignore', 'pipe', 'pipe'],
@@ -169,7 +169,7 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
     expanded.keyframeIds = ruleTrack.keyframes.map((keyframe) => keyframe.id);
   }
   const seedPath = join(directory, 'trajectory-asymmetric.json'); await writeFile(seedPath, `${JSON.stringify(seed)}\n`);
-  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'asymmetric.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
       LANDING_SHOT1_DOCUMENT_PATH: seedPath }, stdio: ['ignore', 'pipe', 'pipe'],

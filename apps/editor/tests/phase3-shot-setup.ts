@@ -43,7 +43,7 @@ export async function runShotSetup({
   }
   const runtimeSeedPath = join(directory, 'trajectory-inherited-timing.json');
   await writeFile(runtimeSeedPath, `${JSON.stringify(seed)}\n`);
-  const processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  const processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'trajectory.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
       LANDING_SHOT1_DOCUMENT_PATH: runtimeSeedPath },

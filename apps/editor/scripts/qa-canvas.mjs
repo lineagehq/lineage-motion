@@ -14,7 +14,7 @@ export async function runCanvasFirstUxQa(repositoryRoot) {
     failurePreservedCompiler: false, consoleErrorCount: 0, networkErrorCount: 0,
   };
   const directory = await mkdtemp(join(tmpdir(), 'lineage-motion-canvas-first-'));
-  const processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
+  const processHandle = spawn(process.execPath, [resolve(repositoryRoot, 'node_modules/vite-node/vite-node.mjs'), resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: repositoryRoot, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env,
       PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: '0', LANDING_SHOT1_WORKSPACE: '1',
       PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),

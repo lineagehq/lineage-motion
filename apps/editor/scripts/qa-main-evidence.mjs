@@ -108,7 +108,7 @@ export async function finishMainQaEvidence(context, root) {
   const persistencePort = 0;
   const humanCapability = randomBytes(32).toString('base64url');
   const agentCapability = randomBytes(32).toString('base64url');
-  const persistence = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  const persistence = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(persistenceDirectory, 'project.sqlite'),
       PHASE3_EDITOR_PORT: String(persistencePort), PHASE3_HUMAN_CAPABILITY: humanCapability,
       PHASE3_AGENT_CAPABILITY: agentCapability }, stdio: ['ignore', 'pipe', 'pipe'],

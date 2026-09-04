@@ -20,7 +20,7 @@ test.beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'lineage-motion-browser-'));
   humanCapability = randomBytes(32).toString('base64url'); agentCapability = randomBytes(32).toString('base64url');
   const root = resolve(import.meta.dirname, '../../..'); const port = 42000 + Math.floor(Math.random() * 1000);
-  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability },
     stdio: ['ignore', 'pipe', 'pipe'],
@@ -154,7 +154,7 @@ test('rejected retimes stay coherent and failed waypoint publication is visibly 
   if (processHandle?.exitCode === null) await new Promise((resolveExit) => processHandle!.once('exit', resolveExit));
   const root = resolve(import.meta.dirname, '../../..'); const seed = createTrajectorySeed(root);
   const runtimeSeedPath = join(directory, 'retime-failure-seed.json'); await writeFile(runtimeSeedPath, `${JSON.stringify(seed)}\n`);
-  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'retime-failure.sqlite'), PHASE3_EDITOR_PORT: '0',
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
       LANDING_SHOT1_DOCUMENT_PATH: runtimeSeedPath }, stdio: ['ignore', 'pipe', 'pipe'],

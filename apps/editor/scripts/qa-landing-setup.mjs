@@ -39,7 +39,7 @@ export async function setupLandingShot1({ authority, workspaceSmokeOnly }) {
   const directory = await mkdtemp(join(tmpdir(), 'lineage-motion-shot1-qa-'));
   const humanCapability = randomBytes(32).toString('base64url'); const agentCapability = randomBytes(32).toString('base64url');
   const port = 43500 + Math.floor(Math.random() * 300);
-  const processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
+  const processHandle = spawn(process.execPath, [resolve(repositoryRoot, 'node_modules/vite-node/vite-node.mjs'), resolve(repositoryRoot, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: repositoryRoot, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
       ...(authority === 'private' ? { LANDING_SHOT1_DOCUMENT_PATH: privateDocumentPath } : {}) }, stdio: ['ignore', 'pipe', 'pipe'],

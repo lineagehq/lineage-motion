@@ -20,7 +20,7 @@ test.beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'lineage-motion-browser-'));
   humanCapability = randomBytes(32).toString('base64url'); agentCapability = randomBytes(32).toString('base64url');
   const root = resolve(import.meta.dirname, '../../..'); const port = 42000 + Math.floor(Math.random() * 1000);
-  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability },
     stdio: ['ignore', 'pipe', 'pipe'],

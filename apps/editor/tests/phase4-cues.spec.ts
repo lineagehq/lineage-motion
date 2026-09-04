@@ -10,7 +10,7 @@ let processHandle: ChildProcess | undefined; let directory = ''; let editorUrl =
 test.beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'lineage-motion-cursor-cues-'));
   const root = resolve(import.meta.dirname, '../../..');
-  processHandle = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: '0',
       PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
       PHASE3_AGENT_CAPABILITY: randomBytes(32).toString('base64url'), PHASE4_CURSOR_CLICK_REVEAL: '1' },

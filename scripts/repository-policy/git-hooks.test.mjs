@@ -1,9 +1,12 @@
 import assert from 'node:assert/strict';
 import { readFile, stat } from 'node:fs/promises';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
 import test from 'node:test';
 
 const repositoryRoot = new URL('../../', import.meta.url);
 const readRepositoryFile = (path) => readFile(new URL(path, repositoryRoot), 'utf8');
+const execFileAsync = promisify(execFile);
 
 test('package installation prepares Husky hooks', async () => {
   const packageJson = JSON.parse(await readRepositoryFile('package.json'));
@@ -59,4 +62,22 @@ test('CI exposes stable, non-overlapping verification jobs', async () => {
   assert.doesNotMatch(workflow, /private-acceptance|private\.test|private\.visual/);
   const integrationJob = workflow.match(/^  integration:\n([\s\S]*?)(?=^  [a-z][a-z-]*:\n)/m)?.[1] ?? '';
   assert.match(integrationJob, /npx playwright install --with-deps chromium/);
+});
+
+test('test servers launch vite-node directly so termination reaches the service process', async () => {
+  let stdout = '';
+  try {
+    ({ stdout } = await execFileAsync('git', [
+      'grep',
+      '-n',
+      '-F',
+      "spawn('npm', ['exec', 'vite-node'",
+      '--',
+      'apps/editor',
+    ], { cwd: repositoryRoot }));
+  } catch (error) {
+    if (error.code !== 1) throw error;
+    stdout = error.stdout ?? '';
+  }
+  assert.equal(stdout, '', `indirect vite-node launchers can orphan services:\n${stdout}`);
 });

@@ -14,7 +14,7 @@ await handleQaCommand(process.argv);
 import { handleQaCommand } from './qa-commands.mjs';
 const root = resolve(import.meta.dirname, '../../..'); const port = 0;
 const mainQaDirectory = await mkdtemp(join(tmpdir(), 'lineage-motion-chrome-main-'));
-const server = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+const server = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
   cwd: root, stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env,
     PHASE3_DATABASE_PATH: join(mainQaDirectory, 'project.sqlite'), PHASE3_EDITOR_PORT: String(port),
     PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
