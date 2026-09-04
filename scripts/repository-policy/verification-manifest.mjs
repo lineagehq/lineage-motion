@@ -91,7 +91,7 @@ export const verificationSuites = {
     'packages/visual-proof/src/trajectory-authoring.visual.test.ts',
     'packages/visual-proof/src/trajectory-representability.visual.test.ts',
     'packages/visual-proof/src/visual.test.ts',
-  ], { args: ['--maxWorkers=2'] }),
+  ], { args: ['--maxWorkers=1'] }),
   browser: {
     kind: 'playwright', command: 'npx', args: ['playwright', 'test', '--config', 'apps/editor/playwright.config.ts'],
     files: [

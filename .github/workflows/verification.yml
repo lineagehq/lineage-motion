@@ -37,6 +37,7 @@ jobs:
           node-version: 22.22.0
           cache: npm
       - run: npm ci
+      - run: npx playwright install --with-deps chromium
       - run: node scripts/run-verification.mjs --suite repository-safety --suite service-integration --suite acquisition
 
   recovery-parity:

@@ -9,6 +9,7 @@ test('package installation prepares Husky hooks', async () => {
   const packageJson = JSON.parse(await readRepositoryFile('package.json'));
   assert.equal(packageJson.scripts.prepare, 'husky');
   assert.match(packageJson.devDependencies.husky, /^\^9\./);
+  assert.match(packageJson.devDependencies.tsx, /^\^4\./);
 });
 
 test('pre-commit rejects line-limit and verification-manifest drift', async () => {
@@ -56,4 +57,6 @@ test('CI exposes stable, non-overlapping verification jobs', async () => {
     assert.equal(workflow.match(new RegExp(`--suite ${suite}(?:\\s|$)`, 'g'))?.length, 1, suite);
   }
   assert.doesNotMatch(workflow, /private-acceptance|private\.test|private\.visual/);
+  const integrationJob = workflow.match(/^  integration:\n([\s\S]*?)(?=^  [a-z][a-z-]*:\n)/m)?.[1] ?? '';
+  assert.match(integrationJob, /npx playwright install --with-deps chromium/);
 });
