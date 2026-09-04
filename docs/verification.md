@@ -20,9 +20,29 @@ node scripts/run-verification.mjs --suite parity
 node scripts/run-verification.mjs --suite browser
 ```
 
-Before sharing work, run `npm run verify:fast`. Before merging, run
-`npm run verify:pr`. The local runner is serial so a failure is easy to
-attribute; CI fans the same public suite identifiers across independent jobs.
+After the first coherent implementation commit, push the feature branch and
+open a draft pull request. Keep using focused local suites while GitHub runs
+the broad public graph in parallel. This makes integration failures visible
+during implementation instead of postponing them until packaging is complete.
+
+Before sharing work, run `npm run verify:fast`. Mark the pull request ready
+only when the bounded implementation and its focused verification are
+complete. Do not merge until every required check passes on the exact head
+commit. `main` requires a pull request, an up-to-date branch, resolved review
+conversations, and these checks:
+
+- `policy-fast`
+- `integration`
+- `recovery-parity`
+- `determinism-visual`
+- `browser`
+- `typecheck-build`
+- `Analyze (javascript-typescript)`
+
+The local runner remains available as `npm run verify:pr` when a complete
+serial reproduction is useful. It is not the default inner-loop command and
+does not need to be repeated independently by every agent role when CI already
+proves the same exact revision.
 
 ## File-size ratchet
 

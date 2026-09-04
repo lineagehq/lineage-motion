@@ -143,9 +143,14 @@ test('human browser and independent CLI agent share one durable animation docume
 
     await page.reload(); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
     expect(new URL(page.url()).hostname).toBe('lineage-motion.localhost');
-    await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(4);
-    expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({ revision: 4,
-      contentDigest: humanMutation.contentDigest, exportDigest: previewBeforeRestart.digest });
+    const expectedReload = { revision: 4, contentDigest: humanMutation.contentDigest,
+      exportDigest: previewBeforeRestart.digest };
+    await expect.poll(async () => {
+      const first = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+      await page.waitForTimeout(50);
+      const second = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+      return { first, second };
+    }).toMatchObject({ first: expectedReload, second: expectedReload });
     await expect.poll(() => page.evaluate(() => { const frame = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
       return frame.srcdoc === window.__motionEditor.compiledHtml
         && frame.contentDocument!.getAnimations().length > 0
