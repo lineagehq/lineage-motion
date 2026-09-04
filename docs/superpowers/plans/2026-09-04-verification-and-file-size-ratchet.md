@@ -219,35 +219,42 @@ git add package.json vitest.config.ts vitest.fast.config.ts scripts/repository-p
 git commit -m "perf: isolate the fast test tier"
 ```
 
-### Task 5: Local pre-push and GitHub Actions enforcement
+### Task 5: Husky commit/push and GitHub Actions enforcement
 
 **Files:**
-- Create: `.githooks/pre-push`
-- Create: `scripts/install-git-hooks.mjs`
+- Create: `.husky/pre-commit`
+- Create: `.husky/pre-push`
 - Create: `scripts/repository-policy/git-hooks.test.mjs`
 - Create: `.github/workflows/verification.yml`
 - Modify: `package.json`
 - Modify: `package-lock.json`
 
 **Interfaces:**
-- `npm run hooks:install` configures `core.hooksPath` to the committed relative hook directory without an absolute checkout path.
-- `prepare` invokes the installer when Git metadata exists and exits successfully for dependency packaging without Git metadata.
-- `.githooks/pre-push` changes to the pushed worktree root and executes `npm run verify:fast`.
+- Husky is a development dependency and `prepare` invokes `husky`.
+- `.husky/pre-commit` executes `npm run check:line-limit` followed by `npm run check:verification-manifest`.
+- `.husky/pre-push` executes `npm run verify:fast`.
 - CI job names remain stable: `policy-fast`, `integration`, `recovery-parity`, `determinism-visual`, `browser`, `typecheck-build`.
 
 - [ ] **Step 1: Write failing hook behavior tests**
 
-Use a temporary linked worktree and a fake `npm` earlier on `PATH`. Prove installation uses a relative hooks path, the hook executes in the pushed worktree, forwards failure, and does not hard-code the source checkout.
+Use a temporary linked worktree and a fake `npm` earlier on `PATH`. Prove the
+pre-commit hook selects both policy commands, the pre-push hook selects only
+`verify:fast`, each hook executes in the active worktree, failures propagate,
+and neither hook hard-codes the source checkout.
 
 - [ ] **Step 2: Verify RED**
 
 Run: `node --test scripts/repository-policy/git-hooks.test.mjs`
 
-Expected: FAIL because no committed hook or installer exists.
+Expected: FAIL because Husky and the committed hooks do not exist.
 
-- [ ] **Step 3: Implement hook installation and hook**
+- [ ] **Step 3: Install Husky and implement both hooks**
 
-Use `git config core.hooksPath .githooks`. Keep the hook POSIX-compatible and under the line limit. Do not write generated hooks into `.git/hooks`.
+Install Husky as a development dependency, set `prepare` to `husky`, initialize
+the committed hook directory, and keep both hooks POSIX-compatible and under
+the line limit. Do not add lint-staged: the line and manifest policies must
+inspect the complete tracked repository, while the fast tier already owns its
+explicit files.
 
 - [ ] **Step 4: Add CI using manifest leaf selections**
 
@@ -259,17 +266,21 @@ Run:
 
 ```bash
 node --test scripts/repository-policy/git-hooks.test.mjs
-npm run hooks:install
+npm run prepare
 git config --get core.hooksPath
+npm run check:line-limit
+npm run check:verification-manifest
 npm run verify:fast
 ```
 
-Expected: tests pass; hooks path is `.githooks`; fast verification passes once the production refactors complete. Before that final condition, record only the expected line-limit failure.
+Expected: tests pass; Husky owns the configured hook path; both policy commands
+and fast verification pass once the production refactors complete. Before that
+final condition, record only the expected line-limit failure.
 
 - [ ] **Step 6: Commit enforcement surfaces**
 
 ```bash
-git add .githooks .github/workflows/verification.yml package.json package-lock.json scripts/install-git-hooks.mjs scripts/repository-policy
+git add .husky .github/workflows/verification.yml package.json package-lock.json scripts/repository-policy
 git commit -m "ci: enforce fast verification and file limits"
 ```
 
@@ -579,7 +590,11 @@ Keep familiar command names but route them through `run-verification.mjs --suite
 
 - [ ] **Step 4: Document the intended loop**
 
-Document fast inner loop, focused leaf selection, pre-push behavior, public PR graph, full/private acceptance, hook bypass semantics, and how to add a test with exactly one suite owner. Update browser QA instructions so complete public proof runs once at final convergence rather than after every tiny correction.
+Document fast inner loop, focused leaf selection, pre-commit and pre-push
+behavior, public PR graph, full/private acceptance, hook bypass semantics, and
+how to add a test with exactly one suite owner. Update browser QA instructions
+so complete public proof runs once at final convergence rather than after every
+tiny correction.
 
 - [ ] **Step 5: Verify GREEN**
 
@@ -600,7 +615,9 @@ git commit -m "docs: define tiered verification workflow"
 - Modify only if a verified defect is found: files already owned by Tasks 1-10
 
 **Interfaces:**
-- User-facing claim: local development has an isolated fast tier, all public proof is non-overlapping, pre-push and CI enforce the same 500-line policy, and product behavior remains unchanged.
+- User-facing claim: local development has an isolated fast tier, all public
+  proof is non-overlapping, Husky pre-commit/pre-push and CI enforce the same
+  500-line policy, and product behavior remains unchanged.
 
 - [ ] **Step 1: Verify the hard ratchet**
 
@@ -626,7 +643,9 @@ Run the Chrome leaves. Run private leaves only when their ignored authorized inp
 
 - [ ] **Step 4: Inspect workflow enforcement**
 
-Run the pre-push hook directly with a synthetic successful push payload and a temporary 501-line committed fixture repository. Validate the workflow YAML syntax and confirm every CI command resolves to a manifest node.
+Run both Husky hooks directly in synthetic successful and failing repositories,
+including a committed 501-line fixture. Validate the workflow YAML syntax and
+confirm every CI command resolves to a manifest node.
 
 - [ ] **Step 5: Inspect complete diff and privacy**
 
@@ -655,4 +674,3 @@ Only if required after fresh evidence:
 git add docs/verification.md
 git commit -m "docs: record verification workflow"
 ```
-

@@ -5,7 +5,7 @@
 Replace the current overlapping verification scripts with one repository-owned
 suite manifest and DAG runner. Add a hard 500-line limit for hand-authored code,
 tests, scripts, styles, and configuration. The same policy must run in the local
-fast tier, a repository-managed pre-push hook, and GitHub Actions.
+fast tier, repository-managed pre-commit and pre-push hooks, and GitHub Actions.
 
 This work changes verification and code organization only. It must preserve the
 motion document, importer, compiler, service, editor, CLI, preview, export, and
@@ -145,20 +145,28 @@ The runner detects dependency cycles and unknown nodes before executing work.
 Local execution is serial by default for readable failure isolation. GitHub
 Actions fans independent nodes into separate jobs.
 
-## Local pre-push enforcement
+## Local commit and push enforcement
 
-Commit `.githooks/pre-push` and a cross-platform Node installer. Dependency
-setup runs the installer through `prepare`, configuring the repository to use
-the committed hook path. The hook executes `npm run verify:fast` and refuses the
-push on line-limit, suite-manifest, or fast-test failure.
+Use Husky with committed `.husky/pre-commit` and `.husky/pre-push` hooks.
+Dependency setup initializes Husky through the `prepare` lifecycle without a
+repository-specific installer.
 
-The hook prints the direct recovery command and honors Git's standard
-`--no-verify` bypass. CI remains authoritative, so bypassing the hook cannot
-merge an oversized file or broken policy.
+The pre-commit hook executes the near-instant repository policy checks:
 
-Worktree handling must be explicit: hook installation must resolve the common
-repository safely while executing verification from the worktree that is being
-pushed. Installation may not hard-code an absolute checkout path.
+- `npm run check:line-limit`; and
+- `npm run check:verification-manifest`.
+
+The pre-push hook executes `npm run verify:fast` and refuses the push on file
+policy, suite-manifest, or fast-test failure. Browser, visual, recovery,
+installed-Chrome, and private suites do not run in either local hook.
+
+Hooks print direct recovery commands and honor Git's standard `--no-verify`
+bypass. CI remains authoritative, so bypassing a hook cannot merge an oversized
+file or broken policy.
+
+Worktree handling must be explicit: hook tests must prove that commands execute
+from the worktree being committed or pushed. No hook or package script may
+hard-code an absolute checkout path.
 
 ## GitHub Actions
 
@@ -227,7 +235,7 @@ responsibility rather than numbered fragments.
    enter the fast tier; then implement the explicit Vitest configuration.
 4. Add DAG behavior tests for unknown nodes, cycles, duplicate leaves,
    dependency failure, and deterministic receipts; then implement the runner.
-5. Wire package commands, the pre-push hook, and CI to the same manifest.
+5. Wire package commands, both Husky hooks, and CI to the same manifest.
 6. Refactor one oversized production boundary at a time, running its focused
    existing tests and the line gate after each extraction.
 7. Split oversized tests and styles without weakening behavior or selectors.
@@ -247,6 +255,8 @@ responsibility rather than numbered fragments.
   subprocess, visual proof, or private acceptance workflow.
 - Aggregate DAG nodes execute every selected leaf at most once.
 - `qa:chrome` does not invoke Playwright.
+- Husky installs through `prepare` without an absolute checkout path.
+- The committed pre-commit hook runs line-limit and manifest policy checks.
 - The committed pre-push hook runs the fast policy gate.
 - GitHub Actions runs the same file policy and public verification manifest.
 - Existing public APIs and import paths remain compatible.
@@ -267,4 +277,3 @@ responsibility rather than numbered fragments.
    suite assignments must show that slow tests moved to explicit leaves rather
    than disappearing; the final public/full DAG must execute each required
    leaf once.
-
