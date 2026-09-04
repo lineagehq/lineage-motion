@@ -36,6 +36,7 @@ service, or Lineage database integration yet.
 - [Relationship to Lineage](docs/lineage-relationship.md)
 - [Architecture boundary](docs/architecture.md)
 - [Acceptance-corpus policy](docs/acceptance-corpus.md)
+- [Agent execution workflow](docs/agent-workflow.md)
 
 ## Current scope
 

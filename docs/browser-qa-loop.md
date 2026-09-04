@@ -82,10 +82,10 @@ After each correction:
 3. run the focused manifest leaf for the changed boundary;
 4. inspect the complete diff for scope growth and sensitive content.
 
-Run the complete public verification graph and installed-Chrome QA once the
-corrections have converged, rather than after every small adjustment. Use
-`npm run verify:pr` for the public graph and `npm run qa:chrome` for the
-installed-Chrome scenarios. Private acceptance remains a separate,
+Once corrections converge, run `npm run qa:chrome` for the installed-Chrome
+scenarios and push the exact commit so CI runs the complete public graph. Do not
+also run `npm run verify:pr` locally unless CI is unavailable or a CI failure
+needs local reproduction. Private acceptance remains a separate,
 authorized-input gate in `npm run verify:full`.
 
 Stop the polish loop when the canonical walkthrough succeeds on the first try,
@@ -97,4 +97,4 @@ for novelty. Report:
 - findings observed in the browser;
 - corrections made and deliberately deferred;
 - the top three realistic remaining failure modes;
-- exact browser and automated evidence.
+- concise browser evidence and the exact-head CI result.
