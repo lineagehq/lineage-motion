@@ -1,0 +1,2 @@
+npm run check:line-limit
+npm run check:verification-manifest

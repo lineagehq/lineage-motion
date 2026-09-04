@@ -14,6 +14,7 @@ export const verificationSuites = {
   'line-limit': command('node', ['scripts/check-line-limit.mjs'], { fast: true }),
   'manifest-policy': command('node', ['scripts/check-verification-manifest.mjs'], { fast: true }),
   'policy-tests': nodeTest([
+    'scripts/repository-policy/git-hooks.test.mjs',
     'scripts/repository-policy/line-limit.test.mjs',
     'scripts/repository-policy/test-discovery.test.mjs',
     'scripts/repository-policy/verification-dag.test.mjs',
