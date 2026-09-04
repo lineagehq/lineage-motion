@@ -5,20 +5,16 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
 
+import { withoutInheritedGitEnvironment } from './git-environment.mjs';
+
 const checker = resolve(import.meta.dirname, '../check-execution-artifacts.mjs');
-const temporaryRepositories = [];
 
-test.afterEach(() => {
-  while (temporaryRepositories.length > 0) {
-    rmSync(temporaryRepositories.pop(), { force: true, recursive: true });
-  }
-});
-
-test('allows ignored local goal artifacts while keeping the tracked tree clean', () => {
+test('allows ignored local goal artifacts while keeping the tracked tree clean', (context) => {
   const repository = committedRepository({
     '.gitignore': 'docs/goals/\n',
     'README.md': 'fixture\n',
   });
+  context.after(() => rmSync(repository, { force: true, recursive: true }));
   writeFixture(repository, 'docs/goals/local/state.yaml', 'status: local\n');
 
   const result = runChecker(repository);
@@ -32,11 +28,12 @@ test('allows ignored local goal artifacts while keeping the tracked tree clean',
   });
 });
 
-test('rejects a force-added goal artifact even when the directory is ignored', () => {
+test('rejects a force-added goal artifact even when the directory is ignored', (context) => {
   const repository = committedRepository({
     '.gitignore': 'docs/goals/\n',
     'docs/evidence/product-receipt.json': '{}\n',
   });
+  context.after(() => rmSync(repository, { force: true, recursive: true }));
   writeFixture(repository, 'docs/goals/forced/notes/T001-receipt.json', '{}\n');
   git(repository, ['add', '--force', 'docs/goals/forced/notes/T001-receipt.json']);
   git(repository, ['commit', '--quiet', '-m', 'force artifact']);
@@ -58,7 +55,6 @@ function runChecker(repository) {
 
 function committedRepository(files) {
   const repository = mkdtempSync(join(tmpdir(), 'motion-execution-artifacts-'));
-  temporaryRepositories.push(repository);
   git(repository, ['init', '--quiet']);
   git(repository, ['config', 'user.email', 'policy@example.invalid']);
   git(repository, ['config', 'user.name', 'Policy Test']);
@@ -75,5 +71,9 @@ function writeFixture(repository, path, contents) {
 }
 
 function git(repository, args) {
-  execFileSync('git', args, { cwd: repository, stdio: 'ignore' });
+  execFileSync('git', args, {
+    cwd: repository,
+    env: withoutInheritedGitEnvironment(),
+    stdio: 'ignore',
+  });
 }
