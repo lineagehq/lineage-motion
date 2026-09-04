@@ -31,6 +31,7 @@
     "test:phase4:review-handoff": "vitest run packages/review-domain/src/index.test.ts packages/motion-protocol/src/review.test.ts packages/local-service/src/review-handoff.test.ts packages/local-service/src/review-handoff-recovery.test.ts packages/motion-cli/src/review-handoff.test.ts packages/phase3-proof/src/review-handoff-parity.test.ts packages/phase3-proof/src/review-handoff-privacy.test.ts --sequence.concurrent false",
     "verify:phase4:five-scene": "vitest run packages/css-import/src/five-scene.private.test.ts --sequence.concurrent false --testTimeout=120000",
     "check:line-limit": "node scripts/check-line-limit.mjs",
+    "check:verification-manifest": "node scripts/check-verification-manifest.mjs",
     "check:private-ignore": "node scripts/check-private-ignore.mjs",
     "check:sensitive": "node scripts/check-sensitive.mjs",
     "typecheck": "tsc --noEmit"
