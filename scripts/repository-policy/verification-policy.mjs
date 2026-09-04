@@ -28,8 +28,10 @@ export function validateVerificationManifest(repositoryRoot, suites, tiers) {
   const unknownNodes = [...new Set(
     Object.values(tiers).flat().filter((name) => !(name in suites)),
   )].sort();
-  const privateInPublic = (tiers.pr ?? [])
-    .filter((name) => suites[name]?.public === false)
+  const privateInPublic = [...new Set(Object.entries(tiers)
+    .filter(([tier]) => tier !== 'full')
+    .flatMap(([, names]) => names)
+    .filter((name) => suites[name]?.public === false))]
     .sort();
   return {
     passed: unowned.length === 0

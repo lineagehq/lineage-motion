@@ -112,7 +112,11 @@ export const verificationSuites = {
     public: true,
     fast: false,
   },
-  chrome: command('node', ['apps/editor/scripts/qa-chrome.mjs']),
+  'chrome-editor': command('node', ['apps/editor/scripts/qa-chrome.mjs']),
+  'chrome-spatial': command('node', ['apps/editor/scripts/qa-chrome.mjs', '--shot1-spatial-parity-public']),
+  'chrome-landing': command('node', [
+    'apps/editor/scripts/qa-chrome.mjs', '--landing-shot1', '--workspace-smoke-only',
+  ]),
   'private-acceptance': vitest([
     'packages/css-import/src/five-scene.private.test.ts',
     'packages/css-import/src/landing-shot1.private.test.ts',
@@ -136,7 +140,15 @@ export const verificationTiers = {
   full: [
     'line-limit', 'manifest-policy', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
-    'public-visual', 'browser', 'chrome', 'private-acceptance', 'typecheck', 'build',
+    'public-visual', 'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
+    'private-acceptance', 'typecheck', 'build',
     'privacy-checks',
   ],
+  phase3: [
+    'line-limit', 'manifest-policy', 'policy-tests', 'fast-unit', 'repository-safety',
+    'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
+    'public-visual', 'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
+    'typecheck', 'build', 'privacy-checks',
+  ],
+  'qa:chrome': ['chrome-editor', 'chrome-spatial', 'chrome-landing'],
 };

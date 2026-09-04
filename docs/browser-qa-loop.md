@@ -79,10 +79,14 @@ After each correction:
 
 1. repeat the exact browser action that exposed the issue;
 2. repeat the complete canonical walkthrough from a fresh state;
-3. run the focused tests for the changed boundary, then the existing Chrome,
-   visual, determinism, privacy, type, build, and diff gates required by the
-   active phase;
+3. run the focused manifest leaf for the changed boundary;
 4. inspect the complete diff for scope growth and sensitive content.
+
+Run the complete public verification graph and installed-Chrome QA once the
+corrections have converged, rather than after every small adjustment. Use
+`npm run verify:pr` for the public graph and `npm run qa:chrome` for the
+installed-Chrome scenarios. Private acceptance remains a separate,
+authorized-input gate in `npm run verify:full`.
 
 Stop the polish loop when the canonical walkthrough succeeds on the first try,
 the next action and current state are clear, keyboard and rejection behavior are

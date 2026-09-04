@@ -10,6 +10,7 @@ import {
   validateVerificationManifest,
 } from './verification-policy.mjs';
 import { verificationSuites, verificationTiers } from './verification-manifest.mjs';
+import { resolveVerificationTier } from './verification-dag.mjs';
 
 const temporaryRepositories = [];
 
@@ -95,6 +96,25 @@ test('assigns every repository test to exactly one primary suite', () => {
   );
 });
 
+test('compatibility scripts select manifest leaves without aggregate recursion', async () => {
+  const packageJson = JSON.parse(await readFileFromRepository('package.json'));
+  assert.equal(packageJson.scripts['test:unit'], 'node scripts/run-verification.mjs --suite fast-unit');
+  assert.equal(packageJson.scripts['qa:chrome'], 'node scripts/run-verification.mjs --tier qa:chrome');
+  assert.equal(packageJson.scripts['verify:phase3'], 'node scripts/run-verification.mjs --tier phase3');
+  assert.doesNotMatch(packageJson.scripts['qa:chrome'], /playwright|test:browser|test:phase3:browser/);
+  assert.doesNotMatch(packageJson.scripts['verify:phase3'], /&&|npm run/);
+});
+
+test('aggregate selections are deduplicated and reserve private suites for full', () => {
+  for (const tier of ['fast', 'pr', 'full', 'phase3', 'qa:chrome']) {
+    const selected = resolveVerificationTier(tier, verificationSuites, verificationTiers);
+    assert.equal(selected.length, new Set(selected).size, tier);
+    if (tier !== 'full') {
+      assert.equal(selected.some((name) => verificationSuites[name].public === false), false, tier);
+    }
+  }
+});
+
 function suite(files, isPublic = true) {
   return {
     kind: 'node',
@@ -124,4 +144,11 @@ function writeFixture(repository, path, contents) {
   const absolute = join(repository, path);
   mkdirSync(dirname(absolute), { recursive: true });
   writeFileSync(absolute, contents);
+}
+
+function readFileFromRepository(path) {
+  return import('node:fs/promises').then(({ readFile }) => readFile(
+    new URL(`../../${path}`, import.meta.url),
+    'utf8',
+  ));
 }
