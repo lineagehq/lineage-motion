@@ -162,13 +162,22 @@ test('authors cursor path, reveal, and click through the native editor lifecycle
       return Boolean(candidate?.isConnected && candidate === document.querySelector(candidateSelector));
     }, selector);
     const handle = page.locator(selector);
-    await handle.scrollIntoViewIfNeeded(); const before = await handle.boundingBox(); expect(before).toBeTruthy();
+    const currentHandleBox = async (phase: string) => {
+      let box = await handle.boundingBox();
+      await expect.poll(async () => {
+        box = await handle.boundingBox();
+        return box !== null;
+      }, { message: `waypoint handle remained visible during ${phase}` }).toBe(true);
+      if (!box) throw new Error(`WAYPOINT_HANDLE_MISSING_${phase.toUpperCase()}`);
+      return box;
+    };
+    await handle.scrollIntoViewIfNeeded(); const before = await currentHandleBox('grab');
     const grab = { x: before!.x + before!.width * .27, y: before!.y + before!.height * .68 };
     const grabOffset = { x: grab.x - before!.x, y: grab.y - before!.y };
     const dpr = await page.evaluate(() => window.devicePixelRatio);
     const assertPointerTracking = async (pointer: { x: number; y: number }, phase: string) => {
-      const actual = await handle.boundingBox(); expect(actual).toBeTruthy();
-      const error = Math.hypot(actual!.x - (pointer.x - grabOffset.x), actual!.y - (pointer.y - grabOffset.y)) * dpr;
+      const actual = await currentHandleBox(phase);
+      const error = Math.hypot(actual.x - (pointer.x - grabOffset.x), actual.y - (pointer.y - grabOffset.y)) * dpr;
       const geometry = await page.evaluate(() => {
         const rect = (selector: string) => { const value = document.querySelector(selector)!.getBoundingClientRect();
           return { x: value.x, y: value.y, width: value.width, height: value.height }; };
