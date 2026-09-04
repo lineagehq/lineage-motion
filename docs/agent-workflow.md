@@ -1,9 +1,9 @@
 # Agent execution workflow
 
 This is the canonical execution contract for routine repository work. Product
-plans define what to build; architecture documents define invariants; historical
-goal boards record what happened. None of them create an additional development
-loop unless the user explicitly asks to operate that process.
+plans define what to build and architecture documents define invariants. They
+do not create an additional development loop unless the user explicitly asks
+to operate that process.
 
 ## Default loop
 
@@ -49,9 +49,10 @@ changed, or adversarially distinct check.
 These checks extend the evidence for the affected boundary; they do not require
 every participant to rerun the complete public graph.
 
-## Historical goal records
+## Execution artifacts
 
-Files under `docs/goals/` are historical execution records. Do not treat their
-task queues, command matrices, agent-role transitions, or receipt requirements
-as current instructions unless the user explicitly asks to resume that named
-goal. Routine work must not update those boards as a side effect.
+Do not commit generated goal boards, role queues, per-task state, command logs,
+or agent transcripts. `docs/goals/` is reserved for ignored local execution
+state, and repository policy rejects force-added files there. User-requested
+durable plans should stay concise; product evidence and deterministic receipts
+remain governed by their existing product and privacy contracts.

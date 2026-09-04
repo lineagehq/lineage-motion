@@ -13,7 +13,9 @@ const command = (executable, args, options = {}) => ({
 export const verificationSuites = {
   'line-limit': command('node', ['scripts/check-line-limit.mjs'], { fast: true }),
   'manifest-policy': command('node', ['scripts/check-verification-manifest.mjs'], { fast: true }),
+  'execution-artifacts': command('node', ['scripts/check-execution-artifacts.mjs'], { fast: true }),
   'policy-tests': nodeTest([
+    'scripts/repository-policy/execution-artifacts.test.mjs',
     'scripts/repository-policy/git-hooks.test.mjs',
     'scripts/repository-policy/line-limit.test.mjs',
     'scripts/repository-policy/test-discovery.test.mjs',
@@ -131,21 +133,21 @@ export const verificationSuites = {
 };
 
 export const verificationTiers = {
-  fast: ['line-limit', 'manifest-policy', 'policy-tests', 'fast-unit'],
+  fast: ['line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit'],
   pr: [
-    'line-limit', 'manifest-policy', 'policy-tests', 'fast-unit', 'repository-safety',
+    'line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
     'public-visual', 'browser', 'typecheck', 'build', 'privacy-checks',
   ],
   full: [
-    'line-limit', 'manifest-policy', 'policy-tests', 'fast-unit', 'repository-safety',
+    'line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
     'public-visual', 'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
     'private-acceptance', 'typecheck', 'build',
     'privacy-checks',
   ],
   phase3: [
-    'line-limit', 'manifest-policy', 'policy-tests', 'fast-unit', 'repository-safety',
+    'line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
     'public-visual', 'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
     'typecheck', 'build', 'privacy-checks',

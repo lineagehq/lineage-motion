@@ -25,6 +25,7 @@ jobs:
       - run: npm ci
       - run: npm run check:line-limit
       - run: npm run check:verification-manifest
+      - run: npm run check:execution-artifacts
       - run: node scripts/run-verification.mjs --suite policy-tests --suite fast-unit
 
   integration:
