@@ -115,6 +115,10 @@ test('aggregate selections are deduplicated and reserve private suites for full'
   }
 });
 
+test('browser-heavy visual verification caps worker contention', () => {
+  assert.equal(verificationSuites['public-visual'].args.includes('--maxWorkers=2'), true);
+});
+
 function suite(files, isPublic = true) {
   return {
     kind: 'node',

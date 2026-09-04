@@ -2,7 +2,7 @@ const nodeTest = (files) => ({
   kind: 'node', command: 'node', args: ['--test', ...files], files, public: true, fast: true,
 });
 const vitest = (files, options = {}) => ({
-  kind: 'vitest', command: 'npx', args: ['vitest', 'run', ...files], files,
+  kind: 'vitest', command: 'npx', args: ['vitest', 'run', ...(options.args ?? []), ...files], files,
   public: options.public ?? true, fast: options.fast ?? false,
 });
 const command = (executable, args, options = {}) => ({
@@ -91,7 +91,7 @@ export const verificationSuites = {
     'packages/visual-proof/src/trajectory-authoring.visual.test.ts',
     'packages/visual-proof/src/trajectory-representability.visual.test.ts',
     'packages/visual-proof/src/visual.test.ts',
-  ]),
+  ], { args: ['--maxWorkers=2'] }),
   browser: {
     kind: 'playwright', command: 'npx', args: ['playwright', 'test', '--config', 'apps/editor/playwright.config.ts'],
     files: [
