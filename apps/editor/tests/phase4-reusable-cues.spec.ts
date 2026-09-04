@@ -225,8 +225,10 @@ test('authors, persists, reloads, detaches, and CLI-updates all reusable cues ov
     await page.getByRole('button', { name: 'Undo' }).click(); await expect(page.locator(`[data-authored-cue="${kind}"]`)).toBeVisible();
     expect(await page.evaluate(() => window.__motionEditor.compiledHtml)).toBe(exact);
   }
+  await settledRevision(34);
   await page.emulateMedia({ reducedMotion: 'reduce' }); await page.reload();
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+  await settledRevision(34);
   const claimBase = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
   const claimSecret = randomBytes(32).toString('base64url');
   const agentCommon = ['--service', serviceUrl, '--document-id', String(beforeReload.state.documentId), '--actor', 'agent',
