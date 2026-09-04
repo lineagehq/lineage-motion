@@ -64,6 +64,8 @@ private material.
 `prepare` lifecycle.
 
 - Pre-commit runs the line limit and verification-manifest checks.
+- Pre-commit rejects tracked execution boards and transcripts under
+  `docs/goals/`.
 - Pre-push runs the complete fast tier.
 
 Git's standard `--no-verify` option can bypass a local hook for emergency

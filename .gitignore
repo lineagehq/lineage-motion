@@ -20,3 +20,6 @@ artifacts/
 screenshots/
 test-results/
 playwright-report/
+
+# Local execution boards, per-task receipts, and agent transcripts
+docs/goals/

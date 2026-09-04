@@ -19,6 +19,7 @@ test('pre-commit rejects line-limit and verification-manifest drift', async () =
   const hook = await readRepositoryFile('.husky/pre-commit');
   assert.match(hook, /npm run check:line-limit/);
   assert.match(hook, /npm run check:verification-manifest/);
+  assert.match(hook, /npm run check:execution-artifacts/);
   assert.notEqual((await stat(new URL('.husky/pre-commit', repositoryRoot))).mode & 0o111, 0);
 });
 
@@ -42,6 +43,7 @@ test('CI exposes stable, non-overlapping verification jobs', async () => {
   }
   assert.equal(workflow.match(/npm run check:line-limit/g)?.length, 1);
   assert.equal(workflow.match(/npm run check:verification-manifest/g)?.length, 1);
+  assert.equal(workflow.match(/npm run check:execution-artifacts/g)?.length, 1);
   for (const suite of [
     'policy-tests',
     'fast-unit',

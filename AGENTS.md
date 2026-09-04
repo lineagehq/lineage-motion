@@ -5,9 +5,11 @@ user-facing claim, name the top three realistic failure modes, and gather direct
 evidence with tests, screenshots, traces, compiler receipts, or inspection.
 
 Routine implementation follows the single-pass workflow in
-`docs/agent-workflow.md`. Product plans and historical goal records describe
-requirements and prior decisions; they do not add execution stages, repeated
-test matrices, or per-role receipts unless the user explicitly activates them.
+`docs/agent-workflow.md`. Product plans describe requirements and prior
+decisions; they do not add execution stages, repeated test matrices, or
+per-role receipts unless the user explicitly activates them. Never commit
+generated execution boards, per-task state, or agent transcripts under
+`docs/goals/`; the path is reserved for ignored local work.
 
 ## Repository boundary
 
