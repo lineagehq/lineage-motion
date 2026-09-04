@@ -11,7 +11,7 @@ async function startCanvasFirstEditor(label: string): Promise<{
 }> {
   const root = resolve(import.meta.dirname, '../../..');
   const directory = await mkdtemp(join(tmpdir(), `lineage-motion-${label}-`));
-  const child: ChildProcess = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  const child: ChildProcess = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root,
     env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'moments.sqlite'), PHASE3_EDITOR_PORT: '0',
       PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
@@ -42,7 +42,7 @@ test('the canvas uses repeatable moments through the shared durable operation pa
   test.setTimeout(90_000);
   const root = resolve(import.meta.dirname, '../../..');
   const directory = await mkdtemp(join(tmpdir(), 'lineage-motion-moments-'));
-  const child: ChildProcess = spawn('npm', ['exec', 'vite-node', '--', resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  const child: ChildProcess = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root,
     env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'moments.sqlite'), PHASE3_EDITOR_PORT: '0',
       PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),

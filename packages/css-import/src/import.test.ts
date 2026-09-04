@@ -343,6 +343,9 @@ describe('structural CSS motion import', () => {
     ['IMPORT_JAVASCRIPT_URL_UNSUPPORTED', '<form action="JaVaScRiPt:void 0"></form>'],
     ['IMPORT_JAVASCRIPT_URL_UNSUPPORTED', '<svg><use href="javascript:void 0"></use></svg>'],
     ['IMPORT_JAVASCRIPT_URL_UNSUPPORTED', '<img src="javascript:void 0">'],
+    ['IMPORT_JAVASCRIPT_URL_UNSUPPORTED', '<a href="vbscript:msgbox(1)">link</a>'],
+    ['IMPORT_JAVASCRIPT_URL_UNSUPPORTED', '<object data="data:text/html,<script>void 0</script>"></object>'],
+    ['IMPORT_JAVASCRIPT_URL_UNSUPPORTED', '<a href="java&#x09;script:void 0">link</a>'],
   ])('rejects executable/declarative HTML escape surface atomically with %s', (code, body) => {
     const result = importMotionHtml(
       `<!doctype html><html><head></head><body>${body}</body></html>`,
