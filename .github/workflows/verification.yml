@@ -34,6 +34,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
 
+      - name: Intentional failed planning gate for migration probe (remove before merge)
+        run: exit 1
+
   policy-fast:
     needs: scope
     runs-on: ubuntu-latest
