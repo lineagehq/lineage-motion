@@ -48,6 +48,7 @@ export const verificationSuites = {
     'packages/domain/src/trajectory.test.ts',
     'packages/domain/src/workspace-projection.test.ts',
     'packages/motion-protocol/src/index.test.ts',
+    'packages/motion-protocol/src/export-archive.test.ts',
     'packages/motion-protocol/src/review.test.ts',
     'packages/preview-runtime/src/index.test.ts',
     'packages/preview-runtime/src/trajectory.test.ts',
@@ -67,6 +68,7 @@ export const verificationSuites = {
     'packages/local-service/src/durable-diagnostics.test.ts',
     'packages/local-service/src/review-handoff.test.ts',
     'packages/local-service/src/service.test.ts',
+    'packages/local-service/src/shot-export.test.ts',
   ]),
   recovery: vitest([
     'packages/local-service/src/project-admission-recovery.test.ts',
@@ -76,6 +78,7 @@ export const verificationSuites = {
   ]),
   parity: vitest([
     'packages/motion-cli/src/cli.test.ts',
+    'packages/motion-cli/src/export-artifact.test.ts',
     'packages/motion-cli/src/review-handoff.test.ts',
     'packages/phase3-proof/src/aggregate.test.ts',
     'packages/phase3-proof/src/branch-claim-parity.test.ts',
@@ -101,6 +104,7 @@ export const verificationSuites = {
     'packages/visual-proof/src/cursor-click-reveal.visual.test.ts',
     'packages/visual-proof/src/hold-ripple.visual.test.ts',
     'packages/visual-proof/src/hold-boundaries.visual.test.ts',
+    'packages/visual-proof/src/standalone-export.visual.test.ts',
     'packages/visual-proof/src/reusable-cues.visual.test.ts',
     'packages/visual-proof/src/trajectory-authoring.visual.test.ts',
     'packages/visual-proof/src/trajectory-representability.visual.test.ts',
