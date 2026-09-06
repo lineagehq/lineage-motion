@@ -1,3 +1,6 @@
+import { initializeProject, readProjectCatalog, type ProjectIdentity } from './project-catalog.ts';
+import { admitShot } from './shot-admission.ts';
+import type { ShotAdmissionCommand } from '../../motion-protocol/src/project.ts';
 import { chmodSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 
@@ -24,12 +27,13 @@ type ClaimRow = { claim_id: string; document_id: string; branch_id: string | nul
   lease_version: number; expires_at: number; active: number; actor_id: string | null };
 
 export class SqliteProjectStore extends SqliteProjectStoreBase implements ProjectStore {
-  constructor(path: string, private readonly fault?: (point: FaultPoint) => void) {
-    super(path); if (path !== ':memory:') chmodSync(path, 0o600);
+  constructor(path: string, private readonly fault?: (point: FaultPoint) => void, project?: ProjectIdentity) {
+    super(path); try { if (path !== ':memory:') chmodSync(path, 0o600);
     this.database.exec('PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;'); this.verifyPreMigration();
-    this.database.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;'); this.migrate();
+    this.database.exec('PRAGMA journal_mode=WAL; PRAGMA synchronous=FULL;'); this.migrate(project);
+    } catch (error) { this.database.close(); throw error; }
   }
-  private migrate(): void {
+  private migrate(project?: ProjectIdentity): void {
     this.database.exec('CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, checksum TEXT NOT NULL, applied_order INTEGER NOT NULL UNIQUE)');
     const newest = this.database.prepare('SELECT MAX(version) version FROM schema_migrations').get() as { version: number | null };
     const supported = MIGRATIONS.at(-1)?.version ?? 0; if (newest.version !== null && newest.version > supported) throw new Error('UNSUPPORTED_SCHEMA_VERSION');
@@ -38,22 +42,32 @@ export class SqliteProjectStore extends SqliteProjectStoreBase implements Projec
       if (row) { if (row.checksum !== migration.checksum) throw new Error('MIGRATION_CHECKSUM_MISMATCH'); continue; }
       if (this.path !== ':memory:' && existsSync(this.path)) this.backup(`${this.path}.backup-v${migration.version}`);
       this.database.exec('BEGIN IMMEDIATE'); try { this.database.exec(migration.sql);
+        if (migration.version === 5) {
+          const row = this.database.prepare('SELECT canonical_json FROM revisions ORDER BY document_id,revision LIMIT 1').get() as
+            { canonical_json: string } | undefined;
+          if (row) initializeProject(this.database, JSON.parse(row.canonical_json) as MotionDocument, project);
+        }
         this.database.prepare('INSERT INTO schema_migrations(version,checksum,applied_order) VALUES(?,?,?)')
           .run(migration.version, migration.checksum, migration.version); this.database.exec('COMMIT');
       } catch (error) { this.database.exec('ROLLBACK'); throw error; }
     }
   }
-  initialize(seed: MotionDocument): void {
+  readProjectCatalog() { return readProjectCatalog(this.database); }
+  admitShot(command: ShotAdmissionCommand, auth: AuthContext) { return admitShot(this.database, command, auth, this.fault); }
+  initialize(seed: MotionDocument, project?: ProjectIdentity): void {
     if (!validateMotionDocument(seed).ok) throw new Error('SEED_INVALID');
     const existing = this.database.prepare('SELECT document_id FROM documents').all() as Array<{ document_id: string }>;
-    if (existing.length) { if (existing.length !== 1 || existing[0]!.document_id !== seed.documentId) throw new Error('STORE_DOCUMENT_MISMATCH');
-      this.verify(); return; }
+    if (existing.length) { if (!existing.some(row => row.document_id === seed.documentId)) throw new Error('STORE_DOCUMENT_MISMATCH');
+      this.database.exec('BEGIN IMMEDIATE');
+      try { initializeProject(this.database, seed, project); this.verify(); this.database.exec('COMMIT'); }
+      catch (error) { this.database.exec('ROLLBACK'); throw error; }
+      return; }
     const json = canonicalJson(seed); const digest = sha256Hex(canonicalBytes(seed)); this.database.exec('BEGIN IMMEDIATE');
     try { this.database.prepare('INSERT INTO documents(document_id,last_revision) VALUES(?,?)').run(seed.documentId, seed.revision);
       this.database.prepare('INSERT INTO revisions(document_id,revision,parent_revision,canonical_json,canonical_digest,creating_event_id) VALUES(?,?,?,?,?,NULL)')
         .run(seed.documentId, seed.revision, null, json, digest);
       this.database.prepare('INSERT INTO branches(document_id,branch_id,head_revision,base_revision) VALUES(?,?,?,?)')
-        .run(seed.documentId, MAIN_BRANCH_ID, seed.revision, seed.revision); this.database.exec('COMMIT');
+        .run(seed.documentId, MAIN_BRANCH_ID, seed.revision, seed.revision); initializeProject(this.database, seed, project); this.database.exec('COMMIT');
     } catch (error) { this.database.exec('ROLLBACK'); throw error; }
   }
   compareAndCommit(command: MotionCommand, auth: AuthContext = { actor: 'human', capability: 'human-editor', now: Date.now() }): CommitResult {
