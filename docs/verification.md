@@ -25,23 +25,21 @@ node scripts/run-verification.mjs --suite browser
 
 After the first coherent implementation commit, push the feature branch and
 open a draft pull request. Keep using focused local suites while GitHub runs
-the broad public graph in parallel. This makes integration failures visible
-during implementation instead of postponing them until packaging is complete.
+the draft smoke graph in parallel. Every code update receives fast tests,
+type checking, a production build, determinism, and normal-launch UI/CLI proof.
+Ready PRs receive the complete public graph on every subsequent head change.
 
-Pre-push runs `npm run verify:fast`. Run it manually only when sharing without
-the hook or investigating a failure; reuse a current result. Mark the pull
+Pre-push verifies the actual tips supplied by Git: the fast tier, types, build,
+determinism, and conservatively selected service/parity tests. See
+[local hooks](local-hooks.md) for exact-state isolation and timing evidence.
+Reuse current hook results rather than repeating them manually. Mark the pull
 request ready
 only when the bounded implementation and its focused verification are
 complete. Do not merge until every required check passes on the exact head
 commit. `main` requires a pull request, an up-to-date branch, resolved review
 conversations, and these checks:
 
-- `policy-fast`
-- `integration`
-- `recovery-parity`
-- `determinism-visual`
-- `browser`
-- `typecheck-build`
+- `verification-gate`
 - `Analyze (javascript-typescript)`
 
 The local runner remains available as `npm run verify:pr` when a complete
@@ -65,14 +63,15 @@ private material.
 `npm install` and `npm ci` activate committed Husky hooks through the
 `prepare` lifecycle.
 
-- Pre-commit runs the line limit and verification-manifest checks.
-- Pre-commit rejects tracked execution boards and transcripts under
-  `docs/goals/`.
-- Pre-push runs the complete fast tier.
+- Pre-commit checks staged blobs for privacy, forbidden artifacts, file size
+  and manifest ownership without changing unstaged work.
+- Pre-push creates isolated snapshots of actual pushed tips and checks the
+  selected verification leaves. Deletion-only pushes have no tip to test.
 
 Git's standard `--no-verify` option can bypass a local hook for emergency
 work. It does not bypass CI: the pull-request workflow reruns the file policy,
-manifest policy, and every public verification leaf.
+manifest policy, and the graph required by the PR state. Ready PRs run every
+public verification leaf.
 
 ## Public, Chrome, and private tiers
 
@@ -91,10 +90,75 @@ Public CI never selects private import, visual, receipt, or corpus-bound tests.
 
 Add the tracked test path to exactly one leaf's `files` array in the
 verification manifest. Run the affected leaf while editing. Pre-commit owns
-manifest and file-size checks; pre-push owns `verify:fast`. Run an individual
+staged policies; pre-push owns exact-tip verification. Run an individual
 policy check locally when diagnosing its failure or checking a manifest edit
 before committing, and reuse current hook evidence.
 
 The manifest check rejects both unowned tests and tests listed in multiple
 leaves. Add a new leaf only when its runtime boundary or setup is genuinely
 different; otherwise extend the existing owner.
+
+## CI selection and aggregate gate
+
+`scripts/ci-verification.mjs` reads the current PR head and readiness through
+the read-only GitHub API at both planning and aggregation. Stale heads,
+unavailable state, and a changed plan fail closed. Rerunning a draft-era event
+after readiness therefore selects full proof; becoming ready during a smoke
+run prevents that lightweight gate from succeeding. Cancellation groups include
+head and event state so an old draft run cannot cancel the ready run. GitHub
+[preserves the original event when rerunning a workflow](https://github.blog/changelog/2019-09-30-github-actions-deterministic-re-runs-for-workflows/),
+so the original event alone is insufficient evidence of readiness.
+
+The planner classifies the complete merge-base-to-head diff,
+including both sides of renames. Unknown or malformed evidence fails closed.
+Only README/LICENSE and ordinary Markdown under docs qualify as prose;
+executable docs, instructions, fixtures, dependency locks and configuration
+remain code changes. Prose changes run repository and privacy policies.
+
+Draft code PRs run the smoke graph. Opening, reopening, editing or synchronizing
+a ready code PR runs the broad public graph; ready-for-review triggers it too.
+Nightly and manual runs always select the broad public graph. Redundant main
+push runs are removed; final delivery explicitly dispatches regression on the
+resulting main commit. CodeQL retains its existing configuration.
+
+The aggregate always runs. Draft code uses the distinct `draft-smoke-gate`
+check name, which cannot satisfy the required `verification-gate` context. This
+also protects the interval between checking readiness and publishing a result.
+The required context is intentionally absent on a new draft code head until
+ready proof runs. Prose and full runs publish `verification-gate`.
+
+The aggregate requires success from every selected
+job, with explicit skipped status only for unselected jobs. Missing planning
+output, failed, canceled or unexpectedly skipped jobs cannot turn green.
+`browser-smoke` owns the normal startup and managed-app/real-CLI smoke tests; the broad
+browser leaf excludes them, so each ready-PR test is executed once.
+
+Required-context migration was validated on 2026-09-06 in [PR #26](https://github.com/lineagehq/lineage-motion/pull/26).
+The [ready run](https://github.com/lineagehq/lineage-motion/actions/runs/34063209679)
+and [rerun of the original draft event, attempt 4](https://github.com/lineagehq/lineage-motion/actions/runs/34062895481/attempts/4)
+both selected and passed full verification at `e35ccaee`.
+An [intentional failed prerequisite](https://github.com/lineagehq/lineage-motion/actions/runs/34063568095)
+at temporary probe commit `c6e2449` failed the aggregate even with the other jobs
+skipped; GitHub reported the ready PR as blocked. The probe is removed before
+merge. The migration replaced only the six verification contexts with
+`verification-gate`, retaining CodeQL, strict up-to-date checking, PR enforcement,
+conversation resolution, admin enforcement and force-push/deletion protections.
+All other protection fields matched the saved before/after snapshots.
+
+Three actual draft smoke runs at `e35ccaee` took **63, 76 and 56 seconds**
+including job setup. Initial workflow-to-first-runner delays were **4, 5 and
+4 seconds**, respectively; these are separate from smoke execution and do not
+claim to measure every dependency queue. These are attempts 1–3 of the draft
+run linked above.
+
+On the audit Mac, five warm exact-tip push measurements with the new policies
+were 12.463, 13.934, 12.940, 12.678 and 12.980 seconds: median **12.940s**, maximum
+**13.934s**. Five commit-policy measurements had median **0.104s**, maximum
+**0.123s**. An earlier heavily loaded series reached median **24.547s**, maximum
+**25.490s**, despite passing all checks; the budgets are measured iteration
+conditions, not guarantees under arbitrary host contention. Dependency setup
+remains inside push measurements; the original separate cold-clone run took **9.396s** including installation
+at `e22940c`, recorded in [the hook PR receipt](https://github.com/lineagehq/lineage-motion/pull/23).
+
+Failure uploads contain only sanitized server diagnostics. Do not upload raw
+browser traces, session files or databases; they can carry live capabilities.
