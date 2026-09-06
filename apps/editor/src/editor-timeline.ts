@@ -57,7 +57,8 @@ export function updateStructuralControls(rows: TimelineRow[]): void {
   for (const choice of creationChoices) {
     const eligibility = projectTrackCreationEligibility(authoring.value.document, choice.elementId, 'opacity');
     const radio = required<HTMLInputElement>(`input[name="creation-target"][value="${choice.elementId}"]`);
-    radio.disabled = locked || !eligibility.available;
+    const existing = rows.some((row) => row.elementId === choice.elementId && row.property === 'opacity');
+    radio.disabled = locked || (!eligibility.available && !existing);
     required(`[data-choice-reason="${choice.elementId}"]`).textContent = eligibility.available
       ? 'Available' : eligibilityReason(eligibility.reason);
   }
@@ -131,6 +132,7 @@ export function eligibilityReason(reason: ReturnType<typeof projectTrackCreation
     PROPERTY_CONFLICT: 'Another opacity binding conflicts with creation.',
     ID_COLLISION: 'Stable track identity is unavailable.',
     DOCUMENT_INVALID: 'The document must be valid before creating a track.',
+    HOLD_LOCKED: 'Undo the whole-shot pause before editing tracks.',
     ELEMENT_NOT_FOUND: 'The target is no longer in the document.',
     TARGET_PROPERTY_UNSUPPORTED: 'This target and property are not supported.',
   } as const;
@@ -138,8 +140,10 @@ export function eligibilityReason(reason: ReturnType<typeof projectTrackCreation
 }
 
 export function findCreatedTrack(rows: TimelineRow[]): TimelineRow | undefined {
-  return rows.find((row) => creationChoices.some((choice) => choice.elementId === row.elementId)
+  const created = rows.filter((row) => creationChoices.some((choice) => choice.elementId === row.elementId)
     && row.property === 'opacity');
+  if (selectedCreationElementId.value) return created.find((row) => row.elementId === selectedCreationElementId.value);
+  return created.find((row) => row.trackId === selectedTrackId.value) ?? (created.length === 1 ? created[0] : undefined);
 }
 
 export function diagnosticMessage(code: string): string {
