@@ -38,7 +38,7 @@ export const STRUCTURAL_AUTHORING_ELEMENT_IDS = [
   'el_2dbee68b1ea318c8',
 ] as const;
 export const STRUCTURAL_AUTHORING_STATUS_ELEMENT_ID = 'el_1f3f2908e4fd2401';
-export type StructuralAuthoringElementId = typeof STRUCTURAL_AUTHORING_ELEMENT_IDS[number];
+export type StructuralAuthoringElementId = string;
 /** Kept as the reviewed Cursor default for callers that have not adopted target selection. */
 export const STRUCTURAL_AUTHORING_ELEMENT_ID: StructuralAuthoringElementId = STRUCTURAL_AUTHORING_ELEMENT_IDS[0];
 
@@ -48,7 +48,7 @@ export type TrackCreationEligibility = {
   available: boolean;
   reason: null | 'DOCUMENT_INVALID' | 'ELEMENT_NOT_FOUND' | 'TARGET_PROPERTY_UNSUPPORTED'
     | 'SHARED_PROPERTY_UNSUPPORTED' | 'PROPERTY_CONFLICT' | 'TRACK_ALREADY_EXISTS'
-    | 'TRACK_LIMIT_REACHED' | 'ID_COLLISION';
+    | 'TRACK_LIMIT_REACHED' | 'ID_COLLISION' | 'HOLD_LOCKED';
 };
 
 /** Pure, selector-independent projection used by both UI and mutation validation. */
@@ -60,9 +60,9 @@ export function projectTrackCreationEligibility(
   const unavailable = (reason: NonNullable<TrackCreationEligibility['reason']>): TrackCreationEligibility =>
     ({ elementId, property, available: false, reason });
   if (!validateMotionDocument(document).ok) return unavailable('DOCUMENT_INVALID');
+  if ((document.holds ?? []).length) return unavailable('HOLD_LOCKED');
   if (!document.elements.some((element) => element.id === elementId)) return unavailable('ELEMENT_NOT_FOUND');
-  if (property !== 'opacity' || ![...STRUCTURAL_AUTHORING_ELEMENT_IDS, STRUCTURAL_AUTHORING_STATUS_ELEMENT_ID]
-    .includes(elementId as StructuralAuthoringElementId)) {
+  if (property !== 'opacity') {
     return unavailable('TARGET_PROPERTY_UNSUPPORTED');
   }
   const propertyTracks = document.tracks.filter((track) => track.property === property);
@@ -70,10 +70,6 @@ export function projectTrackCreationEligibility(
     && document.tracks.filter((candidate) => candidate.ruleId === track.ruleId
       && candidate.property === property).length > 1)) return unavailable('SHARED_PROPERTY_UNSUPPORTED');
   if (propertyTracks.some((track) => track.elementId === elementId)) return unavailable('TRACK_ALREADY_EXISTS');
-  if (STRUCTURAL_AUTHORING_ELEMENT_IDS.some((candidate) =>
-    document.tracks.some((track) => track.id === derivedBundleIds(document.documentId, candidate).trackId))) {
-    return unavailable('TRACK_LIMIT_REACHED');
-  }
   const ids = derivedBundleIds(document.documentId, elementId as StructuralAuthoringElementId);
   const allIds = canonicalIdentitySet(document);
   if ([ids.ruleId, ids.applicationId, ids.slotId, ids.ruleTrackId, ids.trackId, ids.startId, ids.endId]
@@ -330,3 +326,5 @@ export function deriveElementId(
 export * from './css-motion-semantics.js';
 export * from './cue-authoring.js';
 export { sha256Hex } from './sha256.js';
+
+export * from './authoring-eligibility.js';

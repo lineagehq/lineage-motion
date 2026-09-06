@@ -2,7 +2,6 @@ import type { CueSemantic, CueTargetSnapshot } from './cue-authoring.js';
 import { timingFunctionSchema } from './document.js';
 import type { AuthoringOperation, StageProjection, TrajectoryInsertionTarget, TrajectoryTarget, TransformPose } from './authoring-types.js';
 import { validPose, validStage, validTrajectoryInsertionTargets, validTrajectoryTargets } from './trajectory-authoring.js';
-import { STRUCTURAL_AUTHORING_ELEMENT_IDS, type StructuralAuthoringElementId } from './index.js';
 
 export function isValidAuthoringOperationId(value: unknown): value is string {
   return typeof value === 'string' && /^[A-Za-z0-9._:-]{1,128}$/.test(value);
@@ -55,7 +54,8 @@ export function parseOperation(input: unknown): AuthoringOperation | null {
     const payload = plainRecord(value.payload);
     return hasExactObjectKeys(value, [...baseKeys, 'payload']) && payload
       && hasExactObjectKeys(payload, ['cueId', 'durationMs'])
-      && payload.cueId === 'cue_pair' && payload.durationMs === 600 ? base : null;
+      && typeof payload.cueId === 'string' && payload.cueId.length > 0
+      && Number.isSafeInteger(payload.durationMs) && (payload.durationMs as number) > 0 ? base : null;
   }
   if (base.kind === 'motion.transform-pose.set') {
     const payload = plainRecord(value.payload); const pose = plainRecord(payload?.pose); const stage = plainRecord(payload?.stage);
@@ -92,26 +92,26 @@ export function parseOperation(input: unknown): AuthoringOperation | null {
     if (base.kind === 'motion.keyframe-group-easing.set') return hasExactObjectKeys(payload, ['targets', 'expectedEasing', 'easing'])
       && timingFunctionSchema.safeParse(payload.expectedEasing).success && timingFunctionSchema.safeParse(payload.easing).success ? base : null;
     return hasExactObjectKeys(payload, ['targets', 'sourceTimeMs', 'settledTimeMs', 'landingTimeMs', 'boundaryTimeMs'])
-      && ['sourceTimeMs', 'settledTimeMs', 'landingTimeMs', 'boundaryTimeMs'].every((key) => Number.isSafeInteger(payload[key])) && payload.boundaryTimeMs === 2100 ? base : null;
+      && ['sourceTimeMs', 'settledTimeMs', 'landingTimeMs', 'boundaryTimeMs'].every((key) => Number.isSafeInteger(payload[key])) ? base : null;
   }
-  const fixedElement = STRUCTURAL_AUTHORING_ELEMENT_IDS.includes(value.elementId as StructuralAuthoringElementId);
+  const targetElement = typeof value.elementId === 'string' && value.elementId.length > 0;
   if (base.kind === 'motion.track.create') {
     const payload = plainRecord(value.payload);
-    return fixedElement && hasExactObjectKeys(value, [...baseKeys, 'elementId', 'payload'])
+    return targetElement && hasExactObjectKeys(value, [...baseKeys, 'elementId', 'payload'])
       && payload && hasExactObjectKeys(payload,
         ['property', 'durationMs', 'delayMs', 'easing', 'startValue', 'endValue'])
-      && payload.property === 'opacity' && payload.durationMs === 1000 && payload.delayMs === 610
-      && payload.easing === 'linear' && payload.startValue === 0 && payload.endValue === 1 ? base : null;
+      && payload.property === 'opacity' && Number.isSafeInteger(payload.durationMs) && Number.isSafeInteger(payload.delayMs)
+      && payload.easing === 'linear' && typeof payload.startValue === 'number' && typeof payload.endValue === 'number' ? base : null;
   }
   if (base.kind === 'motion.keyframe.add') {
     const payload = plainRecord(value.payload);
-    return fixedElement && typeof value.trackId === 'string'
+    return targetElement && typeof value.trackId === 'string'
       && hasExactObjectKeys(value, [...baseKeys, 'elementId', 'trackId', 'payload'])
       && payload && hasExactObjectKeys(payload, ['timeMs', 'value'])
       && typeof payload.timeMs === 'number' && typeof payload.value === 'number' ? base : null;
   }
   if (base.kind === 'motion.keyframe.remove') {
-    return fixedElement && typeof value.trackId === 'string' && typeof value.keyframeId === 'string'
+    return targetElement && typeof value.trackId === 'string' && typeof value.keyframeId === 'string'
       && hasExactObjectKeys(value, [...baseKeys, 'elementId', 'trackId', 'keyframeId']) ? base : null;
   }
   if (base.kind === 'motion.slot-duration.set' || base.kind === 'motion.binding-delay.set'
@@ -119,7 +119,7 @@ export function parseOperation(input: unknown): AuthoringOperation | null {
     const payload = plainRecord(value.payload);
     const member = base.kind === 'motion.slot-duration.set' ? 'durationMs'
       : base.kind === 'motion.binding-delay.set' ? 'delayMs' : 'easing';
-    return fixedElement && typeof value.trackId === 'string'
+    return targetElement && typeof value.trackId === 'string'
       && hasExactObjectKeys(value, [...baseKeys, 'elementId', 'trackId', 'payload'])
       && payload && hasExactObjectKeys(payload, [member])
       && (member === 'easing' ? typeof payload[member] === 'string'

@@ -1,3 +1,5 @@
+import { projectAuthoringTargets, projectHoldEligibility, type AuthoringTarget } from './authoring-eligibility.js';
+import { resolveIsolatedOpacityBundle } from './structural-authoring.js';
 import { canonicalBytes, projectTrackCreationEligibility, sha256Hex, type MotionDocument, type TimingFunction } from './index.js';
 import { isAuthoringCue, type CueSemantic } from './cue-authoring.js';
 
@@ -22,7 +24,7 @@ export type WorkspaceProjection = {
   canonicalDigest: string;
   durationMs: number;
   inventory: Omit<MotionDocument['inventory'], 'sourceDigest'>;
-  elements: Array<{ elementId: string }>;
+  elements: AuthoringTarget[];
   tracks: Array<{ trackId: string; elementId: string; ruleId: string; slotId: string; property: string;
     interpolation: MotionDocument['tracks'][number]['interpolation']; cueId: string | null }>;
   rules: Array<{ ruleId: string; tracks: Array<{ ruleTrackId: string; property: string;
@@ -45,6 +47,7 @@ export function projectWorkspace(document: MotionDocument, branchId: string,
       elementId: binding.elementId, delayMs: binding.delayOverridesMs[slotIndex] ?? slot.delayMs,
     })).sort((left, right) => left.elementId.localeCompare(right.elementId)),
   })));
+  const authoringTargets = projectAuthoringTargets(document);
   return {
     schemaVersion: 'motion.workspace-projection.v1', documentId: document.documentId, branchId,
     revision: document.revision, canonicalDigest: sha256Hex(canonicalBytes(document)), durationMs: document.durationMs,
@@ -52,8 +55,7 @@ export function projectWorkspace(document: MotionDocument, branchId: string,
       slotCount: document.inventory.slotCount, trackCount: document.inventory.trackCount,
       supportedCount: document.inventory.supportedCount, unsupportedCount: document.inventory.unsupportedCount,
       missingCount: document.inventory.missingCount, diagnosticCodes: [...document.inventory.diagnosticCodes] },
-    elements: document.elements.map(({ id }) => ({ elementId: id }))
-      .sort((left, right) => left.elementId.localeCompare(right.elementId)),
+    elements: authoringTargets,
     tracks: document.tracks.map((track) => ({ trackId: track.id, elementId: track.elementId, ruleId: track.ruleId,
       slotId: track.slotId, property: track.property, interpolation: track.interpolation,
       cueId: track.cueOwnership?.cueId ?? null })).sort((left, right) => left.trackId.localeCompare(right.trackId)),
@@ -75,26 +77,25 @@ export function projectWorkspace(document: MotionDocument, branchId: string,
       expansionDigest: isAuthoringCue(cue) ? cue.expansionDigest : null })).sort((left, right) => left.cueId.localeCompare(right.cueId)),
     holds: (document.holds ?? []).map((hold) => ({ holdId: hold.id, cueId: hold.cueId,
       sourceTimeMs: hold.sourceTimeMs, durationMs: hold.durationMs })), history,
-    eligibility: DURABLE_OPERATION_KINDS.map((kind) => operationEligibility(document, kind, history)),
+    eligibility: DURABLE_OPERATION_KINDS.map((kind) => operationEligibility(document, kind, history, authoringTargets)),
   };
 }
 
 function operationEligibility(document: MotionDocument, kind: DurableOperationKind,
-  history: { undoAvailable: boolean; redoAvailable: boolean }): { kind: DurableOperationKind; eligible: boolean; reasonCode: string | null } {
+  history: { undoAvailable: boolean; redoAvailable: boolean }, authoringTargets: AuthoringTarget[]): { kind: DurableOperationKind; eligible: boolean; reasonCode: string | null } {
   const answer = (eligible: boolean, reasonCode: string | null = null) => ({ kind, eligible, reasonCode });
   if (kind === 'motion.branch.create' || kind === 'motion.claim.acquire') return answer(true);
   if (kind === 'motion.claim.renew' || kind === 'motion.claim.release' || kind === 'motion.claim.revoke')
     return answer(false, 'CLAIM_CONTEXT_REQUIRED');
-  if ((document.holds ?? []).length > 0 && kind !== 'motion.hold.insert') return answer(false, 'AUTHORING_HOLD_LOCKED');
   if (kind === 'motion.history.undo') return answer(history.undoAvailable, history.undoAvailable ? null : 'AUTHORING_HISTORY_EMPTY');
   if (kind === 'motion.history.redo') return answer(history.redoAvailable, history.redoAvailable ? null : 'AUTHORING_HISTORY_EMPTY');
+  if ((document.holds ?? []).length > 0 && kind !== 'motion.hold.insert') return answer(false, 'AUTHORING_HOLD_LOCKED');
   const editableTracks = document.tracks.filter((track) => !track.cueOwnership);
   const opacityTracks = editableTracks.filter((track) => track.property === 'opacity');
   const transformTracks = editableTracks.filter((track) => track.property === 'transform');
-  const structuralTracks = opacityTracks.filter((track) => ['el_a2849ff826f3e167', 'el_2dbee68b1ea318c8'].includes(track.elementId));
+  const structuralTracks = opacityTracks.filter((track) => resolveIsolatedOpacityBundle(document, track.id).ok);
   if (kind === 'motion.track.create') {
-    const candidates = ['el_a2849ff826f3e167', 'el_2dbee68b1ea318c8'].map((elementId) =>
-      projectTrackCreationEligibility(document, elementId, 'opacity'));
+    const candidates = document.elements.map(({ id }) => projectTrackCreationEligibility(document, id, 'opacity'));
     const available = candidates.some((candidate) => candidate.available);
     return answer(available, available ? null : `AUTHORING_${candidates[0]?.reason ?? 'TRACK_CREATE_UNAVAILABLE'}`);
   }
@@ -110,12 +111,18 @@ function operationEligibility(document: MotionDocument, kind: DurableOperationKi
     return answer(removable, removable ? null : structuralTracks.length ? 'AUTHORING_KEYFRAME_MINIMUM' : 'AUTHORING_TRACK_NOT_FOUND');
   }
   if (kind === 'motion.hold.insert') {
-    const available = !(document.holds ?? []).length && document.cues.some((cue) => cue.id === 'cue_pair');
-    return answer(available, available ? null : (document.holds ?? []).length ? 'AUTHORING_HOLD_COLLISION' : 'AUTHORING_HOLD_CUE_MISSING');
+    const candidates = document.cues.map((cue) => projectHoldEligibility(document, cue.id));
+    const available = candidates.some((candidate) => candidate.available);
+    return answer(available, available ? null : (document.holds ?? []).length ? 'AUTHORING_HOLD_COLLISION'
+      : candidates[0]?.reason ?? 'AUTHORING_HOLD_CUE_MISSING');
   }
   if (kind.startsWith('motion.transform-') || kind.startsWith('motion.keyframe-group-') || kind === 'motion.settled-hold.set')
     return answer(transformTracks.length > 0, transformTracks.length ? null : 'AUTHORING_TRAJECTORY_TARGET_INVALID');
-  if (kind === 'motion.cue.create') return answer(document.elements.length > 0, document.elements.length ? null : 'CUE_TARGET_MISSING');
+  if (kind === 'motion.cue.create') {
+    const available = authoringTargets.some((target) => target.actions.some((action) =>
+      action.available && action.action !== 'fade'));
+    return answer(available, available ? null : 'CUE_TARGET_UNAVAILABLE');
+  }
   if (kind === 'motion.cue.update' || kind === 'motion.cue.delete' || kind === 'motion.cue.detach') {
     const hasCue = document.cues.some(isAuthoringCue); return answer(hasCue, hasCue ? null : 'CUE_TARGET_MISSING');
   }

@@ -19,9 +19,9 @@ const stableId = z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/);
 const revision = z.number().int().nonnegative().safe();
 const trackCreate = z.object({ schemaVersion: z.literal('motion.operation.v1'), kind: z.literal('motion.track.create'),
   operationId, documentId: z.string().min(1), expectedRevision: revision,
-  elementId: z.enum(['el_a2849ff826f3e167', 'el_2dbee68b1ea318c8']),
-  payload: z.object({ property: z.literal('opacity'), durationMs: z.literal(1000), delayMs: z.literal(610),
-    easing: z.literal('linear'), startValue: z.literal(0), endValue: z.literal(1) }).strict() }).strict();
+  elementId: z.string().min(1),
+  payload: z.object({ property: z.literal('opacity'), durationMs: z.number().int().positive().safe(), delayMs: revision,
+    easing: z.literal('linear'), startValue: z.number().min(0).max(1), endValue: z.number().min(0).max(1) }).strict() }).strict();
 const target = z.object({ elementId: z.string().min(1), trackId: z.string().min(1), keyframeId: z.string().min(1), expectedTransform: z.string().min(1) }).strict();
 const insertionTarget = z.object({ elementId: z.string().min(1), trackId: z.string().min(1),
   beforeKeyframeId: z.string().min(1), afterKeyframeId: z.string().min(1), expectedBeforeTransform: z.string().min(1),
@@ -41,7 +41,7 @@ const timing = z.discriminatedUnion('kind', [z.object({ kind: z.literal('keyword
     position: z.enum(['start', 'end', 'jump-start', 'jump-end', 'jump-none', 'jump-both']) }).strict(),
   z.object({ kind: z.literal('cubic-bezier'), x1: z.number(), y1: z.number(), x2: z.number(), y2: z.number() }).strict()]);
 const authorBase = { schemaVersion: z.literal('motion.operation.v1'), operationId, documentId: z.string().min(1), expectedRevision: revision } as const;
-const structuralElementId = z.enum(['el_a2849ff826f3e167', 'el_2dbee68b1ea318c8']);
+const structuralElementId = z.string().min(1);
 const editTarget = { elementId: z.string().min(1), trackId: z.string().min(1), keyframeId: z.string().min(1) } as const;
 const keyframeValue = z.object({ ...authorBase, kind: z.literal('motion.keyframe-value.set'), ...editTarget,
   payload: z.object({ value: z.number().finite() }).strict() }).strict();
@@ -58,16 +58,16 @@ const bindingDelay = z.object({ ...authorBase, kind: z.literal('motion.binding-d
 const slotEasing = z.object({ ...authorBase, kind: z.literal('motion.slot-easing.set'), elementId: structuralElementId,
   trackId: z.string().min(1), payload: z.object({ easing: z.enum(['linear', 'ease-in-out']) }).strict() }).strict();
 const holdInsert = z.object({ ...authorBase, kind: z.literal('motion.hold.insert'),
-  payload: z.object({ cueId: z.literal('cue_pair'), durationMs: z.literal(600) }).strict() }).strict();
+  payload: z.object({ cueId: z.string().min(1), durationMs: z.number().int().positive().safe() }).strict() }).strict();
 const poseSet = z.object({ ...authorBase, kind: z.literal('motion.transform-pose.set'), ...target.shape, payload: z.object({ pose, stage }).strict() }).strict();
 const waypointTranslate = z.object({ ...authorBase, kind: z.literal('motion.transform-waypoints.translate'), payload: z.object({ targets, deltaXPpm: z.number().int().min(-1_000_000).max(1_000_000), deltaYPpm: z.number().int().min(-1_000_000).max(1_000_000), stage }).strict() }).strict();
 const waypointAdd = z.object({ ...authorBase, kind: z.literal('motion.transform-waypoint.add'), payload: z.object({
   targets: insertionTargets, timeMs: revision }).strict() }).strict();
 const waypointRemove = z.object({ ...authorBase, kind: z.literal('motion.transform-waypoint.remove'), payload: z.object({
   targets, timeMs: revision }).strict() }).strict();
-const groupTime = z.object({ ...authorBase, kind: z.literal('motion.keyframe-group-time.set'), payload: z.object({ targets, sourceTimeMs: z.number().int().min(0).max(2100), targetTimeMs: z.number().int().min(1).max(2100), landingTimeMs: z.number().int().min(1).max(2099), settledTimeMs: z.number().int().min(2).max(2100) }).strict() }).strict();
+const groupTime = z.object({ ...authorBase, kind: z.literal('motion.keyframe-group-time.set'), payload: z.object({ targets, sourceTimeMs: z.number().int().min(0).safe(), targetTimeMs: z.number().int().min(1).safe(), landingTimeMs: z.number().int().min(1).safe(), settledTimeMs: z.number().int().min(2).safe() }).strict() }).strict();
 const groupEasing = z.object({ ...authorBase, kind: z.literal('motion.keyframe-group-easing.set'), payload: z.object({ targets, expectedEasing: timing, easing: timing }).strict() }).strict();
-const settledHold = z.object({ ...authorBase, kind: z.literal('motion.settled-hold.set'), payload: z.object({ targets, sourceTimeMs: z.number().int().min(1).max(2100), settledTimeMs: z.number().int().min(2).max(2099), landingTimeMs: z.number().int().min(1).max(2098), boundaryTimeMs: z.literal(2100) }).strict() }).strict();
+const settledHold = z.object({ ...authorBase, kind: z.literal('motion.settled-hold.set'), payload: z.object({ targets, sourceTimeMs: z.number().int().min(1).safe(), settledTimeMs: z.number().int().min(2).safe(), landingTimeMs: z.number().int().min(1).safe(), boundaryTimeMs: revision }).strict() }).strict();
 const history = z.object({ ...authorBase, kind: z.enum(['motion.history.undo', 'motion.history.redo']) }).strict();
 const cueSnapshot = z.object({ role: z.string().min(1), ordinal: z.number().int().nonnegative(), elementId: z.string().min(1),
   structuralFingerprint: z.string().min(1), contentKind: z.literal('text').optional() }).strict();
@@ -160,7 +160,7 @@ const intentPayload = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('motion.keyframe-group-easing.set'), elementIds: z.array(stableId).min(1),
     momentMs: revision, expectedEasing: timing, easing: timing }).strict(),
   z.object({ kind: z.literal('motion.settled-hold.set'), elementIds: z.array(stableId).min(1),
-    sourceTimeMs: revision, settledTimeMs: revision, landingTimeMs: revision, boundaryTimeMs: z.literal(2100) }).strict(),
+    sourceTimeMs: revision, settledTimeMs: revision, landingTimeMs: revision, boundaryTimeMs: revision }).strict(),
   z.object({ kind: z.literal('motion.cue.create'), creationKey: z.string().regex(/^[A-Za-z0-9._:-]{1,128}$/),
     semantic: sanitizedCueSemantic }).strict(),
   z.object({ kind: z.literal('motion.cue.update'), cueId, semantic: sanitizedCueSemantic }).strict(),
@@ -336,7 +336,9 @@ const inventorySchema = z.object({ ruleCount: revision, applicationCount: revisi
   supportedCount: revision, unsupportedCount: revision, missingCount: revision, diagnosticCodes: z.array(z.string().min(1)) }).strict();
 const workspaceSchema = z.object({ schemaVersion: z.literal('motion.workspace-projection.v1'), documentId: z.string().min(1),
   branchId, revision, canonicalDigest: digest, durationMs: revision, inventory: inventorySchema,
-  elements: z.array(z.object({ elementId: z.string().min(1) }).strict()),
+  elements: z.array(z.object({ elementId: z.string().min(1), label: z.string().min(1),
+    actions: z.array(z.object({ action: z.enum(['move', 'fade', 'reveal', 'type', 'hold', 'click', 'select', 'drag']),
+      available: z.boolean(), reason: z.string().nullable() }).strict()) }).strict()),
   tracks: z.array(z.object({ trackId: z.string().min(1), elementId: z.string().min(1), ruleId: z.string().min(1),
     slotId: z.string().min(1), property: z.string().min(1), interpolation: z.enum(['continuous', 'discrete', 'step']),
     cueId: z.string().nullable() }).strict()),
