@@ -118,7 +118,7 @@ export function mountProjectActions(root: HTMLElement): void {
     pause.querySelector('[data-pause-reason]')!.textContent = stale(pause) ? 'The shot changed. Discard this pause draft before choosing a new boundary.' : explanation(pauseEligibility.reason);
   };
   const render = () => {
-    if (editing && !authoring.value.document.cues.some(cue => cue.id === editing!.id)) { editing = null; selected = null; form.dataset.projectDraft = 'false'; }
+    if (editing && form.dataset.projectDraft !== 'true' && !authoring.value.document.cues.some(cue => cue.id === editing!.id)) { editing = null; selected = null; form.dataset.projectDraft = 'false'; }
     const items = projectAuthoringTargets(authoring.value.document); const previous = target.value;
     target.replaceChildren(...items.map(item => new Option(item.label, item.elementId))); target.value = items.some(item => item.elementId === previous) ? previous : items[0]?.elementId ?? '';
     lastTarget = target.value;

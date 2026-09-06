@@ -64,7 +64,8 @@ export function mountProjectEntry(options: {
     event.preventDefault(); if (admitting || options.pending()) return;
     // Do not create another document while its origin has an unapplied editing draft.
     if (options.dirty()) { feedback.value = 'Apply or discard the current shot’s editing draft before creating a shot.'; return; }
-    admitting = true; const button = form.querySelector('button')!; button.disabled = true;
+    admitting = true; const controls = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement>('input, select, textarea, button');
+    controls.forEach(control => { control.disabled = true; });
     try {
       const name = (form.elements.namedItem('shotName') as HTMLInputElement).value;
       const selectedSource = source.value === 'html-css' ? { kind: 'html-css' as const, html: html.value }
@@ -83,9 +84,12 @@ export function mountProjectEntry(options: {
         if (response.code === 'STALE_CATALOG_REVISION') { catalog = await options.client.catalog(); render(); }
         return;
       }
-      entryDirty = false; navigate(response.documentId);
+      catalog = await options.client.catalog(); render();
+      pendingCommand = null; entryDirty = false; admitting = false;
+      feedback.value = 'Shot created. Choose it from Current shot when you are ready.';
+      switchTo(response.documentId);
     } catch { feedback.value = 'Could not confirm creation. Retry with the same input to check that exact creation, or reload the shot list. Your input remains here.'; }
-    finally { admitting = false; button.disabled = false; }
+    finally { admitting = false; controls.forEach(control => { control.disabled = false; }); }
   });
   window.addEventListener('beforeunload', event => {
     if (!leaving && (options.pending() || admitting || options.dirty() || entryDirty)) { event.preventDefault(); }
