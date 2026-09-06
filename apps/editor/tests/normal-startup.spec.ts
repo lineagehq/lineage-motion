@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
-import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
+import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
+import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
@@ -10,9 +10,9 @@ type Running = { child: ChildProcess; editorUrl: string; serviceUrl: string; out
 let directory = ''; const running: Running[] = [];
 test.beforeEach(async () => { directory = await mkdtemp(join(tmpdir(), 'motion-normal-start-')); });
 test.afterEach(async () => { for (const app of running.splice(0)) await app.stop(); await rm(directory, { recursive: true, force: true }); });
-async function launch(project = 'My animation', extra: string[] = []): Promise<Running> {
+async function launch(project = 'My animation', extra: string[] = [], checkout = root): Promise<Running> {
   const child = spawn('npm', ['run', 'dev:editor', '--', '--data-dir', directory, '--project', project, '--port', '0', ...extra],
-    { cwd: root, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+    { cwd: checkout, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = ''; child.stdout!.on('data', (chunk) => { output += chunk.toString(); });
   child.stderr!.on('data', (chunk) => { output += chunk.toString(); });
   const stop = async () => {
@@ -45,6 +45,7 @@ test('ordinary command creates through public controls, survives restart, and is
   await page.locator('[data-create-track]').click();
   await expect(page.locator('[data-operation-status]')).toContainText('Revision 1');
   const status = await page.locator('[data-operation-status]').textContent(); expect(status).not.toContain('SERVICE_REQUIRED');
+  await page.screenshot({ path: test.info().outputPath('normal-created.png'), fullPage: true });
   const before = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
   const folders = await readdir(directory); const projects = await readdir(join(directory, folders[0]!));
   const session = join(directory, folders[0]!, projects[0]!, 'session.json');
@@ -88,4 +89,30 @@ test('missing service renders a retry screen without advertising saved edits', a
   await expect(page.locator('[data-create-track]')).toHaveCount(0);
   await page.unroute('**/api/v1/**'); await page.getByRole('button', { name: 'Retry connection' }).click();
   await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+});
+
+
+test('the same project name in a second worktree has independent storage', async ({ page, context }) => {
+  const checkout = join(directory, 'second-checkout');
+  execFileSync('git', ['worktree', 'add', '--detach', checkout, 'HEAD'], { cwd: root, stdio: 'ignore' });
+  try {
+    // Share installed dependencies only; app source and managed data identities remain separate.
+    await symlink(join(root, 'node_modules'), join(checkout, 'node_modules'), 'dir');
+    const first = await launch(); const second = await launch('My animation', [], checkout);
+    await page.goto(first.editorUrl); await page.getByRole('radio', { name: /Orb/ }).check();
+    await page.locator('[data-create-track]').click();
+    await expect(page.locator('[data-operation-status]')).toContainText('Revision 1');
+    const other = await context.newPage(); await other.goto(second.editorUrl);
+    await expect(other.locator('[data-editor-ready="true"]')).toBeVisible();
+    expect(await other.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(0);
+    await other.getByRole('radio', { name: /Orb/ }).check(); await other.locator('[data-create-track]').click();
+    await expect(other.locator('[data-operation-status]')).toContainText('Revision 1');
+    await page.reload(); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
+    expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
+    await page.close(); await other.close(); await first.stop(); await second.stop();
+  } finally {
+    for (const app of running) await app.stop();
+    await rm(join(checkout, 'node_modules'));
+    execFileSync('git', ['worktree', 'remove', checkout], { cwd: root, stdio: 'ignore' });
+  }
 });
