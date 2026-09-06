@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { unzipSync, strFromU8 } from 'fflate';
+import { unzipSync } from 'fflate';
 import { canonicalJson, sha256Hex } from '../../domain/src/index.ts';
 import { createExportArchive } from './export-archive.ts';
 import type { ExportBundle } from './export.ts';
@@ -7,14 +7,14 @@ import type { ExportBundle } from './export.ts';
 function bundle(): ExportBundle {
   const html = '<!doctype html><meta charset="utf-8"><style>p{color:blue}</style><p>Synthetic café</p>';
   const css = 'p{color:blue}';
-  const receipt: ExportBundle['receipt'] = { schemaVersion: 'motion.export-receipt.v1',
+  const receipt: ExportBundle['receipt'] = { schemaVersion: 'motion.export-receipt.v1', encoding: 'utf-8-bom',
     projectId: 'project', documentId: 'shot', branchId: 'main', revision: 0,
     canonicalDigest: sha256Hex('canonical'), sourceDigest: sha256Hex('source'),
-    exportDigest: sha256Hex(`${html}\0${css}`), htmlDigest: sha256Hex(html), cssDigest: sha256Hex(css),
+    exportDigest: sha256Hex(`${html}\0${css}`), htmlDigest: sha256Hex(`\uFEFF${html}`), cssDigest: sha256Hex(`\uFEFF${css}`),
     reducedMotionDigest: sha256Hex(''), inventory: { ruleCount: 0, applicationCount: 0, slotCount: 0,
       trackCount: 0, supportedCount: 0, unsupportedCount: 0, missingCount: 0 } };
   return { ok: true, schemaVersion: 'motion.export-bundle.v1', receipt,
-    files: { 'animation.html': html, 'animation.css': css, 'receipt.json': canonicalJson(receipt) } };
+    files: { 'animation.html': `\uFEFF${html}`, 'animation.css': `\uFEFF${css}`, 'receipt.json': canonicalJson(receipt) } };
 }
 
 test('archive preserves all UTF-8 artifact bytes with deterministic names and timestamps', () => {
@@ -22,7 +22,7 @@ test('archive preserves all UTF-8 artifact bytes with deterministic names and ti
   expect(archives[1]).toEqual(archives[0]); expect(archives[2]).toEqual(archives[0]);
   const files = unzipSync(archives[0]!);
   expect(Object.keys(files)).toEqual(['animation.html', 'animation.css', 'receipt.json']);
-  expect(Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, strFromU8(bytes)]))).toEqual(input.files);
+  expect(Object.fromEntries(Object.entries(files).map(([name, bytes]) => [name, Buffer.from(bytes).toString('utf8')]))).toEqual(input.files);
   const header = new DataView(archives[0]!.buffer);
   expect(header.getUint16(10, true)).toBe(0); // midnight
   expect(header.getUint16(12, true)).toBe(33); // 1980-01-01

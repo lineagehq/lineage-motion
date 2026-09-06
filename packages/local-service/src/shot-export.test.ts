@@ -30,8 +30,8 @@ test('human and agent exports agree byte-for-byte across three runs and a servic
   const baseline = await client(fixture.service).shot(input);
   expect(baseline.ok).toBe(true); if (!baseline.ok) throw new Error('EXPORT_FAILED');
   const compiled = compileMotionDocument(fixture.service.store.readHead(input.documentId)!.document);
-  expect(baseline.files['animation.html']).toBe(compiled.html);
-  expect(baseline.files['animation.css']).toBe(compiled.css);
+  expect(baseline.files['animation.html']).toBe(`\uFEFF${compiled.html}`);
+  expect(baseline.files['animation.css']).toBe(`\uFEFF${compiled.css}`);
   expect(baseline.files['receipt.json']).toBe(canonicalJson(baseline.receipt));
   expect(baseline.receipt.exportDigest).toBe(compiled.exportDigest);
   for (let run = 0; run < 3; run++) {

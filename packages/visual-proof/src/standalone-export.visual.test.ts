@@ -71,3 +71,49 @@ test('extracted HTML plays independently after service shutdown and matches nati
     expect(new Set(reducedHashes[0]).size).toBe(1);
   } finally { await browser.close(); await service?.close(); await rm(directory, { recursive: true, force: true }); }
 }, 60_000);
+
+test.each(['<meta charset="iso-8859-1">', '<meta http-equiv="Content-Type" content="text/html; charset=windows-1252">'])(
+  'standalone UTF-8 files preserve Unicode text despite source encoding %s', async meta => {
+    const unicode = source.replace('<head>', `<head>${meta}`)
+      .replace('<style>', '<style>@charset "iso-8859-1";\n#caption::after{content:" · Crème";}\n')
+      .replace('</body>', '<p id="caption">Café —</p></body>');
+    const directory = await mkdtemp(join(tmpdir(), 'motion-export-encoding-'));
+    let service: Awaited<ReturnType<typeof startLocalMotionService>> | undefined;
+    const browser = await chromium.launch();
+    try {
+      const imported = importMotionHtml(unicode);
+      expect(imported.inventory).toMatchObject({ unsupportedCount: 0, missingCount: 0 });
+      service = await startLocalMotionService({ databasePath: join(directory, 'project.sqlite'), seed: imported.document! });
+      const result = await new ExportServiceClient(service.url, { actor: 'human', capability: 'human-editor' }).shot({
+        schemaVersion: 'motion.export-request.v1', projectId: service.store.readProjectCatalog().projectId,
+        documentId: imported.document!.documentId, branchId: 'main', expectedRevision: 0 });
+      if (!result.ok) throw new Error('EXPORT_FAILED');
+      const path = join(directory, 'shot.zip'); await writeExportArtifact(path, result);
+      const files = unzipSync(await readFile(path));
+      for (const [name, bytes] of Object.entries(files)) await writeFile(join(directory, name), bytes);
+      // Exercise the separately delivered CSS as a real stylesheet byte stream too.
+      await writeFile(join(directory, 'reuse.html'), result.files['animation.html'].replace(/<style>[\s\S]*?<\/style>/g,
+        '<link rel="stylesheet" href="./animation.css">'));
+      expect(sha256Hex(files['animation.html']!)).toBe(result.receipt.htmlDigest);
+      expect(sha256Hex(files['animation.css']!)).toBe(result.receipt.cssDigest);
+      await service.close(); service = undefined;
+      for (const reducedMotion of ['no-preference', 'reduce'] as const) {
+        const context = await browser.newContext({ viewport: { width: 200, height: 100 }, reducedMotion });
+        try {
+          const baseline = await context.newPage(); await baseline.setContent(unicode);
+          for (const filename of ['animation.html', 'reuse.html']) {
+            const page = await context.newPage(); await page.goto(pathToFileURL(join(directory, filename)).href);
+            expect(await page.evaluate(() => document.characterSet)).toBe('UTF-8');
+            expect(await page.locator('#caption').textContent()).toBe('Café —');
+            expect(await page.locator('#caption').evaluate(element => getComputedStyle(element, '::after').content)).toBe('" · Crème"');
+            for (const current of [baseline, page]) await current.evaluate(() => {
+              for (const animation of document.getAnimations()) { animation.pause(); animation.currentTime = 500; }
+            });
+            expect(sha256Hex(await page.screenshot({ animations: 'allow' })))
+              .toBe(sha256Hex(await baseline.screenshot({ animations: 'allow' })));
+            await page.close();
+          }
+        } finally { await context.close(); }
+      }
+    } finally { await browser.close(); await service?.close(); await rm(directory, { recursive: true, force: true }); }
+  }, 20_000);

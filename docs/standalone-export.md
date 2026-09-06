@@ -21,7 +21,10 @@ overwritten. The browser handles its own download filenames and destination.
 Unzip the archive and open **animation.html** in a browser. It includes its CSS
 and plays without the editor or local service. **animation.css** is an identical
 copy of the compiled stylesheet for inspection or reuse; the HTML does not need
-to fetch that separate file. **receipt.json** records the project, shot, branch,
+to fetch that separate file. Both files have a UTF-8 byte-order mark so imported
+legacy encoding declarations cannot corrupt text. File digests include that
+encoding marker; the compiler export digest identifies the underlying compiled
+HTML/CSS before the marker. **receipt.json** records the project, shot, branch,
 revision, content hashes and animation inventory. Equal committed content and
 identity produce identical archive bytes across UI/CLI runs and service restarts.
 Browser reduced-motion preferences use the same compiled rules shown in the editor.

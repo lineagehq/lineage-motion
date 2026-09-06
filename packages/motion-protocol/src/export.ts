@@ -8,7 +8,7 @@ const digest = z.string().regex(/^[a-f0-9]{64}$/);
 export const exportRequestSchema = z.object({ schemaVersion: z.literal('motion.export-request.v1'),
   projectId: identity, documentId: identity, branchId: identity, expectedRevision: revision }).strict();
 export type ExportRequest = z.infer<typeof exportRequestSchema>;
-const receiptSchema = z.object({ schemaVersion: z.literal('motion.export-receipt.v1'),
+const receiptSchema = z.object({ schemaVersion: z.literal('motion.export-receipt.v1'), encoding: z.literal('utf-8-bom'),
   projectId: identity, documentId: identity, branchId: identity, revision,
   canonicalDigest: digest, sourceDigest: digest, exportDigest: digest,
   htmlDigest: digest, cssDigest: digest, reducedMotionDigest: digest,
@@ -35,7 +35,8 @@ export function parseExportResponse(value: unknown, request: ExportRequest): Exp
     || receipt.branchId !== request.branchId || receipt.revision !== request.expectedRevision
     || sha256Hex(files['animation.html']) !== receipt.htmlDigest
     || sha256Hex(files['animation.css']) !== receipt.cssDigest
-    || sha256Hex(`${files['animation.html']}\0${files['animation.css']}`) !== receipt.exportDigest
+    || !files['animation.html'].startsWith('\uFEFF') || !files['animation.css'].startsWith('\uFEFF')
+    || sha256Hex(`${files['animation.html'].slice(1)}\0${files['animation.css'].slice(1)}`) !== receipt.exportDigest
     || canonicalJson(receipt) !== files['receipt.json']) throw new Error('EXPORT_RESPONSE_MISMATCH');
   return result;
 }

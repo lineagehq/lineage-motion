@@ -6,7 +6,7 @@ vi.mock('node:fs/promises', async importOriginal => {
 import { mkdtemp, readFile, readdir, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { unzipSync, strFromU8 } from 'fflate';
+import { unzipSync } from 'fflate';
 import { sha256Hex } from '../../domain/src/index.ts';
 import { exportShot } from '../../local-service/src/shot-export.ts';
 import { startLocalMotionService } from '../../local-service/src/index.ts';
@@ -28,7 +28,7 @@ test('publishes complete artifact bytes once and cannot overwrite files or symli
   const receipt = await writeExportArtifact(destination, bundle);
   const bytes = await readFile(destination);
   expect(receipt.archiveDigest).toBe(sha256Hex(bytes));
-  expect(Object.fromEntries(Object.entries(unzipSync(bytes)).map(([name, data]) => [name, strFromU8(data)]))).toEqual(bundle.files);
+  expect(Object.fromEntries(Object.entries(unzipSync(bytes)).map(([name, data]) => [name, Buffer.from(data).toString('utf8')]))).toEqual(bundle.files);
   await expect(writeExportArtifact(destination, bundle)).rejects.toThrow('EXPORT_OUTPUT_EXISTS');
   expect(await readFile(destination)).toEqual(bytes);
   const protectedFile = join(directory, 'keep.txt'); await writeFile(protectedFile, 'Keep this content');

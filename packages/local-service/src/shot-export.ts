@@ -20,12 +20,14 @@ export function exportShot(store: ProjectStore, input: unknown): ExportResponse 
   let compiled;
   try { compiled = compileMotionDocument(document); }
   catch { return { ok: false, code: 'EXPORT_UNSUPPORTED' }; }
-  const receipt: ExportReceipt = { schemaVersion: 'motion.export-receipt.v1', projectId: request.projectId,
+  // A byte-order mark overrides legacy source charset declarations for standalone files.
+  const html = `\uFEFF${compiled.html}`; const css = `\uFEFF${compiled.css}`;
+  const receipt: ExportReceipt = { schemaVersion: 'motion.export-receipt.v1', encoding: 'utf-8-bom', projectId: request.projectId,
     documentId: document.documentId, branchId: request.branchId, revision: document.revision,
     canonicalDigest: snapshot.canonicalDigest, sourceDigest: inventory.sourceDigest, exportDigest: compiled.exportDigest,
-    htmlDigest: sha256Hex(compiled.html), cssDigest: sha256Hex(compiled.css), reducedMotionDigest: sha256Hex(document.reducedMotion.css),
+    htmlDigest: sha256Hex(html), cssDigest: sha256Hex(css), reducedMotionDigest: sha256Hex(document.reducedMotion.css),
     inventory: { ruleCount: inventory.ruleCount, applicationCount: inventory.applicationCount, slotCount: inventory.slotCount,
       trackCount: inventory.trackCount, supportedCount: inventory.supportedCount, unsupportedCount: 0, missingCount: 0 } };
   return { ok: true, schemaVersion: 'motion.export-bundle.v1', receipt,
-    files: { 'animation.html': compiled.html, 'animation.css': compiled.css, 'receipt.json': canonicalJson(receipt) } };
+    files: { 'animation.html': html, 'animation.css': css, 'receipt.json': canonicalJson(receipt) } };
 }
