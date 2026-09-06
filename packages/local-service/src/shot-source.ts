@@ -1,4 +1,4 @@
-import { admitShotTargets } from './shot-targets.ts';
+import { admitShotTargets, ShotStaticBindingConflict } from './shot-targets.ts';
 import { canonicalJson, sha256Hex, validateMotionDocument, type MotionDocument } from '../../domain/src/index.ts';
 import { compileMotionDocument } from '../../css-compiler/src/index.ts';
 import { importMotionHtml } from '../../css-import/src/index.ts';
@@ -14,7 +14,14 @@ export function prepareShot(command: ShotAdmissionCommand): PreparedShot | ShotA
     document = imported.document;
   } else document = command.source.starterId === 'trajectory' ? createTrajectorySeed() : createPhase4ReusableCueSeed();
   // Source binding identities remain scoped to the new document; only its instance identity changes.
-  document = admitShotTargets({ ...document, documentId: command.documentId, revision: 0 });
+  try { document = admitShotTargets({ ...document, documentId: command.documentId, revision: 0 }); }
+  catch (error) {
+    if (!(error instanceof ShotStaticBindingConflict)) throw error;
+    const diagnosticCode = 'SHOT_STATIC_BINDING_CONFLICT';
+    return { ok: false, code: 'IMPORT_REJECTED', diagnosticCode, inventory: { ...document.inventory,
+      unsupportedCount: document.inventory.unsupportedCount + 1,
+      diagnosticCodes: [...document.inventory.diagnosticCodes, diagnosticCode] } };
+  }
   if (!validateMotionDocument(document).ok) return { ok: false, code: 'IMPORT_REJECTED', diagnosticCode: 'SHOT_DOCUMENT_INVALID', inventory: document.inventory };
   try { const compiled = compileMotionDocument(document);
     return { document, canonicalDigest: sha256Hex(canonicalJson(document)), exportDigest: compiled.exportDigest, inventory: document.inventory };

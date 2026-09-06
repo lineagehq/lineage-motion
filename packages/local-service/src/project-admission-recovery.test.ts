@@ -7,7 +7,7 @@ import { MIGRATIONS } from './migrations.ts';
 import { phase3Command, phase3Seed, temporaryStore } from './test-support.ts';
 import type { ShotAdmissionCommand } from '../../motion-protocol/src/project.ts';
 const human = { actor: 'human' as const, capability: 'human-editor', now: 1000 };
-const agent = { actor: 'agent' as const, capability: 'cli-agent', claimSecret: 'synthetic-claim-secret'.repeat(3), now: 1000 };
+const agent = { actor: 'agent' as const, capability: 'cli-agent', claimSecret: 'r'.repeat(64), now: 1000 };
 function command(store: SqliteProjectStore, claimed = false): ShotAdmissionCommand {
   return { protocolVersion: 'motion.project-protocol.v1', kind: 'motion.shot.admit', operationId: 'admit-recovery',
     projectId: store.readProjectCatalog().projectId, expectedCatalogRevision: 0, documentId: 'recovery_shot', name: 'Recovered',

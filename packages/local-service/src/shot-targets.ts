@@ -5,6 +5,9 @@ import { adapter as treeAdapter } from 'parse5-htmlparser2-tree-adapter';
 import { deriveElementId, type MotionDocument } from '../../domain/src/index.ts';
 import { fingerprint } from '../../css-import/src/import-utilities.ts';
 type Target = MotionDocument['elements'][number] & { label?: string };
+export class ShotStaticBindingConflict extends Error {
+  constructor() { super('SHOT_STATIC_BINDING_CONFLICT'); }
+}
 /** Admit visible body targets without changing source selectors or animation inventories. */
 export function admitShotTargets(document: MotionDocument): MotionDocument {
   const dom = parse(document.presentation.html, { treeAdapter }) as unknown as ParentNode;
@@ -28,6 +31,8 @@ export function admitShotTargets(document: MotionDocument): MotionDocument {
       .replace(/\s+/g, ' ').trim().slice(0, 160);
     if (label) target.label = label;
     if (leaf && text.length > 0) target.editableText = text;
+    const sourceBinding = node.attribs['data-motion-id'];
+    if (sourceBinding !== undefined && sourceBinding !== target.id) throw new ShotStaticBindingConflict();
     node.attribs['data-motion-id'] = target.id;
   }
   return { ...document, elements, presentation: { ...document.presentation, html: serialize(dom, { treeAdapter }) } };

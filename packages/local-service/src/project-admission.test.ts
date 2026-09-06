@@ -56,7 +56,7 @@ test('rejects unsupported/missing animation imports explicitly and leaves every 
   }
 });
 test('enforces stale catalog, project, identity and exact private retry boundaries atomically', async () => {
-  const service = await setup(); const agent = client(service, 'agent'); const secret = 'synthetic-secret-'.repeat(4);
+  const service = await setup(); const agent = client(service, 'agent'); const secret = 's'.repeat(64);
   const input = await command(service, { claim: { scope: 'document', documentId: 'shot_one' } });
   const result = await agent.admit(input, secret); expect(result).toMatchObject({ ok: true, claim: { leaseVersion: 1, scope: 'document' } });
   const before = service.store.snapshot();
@@ -102,7 +102,7 @@ test('newly authored source admits labelled static text and arbitrary-duration t
   const outputs = [0, 1, 2].map(() => compileMotionDocument(document)); expect(outputs[1]).toEqual(outputs[0]); expect(outputs[2]).toEqual(outputs[0]);
 });
 test('admission creates a usable bounded agent claim; missing and wrong secrets cannot author the new shot', async () => {
-  const service = await setup(); const secret = 'usable-claim-'.repeat(4);
+  const service = await setup(); const secret = 'u'.repeat(64);
   const html = readFileSync(new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8');
   const input = await command(service, { source: { kind: 'html-css', html }, claim: { scope: 'document', documentId: 'shot_one' } });
   expect(await client(service, 'agent').admit(input, secret)).toMatchObject({ ok: true });
@@ -126,4 +126,23 @@ test('authenticates catalog/admission and rejects malformed commands without all
     expect(response.status).toBe(422); expect(await response.json()).toEqual({ ok: false, code: 'VALIDATION', diagnosticCode: 'PROJECT_COMMAND_INVALID' });
     expect(service.store.snapshot()).toEqual(before);
   }
+});
+test('rejects static source binding conflicts atomically and permits a corrected retry without reserved identity', async () => {
+  const service = await setup(); const agent = client(service, 'agent'); const secret = 'b'.repeat(64);
+  const html = '<style>[data-motion-id="caption-source"]{color:red}.comet{animation:fly 1s linear}'
+    + '@keyframes fly{from{opacity:0}to{opacity:1}}</style>'
+    + '<main><div class="comet"></div><p data-motion-id="caption-source">Synthetic caption</p></main>';
+  const input = await command(service, { source: { kind: 'html-css', html }, claim: { scope: 'document', documentId: 'shot_one' } });
+  const before = service.store.snapshot(); const catalog = await agent.catalog();
+  const rejected = await agent.admit(input, secret);
+  expect(rejected).toMatchObject({ ok: false, code: 'IMPORT_REJECTED', diagnosticCode: 'SHOT_STATIC_BINDING_CONFLICT',
+    inventory: { ruleCount: 1, applicationCount: 1, slotCount: 1, trackCount: 1, missingCount: 0,
+      unsupportedCount: 1, diagnosticCodes: expect.arrayContaining(['SHOT_STATIC_BINDING_CONFLICT']) } });
+  expect(await agent.admit(input, secret)).toEqual(rejected);
+  expect(service.store.snapshot()).toEqual(before); expect(await agent.catalog()).toEqual(catalog);
+  expect(service.store.readHead(input.documentId)).toBeNull(); expect(service.store.listActiveClaims(input.documentId, Date.now())).toBeNull();
+  const corrected = html.replaceAll('data-motion-id="caption-source"', 'id="caption-source"');
+  const accepted = await agent.admit({ ...input, source: { kind: 'html-css', html: corrected } }, secret);
+  expect(accepted).toMatchObject({ ok: true, catalogRevision: 1, claim: { leaseVersion: 1 } });
+  expect(service.store.listActiveClaims(input.documentId, Date.now())?.claims).toHaveLength(1);
 });
