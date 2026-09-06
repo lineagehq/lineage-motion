@@ -31,9 +31,9 @@ try {
       // Independent leaves share immutable source, while each service test owns
       // isolated data. Await every result: no failed child can become a green push.
       const selections = [['--tier', 'fast'], ...selectPushSuites(paths).map((suite) => ['--suite', suite])];
-      const results = await Promise.all(selections.map((selection) =>
+      const results = await Promise.allSettled(selections.map((selection) =>
         run('node', ['scripts/run-verification.mjs', ...selection], snapshot)));
-      return results.every((code) => code === 0);
+      return results.every((result) => result.status === 'fulfilled' && result.value === 0);
     });
     if (!passed) throw new Error(`Verification failed for pushed commit ${tip}.`);
   }
