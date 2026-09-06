@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { expect, test } from './test-fixture.ts';
+import { spawnTestServer, waitForTestServer, stopTestServer } from './test-server.ts';
+import { type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,26 +15,15 @@ const agentCapability = randomBytes(32).toString('base64url');
 
 test.beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'motion-replay-'));
-  child = spawn(process.execPath, ['--import', 'tsx', 'apps/editor/scripts/serve-editor.mjs'], {
+  child = spawnTestServer(process.execPath, ['--import', 'tsx', 'apps/editor/scripts/serve-editor.mjs'], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'),
       PHASE3_EDITOR_PORT: '0', PHASE4_REUSABLE_CUES: '1', PHASE3_HUMAN_CAPABILITY: humanCapability,
       PHASE3_AGENT_CAPABILITY: agentCapability }, stdio: ['ignore', 'pipe', 'pipe'],
   });
-  ({ editorUrl, serviceUrl } = await new Promise<{ editorUrl: string; serviceUrl: string }>((resolveReady, reject) => {
-    let output = ''; const timer = setTimeout(() => reject(new Error('REPLAY_SERVER_TIMEOUT')), 10000);
-    child.once('error', (error) => { clearTimeout(timer); reject(error); });
-    child.once('exit', (code) => { clearTimeout(timer); reject(new Error(`REPLAY_SERVER_EXIT_${code}`)); });
-    child.stdout!.on('data', (chunk) => {
-      output += chunk.toString(); const line = output.split('\n').find((value) => value.startsWith('{'));
-      if (line) { clearTimeout(timer); resolveReady(JSON.parse(line)); }
-    });
-  }));
+  ({ editorUrl, serviceUrl } = await waitForTestServer(child));
 });
 test.afterAll(async () => {
-  if (child?.exitCode === null) {
-    const exited = new Promise<void>((resolveExit) => child.once('exit', () => resolveExit()));
-    child.kill('SIGTERM'); await exited;
-  }
+  await stopTestServer(child);
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
