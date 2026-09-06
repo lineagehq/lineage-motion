@@ -82,9 +82,11 @@ export const verificationSuites = {
   determinism: vitest([
     'packages/css-compiler/src/determinism.test.ts',
   ]),
-  'public-visual': vitest([
+  'public-visual-preprocessor': vitest([
     'packages/browser-resolved-preprocessor/src/acquisition.visual.test.ts',
     'packages/browser-resolved-preprocessor/src/conformance.visual.test.ts',
+  ], { args: ['--maxWorkers=1'] }),
+  'public-visual-proof': vitest([
     'packages/visual-proof/src/animation-longhands-reduced-motion.visual.test.ts',
     'packages/visual-proof/src/authoring.visual.test.ts',
     'packages/visual-proof/src/cursor-click-reveal.visual.test.ts',
@@ -137,19 +139,21 @@ export const verificationTiers = {
   pr: [
     'line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
-    'public-visual', 'browser', 'typecheck', 'build', 'privacy-checks',
+    'public-visual-preprocessor', 'public-visual-proof', 'browser', 'typecheck', 'build', 'privacy-checks',
   ],
   full: [
     'line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
-    'public-visual', 'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
+    'public-visual-preprocessor', 'public-visual-proof',
+    'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
     'private-acceptance', 'typecheck', 'build',
     'privacy-checks',
   ],
   phase3: [
     'line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
-    'public-visual', 'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
+    'public-visual-preprocessor', 'public-visual-proof',
+    'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
     'typecheck', 'build', 'privacy-checks',
   ],
   'qa:chrome': ['chrome-editor', 'chrome-spatial', 'chrome-landing'],
