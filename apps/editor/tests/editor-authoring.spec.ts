@@ -42,13 +42,37 @@ test('selects Cursor by pointer and creates a distinct deterministic contained b
   expect(after.selectedCreationElementId).toBe('el_a2849ff826f3e167');
   expect(after.contentDigest).not.toBe(before.contentDigest);
   await expect(page.locator('[data-element-id="el_a2849ff826f3e167"][data-property="opacity"]')).toHaveCount(1);
-  await expect(page.getByRole('radio', { name: /Orb/ })).toBeDisabled();
+  await expect(page.getByRole('radio', { name: /Orb/ })).toBeEnabled();
   expect(await page.evaluate(() => {
     const iframe = document.querySelector<HTMLIFrameElement>('[data-preview]')!;
     const target = iframe.contentDocument!.querySelector('[data-motion-id="el_a2849ff826f3e167"]');
     return iframe.srcdoc === window.__motionEditor.compiledHtml && target !== null
       && iframe.contentDocument!.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
   })).toBe(true);
+});
+
+test('edits the selected object when two independently created tracks exist', async ({ page }) => {
+  await page.goto(editorUrl);
+  await page.getByRole('radio', { name: /Cursor/ }).check();
+  await page.getByRole('button', { name: 'Create Cursor opacity track' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 1');
+  await page.getByRole('radio', { name: /Orb/ }).check();
+  await page.getByRole('button', { name: 'Create Orb opacity track' }).click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 2');
+  await page.locator('[data-duration]').fill('1500');
+  await page.locator('[data-set-duration]').click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 3');
+  await page.getByRole('radio', { name: /Cursor/ }).check();
+  await expect(page.locator('[data-duration]')).toHaveValue('1000');
+  await page.getByRole('radio', { name: /Orb/ }).check();
+  await expect(page.locator('[data-duration]')).toHaveValue('1500');
+  await page.getByRole('button', { name: 'Undo', exact: true }).click();
+  await expect(page.locator('[data-duration]')).toHaveValue('1000');
+  await page.getByRole('button', { name: 'Redo', exact: true }).click();
+  await expect(page.locator('[data-duration]')).toHaveValue('1500');
+  await page.reload();
+  await page.getByRole('radio', { name: /Orb/ }).check();
+  await expect(page.locator('[data-duration]')).toHaveValue('1500');
 });
 
 test('retains a rejected creation draft and clears it only after accepted application', async ({ page }) => {

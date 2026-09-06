@@ -45,9 +45,9 @@ describe('motion.workspace-projection.v1', () => {
     expect(heldProjection.eligibility.find((item) => item.kind === 'motion.cue.create'))
       .toEqual({ kind: 'motion.cue.create', eligible: false, reasonCode: 'AUTHORING_HOLD_LOCKED' });
     expect(heldProjection.eligibility.find((item) => item.kind === 'motion.history.undo'))
-      .toEqual({ kind: 'motion.history.undo', eligible: false, reasonCode: 'AUTHORING_HOLD_LOCKED' });
+      .toEqual({ kind: 'motion.history.undo', eligible: true, reasonCode: null });
     expect(heldProjection.eligibility.find((item) => item.kind === 'motion.history.redo'))
-      .toEqual({ kind: 'motion.history.redo', eligible: false, reasonCode: 'AUTHORING_HOLD_LOCKED' });
+      .toEqual({ kind: 'motion.history.redo', eligible: true, reasonCode: null });
     expect(heldProjection.eligibility.find((item) => item.kind === 'motion.hold.insert'))
       .toEqual({ kind: 'motion.hold.insert', eligible: false, reasonCode: 'AUTHORING_HOLD_COLLISION' });
   });

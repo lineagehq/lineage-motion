@@ -21,7 +21,7 @@ export type OperationIntentPayload =
   | { kind: 'motion.keyframe-group-easing.set'; elementIds: string[]; momentMs: number;
     expectedEasing: TimingFunction; easing: TimingFunction }
   | { kind: 'motion.settled-hold.set'; elementIds: string[]; sourceTimeMs: number; settledTimeMs: number;
-    landingTimeMs: number; boundaryTimeMs: 2100 }
+    landingTimeMs: number; boundaryTimeMs: number }
   | { kind: 'motion.cue.create'; creationKey: string; semantic: CueSemantic }
   | { kind: 'motion.cue.update'; cueId: string; semantic: CueSemantic }
   | { kind: 'motion.cue.delete' | 'motion.cue.detach'; cueId: string };

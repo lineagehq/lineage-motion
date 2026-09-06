@@ -21,7 +21,7 @@ export type HistoryOperation = OperationEnvelope & {
 };
 export type TrackCreateOperation = OperationEnvelope & {
   kind: 'motion.track.create'; elementId: StructuralAuthoringElementId;
-  payload: { property: 'opacity'; durationMs: 1000; delayMs: 610; easing: 'linear'; startValue: 0; endValue: 1 };
+  payload: { property: 'opacity'; durationMs: number; delayMs: number; easing: 'linear'; startValue: number; endValue: number };
 };
 export type KeyframeAddOperation = OperationEnvelope & {
   kind: 'motion.keyframe.add'; elementId: StructuralAuthoringElementId;
@@ -44,7 +44,7 @@ export type SlotEasingSetOperation = OperationEnvelope & {
   trackId: string; payload: { easing: 'linear' | 'ease-in-out' };
 };
 export type HoldInsertOperation = OperationEnvelope & {
-  kind: 'motion.hold.insert'; payload: { cueId: 'cue_pair'; durationMs: 600 };
+  kind: 'motion.hold.insert'; payload: { cueId: string; durationMs: number };
 };
 export type TransformPose = {
   translateXMicrounits: number;
@@ -92,7 +92,7 @@ export type KeyframeGroupEasingSetOperation = OperationEnvelope & {
 };
 export type SettledHoldSetOperation = OperationEnvelope & {
   kind: 'motion.settled-hold.set';
-  payload: { targets: TrajectoryTarget[]; sourceTimeMs: number; settledTimeMs: number; landingTimeMs: number; boundaryTimeMs: 2100 };
+  payload: { targets: TrajectoryTarget[]; sourceTimeMs: number; settledTimeMs: number; landingTimeMs: number; boundaryTimeMs: number };
 };
 export type CueCreateOperation = OperationEnvelope & {
   kind: 'motion.cue.create';

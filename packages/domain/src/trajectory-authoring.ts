@@ -104,18 +104,20 @@ export function projectShotWorkspace(document: MotionDocument, config: ShotWorks
   eligible: boolean; code: string | null; startMs: number; landedMs: number; settledMs: number;
   trajectories: TransformTrajectoryProjection[]; continuityTimesMs: number[];
 } {
-  if (!exactShotConfig(config) || config.startMs !== 0 || config.landedMs !== 700 || config.settledMs !== 2100
-    || config.targetElementIds.length !== 2 || new Set(config.targetElementIds).size !== 2) {
+  if (!exactShotConfig(config) || !Number.isSafeInteger(config.startMs) || !Number.isSafeInteger(config.landedMs)
+    || !Number.isSafeInteger(config.settledMs) || config.startMs < 0 || config.startMs >= config.landedMs
+    || config.landedMs >= config.settledMs || config.settledMs > document.durationMs
+    || config.targetElementIds.length === 0 || new Set(config.targetElementIds).size !== config.targetElementIds.length) {
     return { eligible: false, code: 'SHOT_CONFIG_INVALID', startMs: config.startMs, landedMs: config.landedMs, settledMs: config.settledMs, trajectories: [], continuityTimesMs: [] };
   }
   const trajectories = config.targetElementIds.map((id) => projectTransformTrajectory(document, id));
   if (trajectories.some((item) => !item.eligible)) return { eligible: false, code: 'SHOT_TARGET_INELIGIBLE', ...config, trajectories, continuityTimesMs: [] };
-  if (trajectories.some((item) => item.eligible && ![0, 700, 2100].every((time) => item.waypoints.some((point) => point.timeMs === time)))) {
+  if (trajectories.some((item) => item.eligible && ![config.startMs, config.landedMs, config.settledMs].every((time) => item.waypoints.some((point) => point.timeMs === time)))) {
     return { eligible: false, code: 'SHOT_BOUNDARY_KEYFRAME_MISSING', ...config, trajectories, continuityTimesMs: [] };
   }
   return { eligible: true, code: null, ...config, trajectories,
     continuityTimesMs: [...new Set(document.cues.filter((cue): cue is TimelineCue => cue.schemaVersion === 'motion.cue.v1')
-      .map((cue) => cue.timeMs).filter((time) => time > 2100).concat(document.durationMs > 2100 ? [2101] : []))].sort((a, b) => a - b) };
+      .map((cue) => cue.timeMs).filter((time) => time > config.settledMs).concat(document.durationMs > config.settledMs ? [config.settledMs + 1] : []))].sort((a, b) => a - b) };
 }
 
 export function projectTrajectorySelection(document: MotionDocument, orderedElementIds: string[], momentMs: number): {
@@ -141,7 +143,7 @@ export function applyTrajectoryOperation(document: MotionDocument, operation: Tr
   if (operation.kind === 'motion.transform-waypoint.add') {
     const { targets, timeMs } = operation.payload;
     if (!validTrajectoryInsertionTargets(targets) || !completeTrajectoryInsertionBundle(next, targets)
-      || !Number.isSafeInteger(timeMs) || timeMs <= 0 || timeMs >= 2100) {
+      || !Number.isSafeInteger(timeMs) || timeMs <= 0 || timeMs >= document.durationMs) {
       return { ok: false, code: 'AUTHORING_TRAJECTORY_INSERT_INVALID' };
     }
     for (const target of targets) {
@@ -209,7 +211,7 @@ export function applyTrajectoryOperation(document: MotionDocument, operation: Tr
   const entries = resolved as NonNullable<ReturnType<typeof resolveTrajectoryTarget>>[];
   if (operation.kind === 'motion.transform-waypoint.remove') {
     const { timeMs } = operation.payload;
-    if (!Number.isSafeInteger(timeMs) || timeMs <= 0 || timeMs >= 2100
+    if (!Number.isSafeInteger(timeMs) || timeMs <= 0 || timeMs >= document.durationMs
       || !completeTrajectoryMomentBundle(next, entries, timeMs)) {
       return { ok: false, code: 'AUTHORING_TRAJECTORY_REMOVE_INVALID' };
     }
@@ -240,7 +242,7 @@ export function applyTrajectoryOperation(document: MotionDocument, operation: Tr
   } else if (operation.kind === 'motion.keyframe-group-time.set') {
     const { sourceTimeMs, targetTimeMs, landingTimeMs, settledTimeMs } = operation.payload;
     if (![sourceTimeMs, targetTimeMs, landingTimeMs, settledTimeMs].every(Number.isSafeInteger)
-      || targetTimeMs < 1 || targetTimeMs > 2100 || landingTimeMs < 1 || landingTimeMs >= settledTimeMs || settledTimeMs > 2100
+      || targetTimeMs < 1 || targetTimeMs > document.durationMs || landingTimeMs < 1 || landingTimeMs >= settledTimeMs || settledTimeMs > document.durationMs
       || sourceTimeMs === targetTimeMs) return { ok: false, code: 'AUTHORING_TRAJECTORY_TIME_INVALID' };
     if (!completeTrajectoryMomentBundle(next, entries, sourceTimeMs)) return { ok: false, code: 'AUTHORING_TRAJECTORY_BUNDLE_INCOMPLETE' };
     for (const entry of uniqueRuleEntries(entries)) { if (entry.timeMs !== sourceTimeMs) return { ok: false, code: 'AUTHORING_TRAJECTORY_TIME_STALE' };
@@ -256,14 +258,14 @@ export function applyTrajectoryOperation(document: MotionDocument, operation: Tr
     for (const entry of uniqueRuleEntries(entries)) { if (canonicalJson(entry.keyframe.easing ?? entry.slot.timingFunction) !== canonicalJson(expected)) return { ok: false, code: 'AUTHORING_TRAJECTORY_EASING_STALE' }; entry.keyframe.easing = easing; }
   } else {
     const { sourceTimeMs, settledTimeMs, landingTimeMs, boundaryTimeMs } = operation.payload;
-    if (boundaryTimeMs !== 2100 || !Number.isSafeInteger(settledTimeMs) || settledTimeMs <= landingTimeMs || settledTimeMs >= 2100 || sourceTimeMs !== 2100
+    if (!Number.isSafeInteger(boundaryTimeMs) || boundaryTimeMs > document.durationMs || !Number.isSafeInteger(settledTimeMs) || settledTimeMs <= landingTimeMs || settledTimeMs >= boundaryTimeMs || sourceTimeMs !== boundaryTimeMs
       || !completeTrajectoryMomentBundle(next, entries, sourceTimeMs)) return { ok: false, code: 'AUTHORING_TRAJECTORY_HOLD_INVALID' };
     for (const entry of uniqueRuleEntries(entries)) {
       const projectedTimes = projectTrajectoryKeyframeTimes(entry.ruleTrack, entry.delayMs,
         entry.slot.durationMs, next.durationMs);
       if (!projectedTimes || entry.timeMs !== sourceTimeMs
         || entry.ruleTrack.keyframes.some((frame) => { const time = projectedTimes.get(frame.id)!;
-          return time > settledTimeMs && time < 2100; })) return { ok: false, code: 'AUTHORING_TRAJECTORY_HOLD_COLLISION' };
+          return time > settledTimeMs && time < boundaryTimeMs; })) return { ok: false, code: 'AUTHORING_TRAJECTORY_HOLD_COLLISION' };
       const settledOffset = trajectoryOffsetForTime(settledTimeMs, entry.delayMs, entry.slot.durationMs);
       const boundaryOffset = trajectoryOffsetForTime(boundaryTimeMs, entry.delayMs, entry.slot.durationMs);
       if (settledOffset === null || boundaryOffset === null || settledOffset <= 0 || settledOffset >= 1) {
