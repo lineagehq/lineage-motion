@@ -36,7 +36,7 @@ try {
     process.env.PHASE3_AGENT_CAPABILITY = randomBytes(32).toString('base64url');
     for (const key of ['PHASE4_REUSABLE_CUES', 'PHASE4_CURSOR_CLICK_REVEAL', 'LANDING_SHOT1_WORKSPACE', 'PHASE3_SERVICE_URL']) delete process.env[key];
     process.env.MOTION_PROJECT_NAME = project;
-    const { launchEditor } = await import('./serve-editor.mjs');
+    const { launchEditor } = await import('./editor-server.mjs');
     await launchEditor({ onReady: (addresses) => {
       const contextPath = join(directory, 'session.json');
       writeFileSync(contextPath, JSON.stringify({ schemaVersion: 'motion.local-session.v1', project,
