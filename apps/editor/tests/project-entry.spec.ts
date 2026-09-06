@@ -40,11 +40,15 @@ test('normal project creates and imports named shots, preserves exact routing, a
   await page.getByLabel('Shot name', { exact: true }).fill('Comet arrival');
   await page.getByLabel('Starting point').selectOption('html-css');
   await page.getByLabel('Self-contained HTML and CSS').fill(source);
-  const admission = page.waitForResponse(response => response.url().endsWith('/api/project/v1/shots'));
+  let receipt: Record<string, unknown> | undefined;
+  await page.route('**/api/project/v1/shots', async route => {
+    const response = await route.fetch(); receipt = await response.json();
+    await route.fulfill({ response });
+  });
   await page.getByRole('button', { name: 'Create shot', exact: true }).click();
-  const receipt = await (await admission).json();
+  await expect.poll(() => receipt).toBeDefined();
   expect(receipt).toMatchObject({ ok: true, inventory: { trackCount: 1, unsupportedCount: 0, missingCount: 0 } });
-  for (const digest of [receipt.sourceDigest, receipt.canonicalDigest, receipt.exportDigest]) expect(digest).toMatch(/^[a-f0-9]{64}$/);
+  for (const digest of [receipt!.sourceDigest, receipt!.canonicalDigest, receipt!.exportDigest]) expect(digest).toMatch(/^[a-f0-9]{64}$/);
   await expect(page.locator('[data-project-shot] option:checked')).toHaveText('Comet arrival');
   await expect(page.locator('[data-action-target] option')).toHaveText(['Mission caption', 'Violet comet']);
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(0);
