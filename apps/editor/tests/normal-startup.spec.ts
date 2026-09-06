@@ -1,3 +1,4 @@
+import { launcherShutdown } from './launcher-shutdown.ts';
 import { expect, test } from '@playwright/test';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
@@ -16,15 +17,8 @@ async function launch(project = 'My animation', extra: string[] = [], checkout =
     { cwd: checkout, detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
   let output = ''; child.stdout!.on('data', (chunk) => { output += chunk.toString(); });
   child.stderr!.on('data', (chunk) => { output += chunk.toString(); });
-  const stop = async () => {
-    if (child.exitCode !== null || child.signalCode !== null) return;
-    const exited = new Promise<void>((done) => child.once('exit', () => done()));
-    process.kill(-child.pid!, 'SIGTERM');
-    await Promise.race([exited, new Promise<never>((_, reject) => {
-      const timer = setTimeout(() => { try { process.kill(-child.pid!, 'SIGKILL'); } catch {} reject(new Error('Launcher shutdown timed out')); }, 5000);
-      timer.unref(); exited.then(() => clearTimeout(timer));
-    })]);
-  };
+  const stop = launcherShutdown(child);
+
   let app: Running;
   try {
     const addresses = await new Promise<{ editorUrl: string; serviceUrl: string }>((done, reject) => {
@@ -141,5 +135,33 @@ test('data directory containment rejects dot-prefix children and symlinks into t
   } finally {
     for (const app of running) await app.stop();
     await rm(child, { recursive: true, force: true });
+  }
+});
+
+test('launcher stop waits for delayed command cleanup after the npm-like leader exits', async () => {
+  const session = join(directory, 'delayed-session.json'); const release = join(directory, 'release-cleanup');
+  const command = `const fs=require('node:fs'); fs.writeFileSync(${JSON.stringify(session)}, 'synthetic');
+    process.once('SIGTERM',()=>{ const timer=setInterval(()=>{ if(fs.existsSync(${JSON.stringify(release)})) {
+      clearInterval(timer);fs.unlinkSync(${JSON.stringify(session)});process.exit(0); } },10); });
+    console.log('COMMAND_READY');setInterval(()=>{},1000);`;
+  const launcher = `require('node:child_process').spawn(process.execPath,['-e',${JSON.stringify(command)}],{stdio:'inherit'});
+    process.once('SIGTERM',()=>process.exit(0));`;
+  const child = spawn(process.execPath, ['-e', launcher], { detached: true, stdio: ['ignore', 'pipe', 'pipe'] });
+  const stop = launcherShutdown(child); const exited = new Promise<void>((done) => child.once('exit', () => done()));
+  const closed = new Promise<void>((done) => child.once('close', () => done()));
+  let output = ''; child.stderr!.resume();
+  try {
+    await new Promise<void>((done) => child.stdout!.on('data', (chunk) => {
+      output += chunk.toString(); if (output.includes('COMMAND_READY')) done();
+    }));
+    let stopped = false; const stopping = stop().then(() => { stopped = true; });
+    await exited; await new Promise<void>((done) => setImmediate(done));
+    expect(stopped).toBe(false);
+    expect(await readFile(session, 'utf8')).toBe('synthetic');
+    await writeFile(release, 'release'); await stopping;
+    await expect(stat(session)).rejects.toThrow();
+    await stop(); // Idempotent after both the launcher and command are finished.
+  } finally {
+    await writeFile(release, 'release'); await stop(); await closed;
   }
 });

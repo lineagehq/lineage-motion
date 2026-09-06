@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawnTestServer, waitForTestServer, stopTestServer } from './test-server.ts';
+import { expect, test } from './test-fixture.ts';
+import { type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -16,25 +17,17 @@ test('human browser and independent CLI agent share one durable animation docume
   let processHandle: ChildProcess | undefined;
 
   const start = async () => {
-    const child = spawn('vite-node', [resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+    const child = spawnTestServer('vite-node', [resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
       cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: databasePath, PHASE3_EDITOR_PORT: '0',
         PHASE3_HUMAN_CAPABILITY: capabilities.human, PHASE3_AGENT_CAPABILITY: capabilities.agent },
       stdio: ['ignore', 'pipe', 'pipe'],
     });
-    const addresses = await new Promise<{ editorUrl: string; serviceUrl: string }>((resolveAddress, reject) => {
-      let output = ''; const timer = setTimeout(() => reject(new Error('DOGFOOD_SERVER_TIMEOUT')), 10_000);
-      child.stdout!.on('data', (chunk) => { output += chunk.toString();
-        const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-        if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); }
-      });
-      child.once('exit', (code) => { clearTimeout(timer); reject(new Error(`DOGFOOD_SERVER_EXIT_${code}`)); });
-    });
+    const addresses = await waitForTestServer(child!);
     await expect.poll(async () => { try { return (await fetch(addresses.editorUrl)).ok; } catch { return false; } }).toBe(true);
     processHandle = child; return addresses;
   };
   const stop = async () => {
-    if (processHandle?.exitCode === null) { processHandle.kill('SIGTERM');
-      await new Promise((resolveExit) => processHandle!.once('exit', resolveExit)); }
+    await stopTestServer(processHandle);
     processHandle = undefined;
   };
 

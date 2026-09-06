@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawnTestServer, waitForTestServer, stopTestServer } from './test-server.ts';
+import { expect, test } from './test-fixture.ts';
+import { type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -11,7 +12,7 @@ async function startCanvasFirstEditor(label: string): Promise<{
 }> {
   const root = resolve(import.meta.dirname, '../../..');
   const directory = await mkdtemp(join(tmpdir(), `lineage-motion-${label}-`));
-  const child: ChildProcess = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  const child: ChildProcess = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root,
     env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'moments.sqlite'), PHASE3_EDITOR_PORT: '0',
       PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
@@ -19,20 +20,13 @@ async function startCanvasFirstEditor(label: string): Promise<{
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   try {
-    const { editorUrl } = await new Promise<{ editorUrl: string }>((resolveAddress, reject) => {
-      let output = ''; const timer = setTimeout(() => reject(new Error(`${label.toUpperCase()}_SERVER_TIMEOUT`)), 10_000);
-      child.stdout!.on('data', (chunk) => { output += chunk.toString();
-        const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-        if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); }
-      });
-      child.once('exit', (code) => { clearTimeout(timer); reject(new Error(`${label.toUpperCase()}_SERVER_EXIT_${code}`)); });
-    });
+    const { editorUrl } = await waitForTestServer(child!);
     return { editorUrl, close: async () => {
-      if (child.exitCode === null) { child.kill('SIGTERM'); await new Promise((resolveExit) => child.once('exit', resolveExit)); }
+      await stopTestServer(child);
       await rm(directory, { recursive: true, force: true });
     } };
   } catch (error) {
-    if (child.exitCode === null) child.kill('SIGTERM');
+    await stopTestServer(child);
     await rm(directory, { recursive: true, force: true });
     throw error;
   }
@@ -42,7 +36,7 @@ test('the canvas uses repeatable moments through the shared durable operation pa
   test.setTimeout(90_000);
   const root = resolve(import.meta.dirname, '../../..');
   const directory = await mkdtemp(join(tmpdir(), 'lineage-motion-moments-'));
-  const child: ChildProcess = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  const child: ChildProcess = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root,
     env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'moments.sqlite'), PHASE3_EDITOR_PORT: '0',
       PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
@@ -50,14 +44,7 @@ test('the canvas uses repeatable moments through the shared durable operation pa
     stdio: ['ignore', 'pipe', 'pipe'],
   });
   try {
-    const { editorUrl } = await new Promise<{ editorUrl: string }>((resolveAddress, reject) => {
-      let output = ''; const timer = setTimeout(() => reject(new Error('MOMENTS_SERVER_TIMEOUT')), 10_000);
-      child.stdout!.on('data', (chunk) => { output += chunk.toString();
-        const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-        if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); }
-      });
-      child.once('exit', (code) => { clearTimeout(timer); reject(new Error(`MOMENTS_SERVER_EXIT_${code}`)); });
-    });
+    const { editorUrl } = await waitForTestServer(child!);
     const commandBodies: string[] = [];
     page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) commandBodies.push(request.postData() ?? ''); });
     await page.goto(editorUrl); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
@@ -192,7 +179,7 @@ test('the canvas uses repeatable moments through the shared durable operation pa
         && frame.contentDocument!.getAnimations().length > 0
         && frame.contentDocument!.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation'); })).toBe(true);
   } finally {
-    if (child.exitCode === null) { child.kill('SIGTERM'); await new Promise((resolveExit) => child.once('exit', resolveExit)); }
+    await stopTestServer(child);
     await rm(directory, { recursive: true, force: true });
   }
 });
