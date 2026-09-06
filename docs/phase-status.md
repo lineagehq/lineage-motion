@@ -18,6 +18,16 @@ The [incubation plan](incubation-plan.md) remains the roadmap.
 
 ## Decision boundary
 
+On 2026-09-06 the owner approved the [Animation Delivery Plan](animation-delivery-plan.md)
+for end-to-end implementation: normal durable startup, supported shot authoring
+and export through UI/CLI, bounded two-shot hard-cut composition, and tiered
+local/CI verification. The plan authorizes necessary sequence persistence and
+recoverable migrations, PR creation/monitoring/merging, and the specified
+required-check migration while retaining other branch protections and CodeQL.
+This records scope authorization, not implementation or acceptance-gate success.
+Private inputs, Lineage integration, publication and the other plan exclusions
+remain outside that authorization.
+
 The repository has progressed beyond its initial Phase 0/read-only Phase 1
 package. Fixing existing persistence, branch, claim, or landing behavior within
 a user's request does not require reauthorizing its historical implementation.
