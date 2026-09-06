@@ -97,6 +97,7 @@ export const verificationSuites = {
   browser: {
     kind: 'playwright', command: 'npx', args: ['playwright', 'test', '--config', 'apps/editor/playwright.config.ts'],
     files: [
+      'apps/editor/tests/normal-startup.spec.ts',
       'apps/editor/tests/editor.spec.ts',
       'apps/editor/tests/editor-authoring.spec.ts',
       'apps/editor/tests/integrated-dogfood.spec.ts',
