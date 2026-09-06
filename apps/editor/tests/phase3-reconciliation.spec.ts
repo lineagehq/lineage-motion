@@ -58,7 +58,7 @@ test('a disconnected editor resumes from its durable cursor and refetches the im
   expect(proof.exact).toBe(true); expect(proof.native).toBe(true); expect(pageErrors).toEqual([]);
 });
 
-test('remote CLI conflict preserves a visible creation draft until explicit keep or discard', async ({ page }) => {
+for (const sameTarget of [false, true]) test(`remote CLI edit preserves a creation draft across branches (same target: ${sameTarget})`, async ({ page }) => {
   const editorCommands: unknown[] = []; page.on('request', (request) => {
     if (request.url().endsWith('/commands')) editorCommands.push(request.postDataJSON());
   });
@@ -72,7 +72,7 @@ test('remote CLI conflict preserves a visible creation draft until explicit keep
   await page.getByRole('radio', { name: /Orb/ }).click();
   await page.locator('[data-new-branch]').fill('');
   expect(await runCli(['track-create', '--service', serviceUrl, '--operation-id', 'draft-cli-conflict', '--document-id', seed.documentId,
-    '--expected-revision', '0', '--element-id', 'el_a2849ff826f3e167', '--capability', humanCapability],
+    '--expected-revision', '0', '--element-id', sameTarget ? 'el_2dbee68b1ea318c8' : 'el_a2849ff826f3e167', '--capability', humanCapability],
   { stdout: () => undefined, stderr: () => undefined })).toBe(0);
   await expect(page.locator('[data-draft-conflict]')).toBeVisible();
   await expect(page.getByRole('radio', { name: /Orb/ })).toBeChecked();
@@ -92,8 +92,11 @@ test('remote CLI conflict preserves a visible creation draft until explicit keep
   await page.evaluate(() => window.__motionEditor.switchBranch('main'));
   await expect(page.locator('[data-draft-conflict]')).toBeVisible();
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({ draftDirty: true,
-    draftStaleBaseRevision: 0, unavailableCreation: true, selectedCreationElementId: 'el_2dbee68b1ea318c8' });
-  await expect(page.getByRole('radio', { name: /Orb/ })).toBeDisabled(); await expect(page.locator('[data-create-track]')).toBeDisabled();
+    draftStaleBaseRevision: 0, unavailableCreation: sameTarget, selectedCreationElementId: 'el_2dbee68b1ea318c8' });
+  // Existing tracks remain selectable for editing; only duplicate creation is blocked.
+  await expect(page.getByRole('radio', { name: /Orb/ })).toBeEnabled();
+  if (sameTarget) await expect(page.locator('[data-create-track]')).toBeDisabled();
+  else await expect(page.locator('[data-create-track]')).toBeEnabled();
   await page.getByRole('button', { name: 'Discard draft' }).click();
   await expect(page.locator('[data-draft-conflict]')).toBeHidden(); await expect(page.locator('[data-new-branch]')).toHaveValue('feature');
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toMatchObject({ draftDirty: false,
