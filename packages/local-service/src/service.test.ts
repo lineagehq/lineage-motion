@@ -1,3 +1,4 @@
+import { MIGRATIONS } from './migrations.ts';
 import { spawn } from 'node:child_process';
 import { readFile } from 'node:fs/promises';
 import { describe, expect, test } from 'vitest';
@@ -171,7 +172,7 @@ describe('loopback sole-writer service', () => {
     const service = await startLocalMotionService({ databasePath: temporary.databasePath, seed });
     (service.store as SqliteProjectStore).database
       .prepare('INSERT INTO schema_migrations(version,checksum,applied_order) VALUES(?,?,?)')
-      .run(5, 'future-schema', 5);
+      .run(MIGRATIONS.at(-1)!.version + 1, 'future-schema', MIGRATIONS.at(-1)!.version + 1);
     await service.close();
     await expect(startLocalMotionService({ databasePath: temporary.databasePath, seed }))
       .rejects.toThrow('UNSUPPORTED_SCHEMA_VERSION');
