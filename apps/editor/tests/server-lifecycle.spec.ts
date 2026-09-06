@@ -123,3 +123,41 @@ test('noisy diagnostics remain bounded and redact credentials split across strea
   expect(diagnostic).toContain('readable failure'); expect(diagnostic).toContain('[redacted]');
   expect(diagnostic).not.toContain(secret); expect(diagnostic).not.toContain(secret.slice(20));
 });
+
+test('worker interruption during graceful stop still reaps a signal-resistant detached child', async () => {
+  const helper = new URL('./test-server.ts', import.meta.url).href;
+  const server = 'process.on("SIGTERM",()=>{}); const h = require("node:http").createServer((q,r)=>r.end("ok"));' +
+    'h.listen(0,"127.0.0.1",()=>{ const u="http://127.0.0.1:"+h.address().port+"/?pid="+process.pid; console.log(JSON.stringify({editorUrl:u,serviceUrl:u})); });';
+  const worker = `import { spawnTestServer, waitForTestServer, stopTestServer } from ${JSON.stringify(helper)};
+    const child = spawnTestServer(process.execPath, ['-e', ${JSON.stringify(server)}], {stdio:['ignore','pipe','pipe']});
+    const addresses = await waitForTestServer(child); void stopTestServer(child);
+    console.log(JSON.stringify(addresses)); setInterval(() => {}, 1000);`;
+  const child = spawnTestServer(process.execPath, ['--import', 'tsx', '--input-type=module', '-e', worker],
+    { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] });
+  const addresses = await waitForTestServer(child);
+  const servicePid = Number(new URL(addresses.editorUrl).searchParams.get('pid'));
+  try {
+    expect((await fetch(addresses.editorUrl)).ok).toBe(true);
+    child.kill('SIGTERM');
+    await expect.poll(() => child.exitCode !== null || child.signalCode !== null).toBe(true);
+    await unreachable(addresses.editorUrl);
+    expect(() => process.kill(servicePid, 0)).toThrow();
+  } finally {
+    // The negative-control implementation must not leave the intentionally stubborn child behind.
+    try { process.kill(-servicePid, 'SIGKILL'); } catch { /* Already reaped. */ }
+    await stopTestServer(child);
+  }
+});
+
+test('an oversized unterminated line discards a credential suffix arriving in a later chunk', async () => {
+  const secret = capability();
+  const source = 'process.stderr.write("x".repeat(9000)+process.env.TEST_SECRET.slice(0,20));' +
+    'setTimeout(()=>{ process.stderr.write(process.env.TEST_SECRET.slice(20)+"\\nnext readable failure\\n"); process.exit(9); },100);';
+  const child = spawnTestServer(process.execPath, ['-e', source], {
+    env: { ...process.env, TEST_SECRET: secret }, stdio: ['ignore', 'pipe', 'pipe'] });
+  await expect(waitForTestServer(child)).rejects.toThrow('TEST_SERVER_EXIT_9');
+  const diagnostic = serverDiagnostic(child);
+  expect(diagnostic).toContain('next readable failure');
+  expect(diagnostic).not.toContain(secret.slice(20));
+  expect(diagnostic).not.toContain(secret); expect(diagnostic.length).toBeLessThanOrEqual(8192);
+});

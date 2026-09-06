@@ -1,9 +1,10 @@
 import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
 
 const children = new Set<ChildProcess>();
-const states = new WeakMap<ChildProcess, { output: string; stderr: string; secrets: string[]; spawnError: string }>();
+const states = new WeakMap<ChildProcess, { output: string; stderr: string; secrets: string[]; spawnError: string; droppingStderrLine: boolean }>();
 const limit = 8192;
 const recent: ChildProcess[] = [];
+const stopping = new WeakMap<ChildProcess, Promise<void>>();
 
 export function sanitizeServerDiagnostic(value: string, secrets: string[] = []): string {
   let result = value.replace(/\u001b\[[0-9;]*m/g, '');
@@ -18,17 +19,26 @@ export function spawnTestServer(command: string, args: string[], options: SpawnO
   const child = spawn(command, args, { ...options, detached: process.platform !== 'win32' });
   const secrets = Object.entries(options.env ?? {}).filter(([key]) => /capability|token|password|secret/i.test(key))
     .map(([, value]) => value ?? '');
-  const state = { output: '', stderr: '', secrets, spawnError: '' };
+  const state = { output: '', stderr: '', secrets, spawnError: '', droppingStderrLine: false };
   states.set(child, state); children.add(child); recent.push(child);
   child.stdout?.on('data', (chunk) => { state.output = (state.output + chunk.toString()).slice(-limit); });
   child.stderr?.on('data', (chunk) => {
     // Keep a bounded in-memory tail; redact after joining chunks so split credentials are covered.
-    const combined = state.stderr + chunk.toString();
+    let incoming = chunk.toString();
+    if (state.droppingStderrLine) {
+      const end = incoming.indexOf('\n');
+      if (end < 0) return;
+      incoming = incoming.slice(end + 1);
+      state.droppingStderrLine = false;
+    }
+    const combined = state.stderr + incoming;
     if (combined.length <= limit) state.stderr = combined;
     else {
       const tail = combined.slice(-limit);
-      // Drop the truncated first line, which may start inside a credential.
-      state.stderr = tail.includes('\n') ? tail.slice(tail.indexOf('\n') + 1) : '';
+      // Keep discarding across chunks until the damaged line is complete.
+      const end = tail.indexOf('\n');
+      state.droppingStderrLine = end < 0;
+      state.stderr = end < 0 ? '' : tail.slice(end + 1);
     }
   });
   child.once('error', (error) => { state.spawnError = sanitizeServerDiagnostic(error.message, secrets); });
@@ -42,16 +52,22 @@ function signal(child: ChildProcess, kind: NodeJS.Signals) {
   } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ESRCH') throw error; }
 }
 
-export async function stopTestServer(child: ChildProcess | undefined): Promise<void> {
-  if (!child) return;
-  children.delete(child);
-  if (!child.pid) return;
-  if (child.exitCode !== null || child.signalCode !== null) { signal(child, 'SIGKILL'); return; }
-  await new Promise<void>((resolve) => {
+export function stopTestServer(child: ChildProcess | undefined): Promise<void> {
+  if (!child) return Promise.resolve();
+  const existing = stopping.get(child);
+  if (existing) return existing;
+  const stopped = new Promise<void>((resolve) => {
+    const complete = () => { children.delete(child); resolve(); };
+    if (!child.pid) { complete(); return; }
+    if (child.exitCode !== null || child.signalCode !== null) {
+      signal(child, 'SIGKILL'); complete(); return;
+    }
     const timer = setTimeout(() => signal(child, 'SIGKILL'), 2000);
-    child.once('exit', () => { clearTimeout(timer); signal(child, 'SIGKILL'); resolve(); });
+    child.once('exit', () => { clearTimeout(timer); signal(child, 'SIGKILL'); complete(); });
     signal(child, 'SIGTERM');
   });
+  stopping.set(child, stopped);
+  return stopped;
 }
 
 export function serverDiagnostic(child: ChildProcess): string {
