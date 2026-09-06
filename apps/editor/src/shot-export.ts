@@ -1,3 +1,4 @@
+import './shot-export.css';
 import { createExportArchive } from '../../../packages/motion-protocol/src/export-archive.ts';
 import type { ExportRequest, ExportServiceClient } from '../../../packages/motion-protocol/src/export.ts';
 
@@ -42,7 +43,7 @@ export function mountShotExport(root: HTMLElement, client: ExportServiceClient,
       section.append(link); link.click(); link.remove();
       // Keep the blob alive long enough for the browser's download handoff.
       setTimeout(() => URL.revokeObjectURL(url), 30_000);
-      status.value = 'Animation downloaded. Unzip it and open animation.html to play it independently.';
+      status.value = 'Download started. Unzip it and open animation.html to play it independently.';
     } catch { status.value = 'Could not download the animation. Check that the local app is running and try again.'; }
     finally { busy = false; refresh(); }
   });

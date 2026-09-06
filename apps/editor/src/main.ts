@@ -39,6 +39,7 @@ import { MotionPreparationError, MotionServiceClient, commandSchema, makeBranchC
   type CommitMetadata, type MotionCommand, type MotionDiagnostic } from '../../../packages/motion-protocol/src/index.ts';
 import { mountReviewHandoff } from './review-handoff.ts';
 import './styles.css';
+import { mountProjectExport } from './shot-export-integration.ts';
 import { mountProjectActions } from './project-actions.js';
 import { escapeMarkup, loadProjectEntry, mountProjectEntry } from './project-entry.js';
 import { projectAuthoringTargets } from '../../../packages/domain/src/authoring-eligibility.js';
@@ -341,6 +342,7 @@ if (projectEntry) mountProjectActions(required<HTMLElement>('main'));
 if (projectEntry) mountProjectEntry({ root: required<HTMLElement>('main'), ...projectEntry, displayName: payload.projectName ?? null,
   dirty: () => captureDraft().dirty || Boolean(activeWaypointDraft.value) || Boolean(document.querySelector('[data-project-draft="true"]')),
   pending: () => publicationState.value !== 'settled' || pendingRevision.value !== null || Boolean(document.querySelector('[data-operation-pending="true"]')) });
+if (projectEntry && payload.humanCapability) mountProjectExport(required<HTMLElement>('main'), projectEntry.catalog.projectId, payload.humanCapability);
 window.addEventListener('resize', () => {
   if (previewStage.clientWidth <= 0) return;
   configurePreviewCanvas(); schedulePreviewSelection(); scheduleCueCanvas(); if (shotConfig.value) renderShotWorkspace();

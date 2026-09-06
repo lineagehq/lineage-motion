@@ -86,6 +86,7 @@ export const verificationSuites = {
     'packages/motion-cli/src/managed-admission.test.ts',
     'packages/motion-cli/src/cli.test.ts',
     'packages/motion-cli/src/export-artifact.test.ts',
+    'packages/motion-cli/src/shot-export.test.ts',
     'packages/motion-cli/src/review-handoff.test.ts',
     'packages/phase3-proof/src/aggregate.test.ts',
     'packages/phase3-proof/src/branch-claim-parity.test.ts',
@@ -122,6 +123,7 @@ export const verificationSuites = {
     'apps/editor/tests/normal-agent-smoke.spec.ts',
   ]),
   browser: playwright([
+      'apps/editor/tests/shot-export.spec.ts',
       'apps/editor/tests/project-entry.spec.ts',
       'apps/editor/tests/editor.spec.ts',
       'apps/editor/tests/editor-authoring.spec.ts',

@@ -1,0 +1,3 @@
+.shot-export { border-top: 1px solid #30394a; padding: 14px 16px; }
+.shot-export button { background: #17322f; border-color: #4c8279; color: #b9fff2; }
+.shot-export p, .shot-export output { display: block; margin: .65rem 0 0; color: #c6cede; font-size: .85rem; line-height: 1.45; }

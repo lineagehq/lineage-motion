@@ -25,7 +25,7 @@ export const mutationNames: Record<string, (typeof operationKinds)[number]> = {
   'claim-renew': 'motion.claim.renew', 'claim-release': 'motion.claim.release', 'claim-revoke': 'motion.claim.revoke',
 };
 
-const readNames = ['project', 'shots', 'context', 'workspace', 'head', 'branches', 'claims', 'activity', 'history', 'export-proof'] as const;
+const readNames = ['project', 'shots', 'context', 'workspace', 'head', 'branches', 'claims', 'activity', 'history', 'export-proof', 'export'] as const;
 const baseOptions = ['--shot or --document-id when multiple shots exist', '--branch-id when not main'] as const;
 export const commandDiscovery = {
   schemaVersion: 'motion.cli-command-list.v1',
@@ -98,6 +98,11 @@ function mutationRequiredOptions(kind: (typeof operationKinds)[number]): string[
 }
 
 export function commandDetail(name: string): unknown | null {
+  if (name === 'export') return { schemaVersion: 'motion.cli-command.v1', name, category: 'read',
+    requiredOptions: [...baseOptions, '--expected-revision', '--output FILE.zip'], optionalOptions: ['--project-id'],
+    output: 'Standalone animation.html, animation.css and receipt.json in a deterministic ZIP; stdout contains only the receipt and archive digest.',
+    safety: 'Exports only the selected committed revision. Existing output files are never replaced. No authoring claim is required.',
+    example: 'npm run motion -- export --document-id DOCUMENT_ID --expected-revision REVISION --output /path/to/animation.zip' };
   if (name === 'shot-admit') return { schemaVersion: 'motion.cli-command.v1', name, category: 'mutation',
     kind: 'motion.shot.admit', requiredOptions: ['--project-id', '--expected-catalog-revision', '--document-id', '--name', '--operation-id', '--claim', '--starter or --html-file'],
     starters: ['trajectory', 'reusable-cues'], source: 'One standalone HTML/CSS document, imported atomically with explicit inventories.',

@@ -115,3 +115,18 @@ values inside the loaded shot's duration and use `--validate-only` first.
 a discovered timeline cue, including later motion. This differs from a
 reusable `cue-create --semantic hold`, which holds selected objects. Whole-shot
 pauses visibly reject unsupported animation crossings or attached cue bundles.
+
+## Download a standalone shot
+
+Use `export --help` after inspecting the saved head. For example:
+
+```sh
+npm run motion -- export --document-id DOCUMENT_ID --expected-revision REVISION --output /path/to/animation.zip
+```
+
+The ZIP contains standalone HTML, CSS and a verification receipt. An authoring
+claim is not required for this read. Existing destinations are never replaced;
+choose another output filename to export again. A stale expected revision or
+wrong project fails without writing an artifact. Standard output contains only
+identity/digests and inventory counts, never exported HTML/CSS or the output path.
+See [standalone export](standalone-export.md) for independent playback and recovery.

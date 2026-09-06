@@ -52,4 +52,4 @@ editor explains this restriction rather than inventing a boundary.
 The preview continues to render compiler output through browser-created CSS
 animations. Play, Pause, the time scrubber and the reduced-motion inspection
 remain available in the editor. General drawing, free-form CSS editing, sequence
-composition and export delivery are separate capabilities.
+composition is a separate capability. See [standalone export](standalone-export.md) to download a saved shot.
