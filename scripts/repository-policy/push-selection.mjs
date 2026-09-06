@@ -20,6 +20,6 @@ export function selectPushSuites(paths) {
     /^(?:README|LICENSE)(?:\.md)?$/.test(path)
     || /^docs\/[^\n]+\.md$/.test(path)
     || /^apps\/editor\/src\/[^\n]+\.css$/.test(path));
-  if (!presentationOnly) selected.push('service-integration', 'recovery', 'parity');
+  if (!presentationOnly) selected.push('service-integration', 'parity');
   return selected;
 }

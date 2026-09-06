@@ -21,7 +21,7 @@ A dirty checkout cannot substitute its bytes for the pushed commit.
 
 Every tip receives staged policy, the complete `fast` tier, type checking, the
 production build and determinism. Changes outside the explicitly known prose
-and editor CSS paths also run service integration, recovery and parity. New
+and editor CSS paths also run service integration and parity. New
 branches run these stateful leaves too. The verification manifest remains the
 single owner of test leaves; the hook only selects existing suites. Independent
 leaves run concurrently, and every result must pass.

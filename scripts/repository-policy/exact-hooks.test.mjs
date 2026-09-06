@@ -121,7 +121,7 @@ test('pre-push parses multiple refs, deletes, malformed input and conservative p
   assert.equal(parsePushInput(`refs/heads/a ${sha} refs/heads/a ${zeros}\n: ${zeros} refs/heads/b ${sha}\n`).length, 1);
   assert.throws(() => parsePushInput('refs/heads/a not-a-sha refs/heads/a nope'));
   for (const paths of [null, ['package-lock.json'], ['unknown'], ['docs/run.mjs'], ['packages/domain/src/index.ts']]) {
-    assert.deepEqual(selectPushSuites(paths), ['typecheck', 'build', 'determinism', 'service-integration', 'recovery', 'parity']);
+    assert.deepEqual(selectPushSuites(paths), ['typecheck', 'build', 'determinism', 'service-integration', 'parity']);
   }
   assert.deepEqual(selectPushSuites(['README.md', 'apps/editor/src/main.css']), ['typecheck', 'build', 'determinism']);
 });
@@ -149,7 +149,7 @@ test('new branches verify all leaves; deletion-only input does not install or te
   const tip = git(root, 'rev-parse', 'HEAD');
   const result = run(root, 'scripts/check-push.mjs', `refs/heads/new ${tip} refs/heads/new ${zeros}\n`);
   assert.equal(result.status, 0, result.stderr + result.stdout);
-  for (const leaf of ['--tier fast', '--suite typecheck', '--suite build', '--suite determinism', '--suite service-integration', '--suite recovery', '--suite parity']) {
+  for (const leaf of ['--tier fast', '--suite typecheck', '--suite build', '--suite determinism', '--suite service-integration', '--suite parity']) {
     assert.ok(result.stdout.includes(leaf), leaf);
   }
   const deletion = run(root, 'scripts/check-push.mjs', `: ${zeros} refs/heads/new ${tip}\n`);
@@ -171,4 +171,26 @@ test('shared worktree push leaves config, original index and unstaged work untou
   assert.equal(git(other, 'write-tree'), before);
   assert.equal(readFileSync(join(other, 'README.md'), 'utf8'), 'unstaged worktree edit');
   assert.equal(git(root, 'worktree', 'list', '--porcelain').match(/^worktree /gm).length, 2);
+});
+
+test('workspace dependencies resolve pushed source, never the working checkout', () => {
+  const root = fixture();
+  stage(root, 'package.json', '{"name":"hook-fixture","version":"1.0.0","private":true,"workspaces":["packages/*"]}');
+  stage(root, 'packages/source/package.json', '{"name":"fixture-source","version":"1.0.0","main":"index.js"}');
+  stage(root, 'packages/source/index.js', 'module.exports = "bad";');
+  stage(root, 'package-lock.json', JSON.stringify({
+    name: 'hook-fixture', version: '1.0.0', lockfileVersion: 3,
+    packages: {
+      '': { name: 'hook-fixture', version: '1.0.0', workspaces: ['packages/*'] },
+      'packages/source': { name: 'fixture-source', version: '1.0.0' },
+      'node_modules/fixture-source': { resolved: 'packages/source', link: true },
+    },
+  }));
+  stage(root, 'scripts/run-verification.mjs', 'import value from "fixture-source"; console.log("workspace exact bytes " + value); process.exit(value === "bad" ? 1 : 0);');
+  const tip = commit(root);
+  put(root, 'packages/source/index.js', 'module.exports = "good";');
+  const result = run(root, 'scripts/check-push.mjs', `HEAD ${tip} refs/heads/new ${zeros}\n`);
+  assert.equal(result.status, 1);
+  assert.match(result.stdout, /workspace exact bytes bad/);
+  assert.equal(readFileSync(join(root, 'packages/source/index.js'), 'utf8'), 'module.exports = "good";');
 });

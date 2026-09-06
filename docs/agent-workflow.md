@@ -35,7 +35,7 @@ audit-only request ends with findings unless implementation is also requested.
 | --- | --- | --- | --- |
 | Editing | Implementer | Focused suite for the changed boundary | Relevant code or environment changed |
 | Commit | Pre-commit hook | Staged privacy, artifact, size and test-ownership policies | The staged tree changed |
-| Push | Pre-push hook | Exact-tip fast, types, build, determinism and affected service/recovery/parity | The pushed commit changed |
+| Push | Pre-push hook | Exact-tip fast, types, build, determinism and affected service/parity | The pushed commit changed |
 | Pull request | GitHub Actions | Full public graph on the exact head | The head commit changed or a proven flaky failure needs investigation |
 | Handoff | Pull-request author | Outcome, material risks, concise evidence | The claim or head commit changed |
 
