@@ -14,10 +14,10 @@ to operate that process.
    focused suite that can falsify the change. Re-run it when code or its runtime
    environment changes, not when ownership changes between people or agents.
 3. **Share early.** Push the first coherent implementation commit and open a
-   draft pull request. The hooks own repository policy and the fast tier; do not
+   draft pull request. The hooks own staged policies and exact-tip verification; do not
    manually repeat a current hook result.
-4. **Let CI fan out.** Pull-request CI owns the complete public verification
-   graph for the exact head commit. A local `npm run verify:pr` is for offline
+4. **Let CI fan out.** Draft code CI owns fast/type/build/determinism and normal-launch
+   UI/CLI smoke. Ready PRs own the complete public graph for every exact head. A local `npm run verify:pr` is for offline
    preflight or reproducing a CI failure, not routine duplication.
 5. **Handoff once.** Record the outcome, focused evidence, and material unresolved
    risks in the pull request. Refer to exact-head CI instead of copying its logs
@@ -36,7 +36,7 @@ audit-only request ends with findings unless implementation is also requested.
 | Editing | Implementer | Focused suite for the changed boundary | Relevant code or environment changed |
 | Commit | Pre-commit hook | Staged privacy, artifact, size and test-ownership policies | The staged tree changed |
 | Push | Pre-push hook | Exact-tip fast, types, build, determinism and affected service/parity | The pushed commit changed |
-| Pull request | GitHub Actions | Full public graph on the exact head | The head commit changed or a proven flaky failure needs investigation |
+| Pull request | GitHub Actions | Prose policy, draft smoke or ready full graph on the exact head | The head commit changed or a proven flaky failure needs investigation |
 | Handoff | Pull-request author | Outcome, material risks, concise evidence | The claim or head commit changed |
 
 See [local hook behavior](local-hooks.md) for exact-index/ref handling and dependency isolation.

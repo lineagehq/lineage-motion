@@ -68,9 +68,10 @@ generated execution boards, per-task state, or agent transcripts under
 ## Verification
 
 - Run the smallest focused suite while editing.
-- Let pre-push own `npm run verify:fast` and let pull-request CI own the broad
-  public graph. Do not repeat a passing command on an unchanged commit merely
-  because another agent or stage is taking over.
+- Let pre-push own exact-tip fast, types/build, determinism and conservative
+  service/parity checks. Draft code CI runs the public smoke graph; ready PRs
+  run the complete public graph on every head. Do not repeat passing evidence
+  merely because another agent or stage is taking over.
 - Use `npm run verify:pr` only for an offline preflight or to reproduce a CI
   failure locally.
 - Handoff evidence is the outcome, material unresolved risks, and links or

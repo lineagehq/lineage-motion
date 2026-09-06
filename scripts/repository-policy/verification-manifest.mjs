@@ -5,6 +5,11 @@ const vitest = (files, options = {}) => ({
   kind: 'vitest', command: 'npx', args: ['vitest', 'run', ...(options.args ?? []), ...files], files,
   public: options.public ?? true, fast: options.fast ?? false,
 });
+const playwright = (files) => ({
+  kind: 'playwright', command: 'npx',
+  args: ['playwright', 'test', '--config', 'apps/editor/playwright.config.ts', ...files],
+  files, public: true, fast: false,
+});
 const command = (executable, args, options = {}) => ({
   kind: 'command', command: executable, args, public: options.public ?? true,
   fast: options.fast ?? false,
@@ -15,9 +20,11 @@ export const verificationSuites = {
   'manifest-policy': command('node', ['scripts/check-verification-manifest.mjs'], { fast: true }),
   'execution-artifacts': command('node', ['scripts/check-execution-artifacts.mjs'], { fast: true }),
   'policy-tests': nodeTest([
+    'scripts/repository-policy/ci-policy.test.mjs',
+    'scripts/repository-policy/ci-runner.test.mjs',
+    'scripts/repository-policy/exact-hooks.test.mjs',
     'scripts/repository-policy/execution-artifacts.test.mjs',
     'scripts/repository-policy/git-hooks.test.mjs',
-    'scripts/repository-policy/exact-hooks.test.mjs',
     'scripts/repository-policy/line-limit.test.mjs',
     'scripts/repository-policy/test-discovery.test.mjs',
     'scripts/repository-policy/verification-dag.test.mjs',
@@ -95,11 +102,11 @@ export const verificationSuites = {
     'packages/visual-proof/src/trajectory-representability.visual.test.ts',
     'packages/visual-proof/src/visual.test.ts',
   ], { args: ['--maxWorkers=1'] }),
-  browser: {
-    kind: 'playwright', command: 'npx', args: ['playwright', 'test', '--config', 'apps/editor/playwright.config.ts'],
-    files: [
-      'apps/editor/tests/server-lifecycle.spec.ts',
-      'apps/editor/tests/normal-startup.spec.ts',
+  'browser-smoke': playwright([
+    'apps/editor/tests/normal-startup.spec.ts',
+    'apps/editor/tests/normal-agent-smoke.spec.ts',
+  ]),
+  browser: playwright([
       'apps/editor/tests/editor.spec.ts',
       'apps/editor/tests/editor-authoring.spec.ts',
       'apps/editor/tests/integrated-dogfood.spec.ts',
@@ -114,10 +121,8 @@ export const verificationSuites = {
       'apps/editor/tests/phase4-reusable-cues.spec.ts',
       'apps/editor/tests/preview-transient-resize.spec.ts',
       'apps/editor/tests/review-handoff.spec.ts',
-    ],
-    public: true,
-    fast: false,
-  },
+      'apps/editor/tests/server-lifecycle.spec.ts',
+  ]),
   'chrome-editor': command('node', ['apps/editor/scripts/qa-chrome.mjs']),
   'chrome-spatial': command('node', ['apps/editor/scripts/qa-chrome.mjs', '--shot1-spatial-parity-public']),
   'chrome-landing': command('node', [
@@ -141,19 +146,19 @@ export const verificationTiers = {
   pr: [
     'line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
-    'public-visual', 'browser', 'typecheck', 'build', 'privacy-checks',
+    'public-visual', 'browser', 'browser-smoke', 'typecheck', 'build', 'privacy-checks',
   ],
   full: [
     'line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
-    'public-visual', 'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
+    'public-visual', 'browser', 'browser-smoke', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
     'private-acceptance', 'typecheck', 'build',
     'privacy-checks',
   ],
   phase3: [
     'line-limit', 'manifest-policy', 'execution-artifacts', 'policy-tests', 'fast-unit', 'repository-safety',
     'service-integration', 'recovery', 'parity', 'acquisition', 'determinism',
-    'public-visual', 'browser', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
+    'public-visual', 'browser', 'browser-smoke', 'chrome-editor', 'chrome-spatial', 'chrome-landing',
     'typecheck', 'build', 'privacy-checks',
   ],
   'qa:chrome': ['chrome-editor', 'chrome-spatial', 'chrome-landing'],
