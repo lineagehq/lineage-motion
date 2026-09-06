@@ -219,7 +219,7 @@ export function prepareOperationIntent(document: MotionDocument, branchId: strin
         const afterIndex = trajectory.waypoints.findIndex((waypoint) => waypoint.timeMs > normalizedIntent.timeMs);
         const beforePoint = afterIndex > 0 ? trajectory.waypoints[afterIndex - 1] : undefined;
         const afterPoint = afterIndex > 0 ? trajectory.waypoints[afterIndex] : undefined;
-        if (!beforePoint || !afterPoint || normalizedIntent.timeMs <= 0 || normalizedIntent.timeMs >= 2100) {
+        if (!beforePoint || !afterPoint || normalizedIntent.timeMs <= 0 || normalizedIntent.timeMs >= document.durationMs) {
           return empty('AUTHORING_TRAJECTORY_INSERT_INVALID');
         }
         targets.push({ elementId, trackId: trajectory.trackId, beforeKeyframeId: beforePoint.keyframeId,

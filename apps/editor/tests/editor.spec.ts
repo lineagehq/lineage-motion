@@ -293,9 +293,9 @@ test('guides a first-time author through truthful creation, timing, focus, and e
     return iframe.srcdoc === window.__motionEditor.compiledHtml
       && iframe.contentDocument!.getAnimations().every((animation) => animation.constructor.name === 'CSSAnimation');
   })).toBe(true);
-  await expect(page.getByRole('radio', { name: /Cursor/ })).toBeDisabled();
+  await expect(page.getByRole('radio', { name: /Cursor/ })).toBeEnabled();
   await expect(page.locator('[data-choice-reason="el_a2849ff826f3e167"]'))
-    .toHaveText('One created track is allowed in this document.');
+    .toHaveText('Available');
   await page.locator('[data-duration]').fill('1400.5');
   const invalidBaseline = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
   const invalidRequestBaseline = commandRequestCount;

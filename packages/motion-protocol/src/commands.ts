@@ -23,10 +23,11 @@ function envelope(operation: MotionCommand['command'], branch: string): MotionCo
 }
 
 export function makeTrackCreateCommand(input: { operationId: string; documentId: string; expectedRevision: number;
-  branchId?: string; elementId: 'el_a2849ff826f3e167' | 'el_2dbee68b1ea318c8' }): TrackCreateCommand {
+  branchId?: string; elementId: string; durationMs?: number; delayMs?: number; startValue?: number; endValue?: number }): TrackCreateCommand {
   return envelope({ schemaVersion: 'motion.operation.v1', kind: 'motion.track.create', operationId: input.operationId,
     documentId: input.documentId, expectedRevision: input.expectedRevision, elementId: input.elementId,
-    payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear', startValue: 0, endValue: 1 } }, input.branchId ?? MAIN_BRANCH_ID) as TrackCreateCommand;
+    payload: { property: 'opacity', durationMs: input.durationMs ?? 1000, delayMs: input.delayMs ?? 610, easing: 'linear',
+      startValue: input.startValue ?? 0, endValue: input.endValue ?? 1 } }, input.branchId ?? MAIN_BRANCH_ID) as TrackCreateCommand;
 }
 
 export function makeTrajectoryCommand(operation: TrajectoryAuthoringOperation | HistoryOperation, branchIdValue: string = MAIN_BRANCH_ID): MotionCommand {

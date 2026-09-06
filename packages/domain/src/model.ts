@@ -46,9 +46,9 @@ export type MotionCue = TimelineCue | AuthoringCue;
 export type MotionHold = {
   schemaVersion: 'motion.hold.v1';
   id: string;
-  cueId: 'cue_pair';
-  sourceTimeMs: 2870;
-  durationMs: 600;
+  cueId: string;
+  sourceTimeMs: number;
+  durationMs: number;
 };
 
 export type MotionDocument = {
@@ -62,6 +62,7 @@ export type MotionDocument = {
     selectorHint: string;
     structuralFingerprint: string;
     editableText?: string;
+    label?: string;
   }>;
   rules: Array<{ id: string; sourceName: string; tracks: RuleTrack[] }>;
   applications: Array<{
