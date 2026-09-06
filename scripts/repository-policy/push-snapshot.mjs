@@ -11,11 +11,22 @@ export const git = (root, args) => execFileSync('git', args, {
   maxBuffer: 32 * 1024 * 1024,
 }).trim();
 
+const running = new Set();
+function stopRunning() {
+  for (const child of running) {
+    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* Child already exited. */ }
+  }
+}
+
 export function run(command, args, cwd) {
   return new Promise((resolveResult, reject) => {
-    const child = spawn(command, args, { cwd, env: cleanEnvironment(), stdio: 'inherit' });
-    child.once('error', reject);
-    child.once('exit', (code, signal) => resolveResult(code ?? (signal ? 1 : 0)));
+    const child = spawn(command, args, { cwd, env: cleanEnvironment(), stdio: 'inherit', detached: true });
+    running.add(child);
+    child.once('error', (error) => { running.delete(child); reject(error); });
+    child.once('exit', (code, signal) => {
+      running.delete(child);
+      resolveResult(code ?? (signal ? 1 : 0));
+    });
   });
 }
 
@@ -64,7 +75,7 @@ export async function withPushSnapshot(root, tip, verify) {
   };
   // Normal completion and signals clean up this one owned worktree, never prune
   // or change another worktree's hooks/configuration.
-  const interrupted = () => { cleanup(); process.exit(1); };
+  const interrupted = () => { stopRunning(); cleanup(); process.exit(1); };
   process.once('SIGINT', interrupted);
   process.once('SIGTERM', interrupted);
   try {

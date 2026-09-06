@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawn, spawnSync } from 'node:child_process';
 import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
@@ -193,4 +193,37 @@ test('workspace dependencies resolve pushed source, never the working checkout',
   assert.equal(result.status, 1);
   assert.match(result.stdout, /workspace exact bytes bad/);
   assert.equal(readFileSync(join(root, 'packages/source/index.js'), 'utf8'), 'module.exports = "good";');
+});
+
+
+test('interrupting push stops verification processes and removes its snapshot', async () => {
+  const root = fixture();
+  stage(root, 'scripts/run-verification.mjs',
+    'console.log("running-pid:" + process.pid); setInterval(() => {}, 1000);');
+  const tip = commit(root);
+  const child = spawn('node', [join(source, 'scripts/check-push.mjs')], { cwd: root, env });
+  child.stdin.end(`HEAD ${tip} refs/heads/new ${zeros}\n`);
+  let output = '';
+  child.stderr.resume();
+  const exited = new Promise((resolveExit) => child.once('exit', resolveExit));
+  await new Promise((resolveReady, reject) => {
+    const deadline = setTimeout(() => { child.kill('SIGTERM'); reject(new Error('No verifier startup')); }, 10000);
+    child.stdout.on('data', (bytes) => {
+      output += bytes;
+      if ((output.match(/running-pid:/g) ?? []).length === 6) {
+        clearTimeout(deadline); resolveReady();
+      }
+    });
+  });
+  child.kill('SIGTERM');
+  assert.equal(await exited, 1);
+  for (const [, pid] of output.matchAll(/running-pid:(\d+)/g)) {
+    let alive = true;
+    for (let retry = 0; retry < 20 && alive; retry += 1) {
+      try { process.kill(Number(pid), 0); await new Promise((done) => setTimeout(done, 50)); }
+      catch { alive = false; }
+    }
+    assert.equal(alive, false, 'Verifier must stop on interruption');
+  }
+  assert.equal(git(root, 'worktree', 'list', '--porcelain').match(/^worktree /gm).length, 1);
 });
