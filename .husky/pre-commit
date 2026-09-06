@@ -1,3 +1,2 @@
-npm run check:line-limit
-npm run check:verification-manifest
-npm run check:execution-artifacts
+#!/bin/sh
+node scripts/check-staged.mjs

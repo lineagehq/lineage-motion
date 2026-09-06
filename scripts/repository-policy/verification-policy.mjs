@@ -6,8 +6,7 @@ export function discoverTrackedTests(repositoryRoot) {
   return trackedFiles(repositoryRoot).filter((path) => TEST_FILE.test(path));
 }
 
-export function validateVerificationManifest(repositoryRoot, suites, tiers) {
-  const tests = discoverTrackedTests(repositoryRoot);
+export function validateVerificationManifest(repositoryRoot, suites, tiers, tests = discoverTrackedTests(repositoryRoot)) {
   const owners = new Map(tests.map((path) => [path, []]));
   for (const [suiteName, suite] of Object.entries(suites)) {
     for (const path of suite.files ?? []) {
