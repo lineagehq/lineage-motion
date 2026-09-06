@@ -292,3 +292,87 @@ test('a lost admission response retries the same creation instead of duplicating
   await expect(page.locator('[data-project-shot] option')).toHaveCount(2);
   expect(requests).toHaveLength(2); expect(requests[1]).toBe(requests[0]);
 });
+
+for (const removal of ['Delete', 'Detach'] as const) test(`remote ${removal.toLowerCase()} preserves an edited action draft until explicit discard`, async ({ page, context }) => {
+  const app = await launch(); await page.goto(app.url);
+  const first = await page.locator('[data-project-shot]').inputValue();
+  await page.locator('[data-new-shot] summary').click(); await page.getByLabel('Shot name', { exact: true }).fill('Edited action');
+  await page.getByRole('button', { name: 'Create shot', exact: true }).click();
+  await expect(page.locator('[data-project-shot] option:checked')).toHaveText('Edited action');
+  const shot = await page.locator('[data-project-shot]').inputValue();
+  await page.locator('[data-action-target]').selectOption({ label: 'Object A' });
+  await page.getByRole('button', { name: 'Move', exact: true }).click();
+  await page.getByRole('button', { name: 'Apply action', exact: true }).click();
+  await expect(page.locator('[data-action-status]')).toContainText('Move applied. Revision 1');
+  await page.getByRole('region', { name: 'Created actions' }).getByRole('button', { name: 'Edit', exact: true }).click();
+  await page.locator('[data-action-form] input[name=end]').fill('2400');
+  const selected = await page.locator('[data-action-target]').inputValue();
+  const other = await context.newPage(); await other.goto(`${app.url}/?shot=${shot}`);
+  await other.getByRole('region', { name: 'Created actions' }).getByRole('button', { name: removal, exact: true }).click();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
+  await expect(page.locator('[data-action-form]')).toHaveAttribute('data-project-draft', 'true');
+  await expect(page.locator('[data-action-form] input[name=end]')).toHaveValue('2400');
+  await expect(page.locator('[data-action-target]')).toHaveValue(selected);
+  await expect(page.getByRole('button', { name: 'Update action', exact: true })).toBeDisabled();
+  await expect(page.locator('[data-action-explanation]')).toContainText('saved shot changed');
+  await page.locator('[data-project-shot]').selectOption(first);
+  await expect(page.getByRole('dialog')).toBeVisible();
+  await page.getByRole('button', { name: 'Stay here', exact: true }).click();
+  await expect(page.locator('[data-project-shot]')).toHaveValue(shot);
+  await expect(page.locator('[data-action-form] input[name=end]')).toHaveValue('2400');
+  await page.getByRole('button', { name: 'Discard action draft', exact: true }).click();
+  await expect(page.locator('[data-action-form]')).toHaveAttribute('data-project-draft', 'false');
+  await page.locator('[data-project-shot]').selectOption(first);
+  await expect(page.locator('[data-project-shot]')).toHaveValue(first);
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(0);
+  await other.close();
+});
+
+for (const pending of [false, true]) test(`delayed shot admission preserves a subsequently started ${pending ? 'pending operation' : 'action draft'}`, async ({ page }) => {
+  const app = await launch(); await page.goto(app.url);
+  const first = await page.locator('[data-project-shot]').inputValue();
+  await page.locator('[data-new-shot] summary').click(); await page.getByLabel('Shot name', { exact: true }).fill('Delayed creation');
+  let releaseAdmission!: () => void; let reachedAdmission!: () => void;
+  const admissionGate = new Promise<void>(done => { releaseAdmission = done; });
+  const admissionReached = new Promise<void>(done => { reachedAdmission = done; });
+  await page.route('**/api/project/v1/shots', async route => {
+    const response = await route.fetch(); reachedAdmission(); await admissionGate; await route.fulfill({ response });
+  });
+  let releaseOperation!: () => void; let reachedOperation!: () => void;
+  const operationGate = new Promise<void>(done => { releaseOperation = done; });
+  const operationReached = new Promise<void>(done => { reachedOperation = done; });
+  if (pending) await page.route('**/operations/prepare', async route => { reachedOperation(); await operationGate; await route.continue(); });
+  try {
+    await page.getByRole('button', { name: 'Create shot', exact: true }).click(); await admissionReached;
+    for (const control of await page.locator('[data-shot-create] input, [data-shot-create] select, [data-shot-create] textarea').all()) await expect(control).toBeDisabled();
+    await expect(page.getByLabel('Shot name', { exact: true })).toHaveValue('Delayed creation');
+    await page.getByRole('button', { name: 'Move', exact: true }).click();
+    await page.locator('[data-action-form] input[name=end]').fill('2400');
+    if (pending) { await page.getByRole('button', { name: 'Apply action', exact: true }).click(); await operationReached; }
+    releaseAdmission();
+    await expect(page.locator('[data-project-shot] option')).toHaveCount(2);
+    for (const control of await page.locator('[data-shot-create] input, [data-shot-create] select, [data-shot-create] textarea').all()) await expect(control).toBeEnabled();
+    await expect(page.getByLabel('Shot name', { exact: true })).toHaveValue('Delayed creation');
+    await expect(page.locator('[data-project-shot]')).toHaveValue(first);
+    await expect(page.locator('[data-action-form] input[name=end]')).toHaveValue('2400');
+    const created = await page.locator('[data-project-shot] option', { hasText: 'Delayed creation' }).getAttribute('value');
+    expect(created).toBeTruthy();
+    if (pending) {
+      await expect(page.locator('[data-entry-status]')).toContainText('Wait for the current change');
+      await expect(page.getByRole('dialog')).not.toBeVisible();
+      releaseOperation(); await expect(page.locator('[data-action-status]')).toContainText('Move applied. Revision 1');
+      await page.locator('[data-project-shot]').selectOption(created!);
+    } else {
+      await expect(page.getByRole('dialog')).toBeVisible();
+      await page.getByRole('button', { name: 'Stay here', exact: true }).click();
+      await expect(page.locator('[data-action-form] input[name=end]')).toHaveValue('2400');
+      await page.locator('[data-project-shot]').selectOption(created!);
+      await page.getByRole('button', { name: 'Discard changes and switch', exact: true }).click();
+    }
+    await expect(page.locator('[data-project-shot] option:checked')).toHaveText('Delayed creation');
+    expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(0);
+    await page.locator('[data-project-shot]').selectOption(first);
+    await expect(page.locator('[data-project-shot]')).toHaveValue(first);
+    expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(pending ? 1 : 0);
+  } finally { releaseAdmission(); releaseOperation(); }
+});
