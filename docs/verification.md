@@ -28,7 +28,9 @@ open a draft pull request. Keep using focused local suites while GitHub runs
 the broad public graph in parallel. This makes integration failures visible
 during implementation instead of postponing them until packaging is complete.
 
-Before sharing work, run `npm run verify:fast`. Mark the pull request ready
+Pre-push runs `npm run verify:fast`. Run it manually only when sharing without
+the hook or investigating a failure; reuse a current result. Mark the pull
+request ready
 only when the bounded implementation and its focused verification are
 complete. Do not merge until every required check passes on the exact head
 commit. `main` requires a pull request, an up-to-date branch, resolved review
@@ -88,13 +90,10 @@ Public CI never selects private import, visual, receipt, or corpus-bound tests.
 ## Adding or moving a test
 
 Add the tracked test path to exactly one leaf's `files` array in the
-verification manifest. Then run:
-
-```sh
-npm run check:verification-manifest
-npm run check:line-limit
-npm run verify:fast
-```
+verification manifest. Run the affected leaf while editing. Pre-commit owns
+manifest and file-size checks; pre-push owns `verify:fast`. Run an individual
+policy check locally when diagnosing its failure or checking a manifest edit
+before committing, and reuse current hook evidence.
 
 The manifest check rejects both unowned tests and tests listed in multiple
 leaves. Add a new leaf only when its runtime boundary or setup is genuinely

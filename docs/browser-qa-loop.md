@@ -78,12 +78,15 @@ architecture to solve a walkthrough problem.
 After each correction:
 
 1. repeat the exact browser action that exposed the issue;
-2. repeat the complete canonical walkthrough from a fresh state;
+2. recheck affected behavior; expand coverage when shared state, history, focus,
+   or preview behavior changes;
 3. run the focused manifest leaf for the changed boundary;
 4. inspect the complete diff for scope growth and sensitive content.
 
-Once corrections converge, run `npm run qa:chrome` for the installed-Chrome
-scenarios and push the exact commit so CI runs the complete public graph. Do not
+Once corrections converge, repeat the complete canonical walkthrough from a
+fresh state on the final implementation, including keyboard activation, invalid
+input rejection, and reduced motion. Run `npm run qa:chrome` for the
+installed-Chrome scenarios and push the exact commit so CI runs the complete public graph. Do not
 also run `npm run verify:pr` locally unless CI is unavailable or a CI failure
 needs local reproduction. Private acceptance remains a separate,
 authorized-input gate in `npm run verify:full`.
@@ -96,5 +99,5 @@ for novelty. Report:
 - the user-facing claim;
 - findings observed in the browser;
 - corrections made and deliberately deferred;
-- the top three realistic remaining failure modes;
+- material unresolved risks and missing evidence;
 - concise browser evidence and the exact-head CI result.

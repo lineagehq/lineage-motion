@@ -11,5 +11,7 @@ already records the broad exact-head checks.
 
 ## Adversarial risks
 
-Name the three most realistic ways the outcome could be wrong and the evidence
-that addresses each one. Confirm that the diff contains no private material.
+Describe material unresolved risks and any missing evidence; omit speculative
+risks for a trivial change. For import/compiler fidelity or revision/claim
+correctness, identify the failure modes challenged and the evidence addressing
+them. Confirm that the diff contains no private material.

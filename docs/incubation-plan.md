@@ -108,9 +108,13 @@ Choose from evidence:
 5. stop or narrow the product if the source model does not survive the stress
    test.
 
-## Immediate work package
+## Historical initial work package
 
-Complete only Phase 0 and the read-only portion of Phase 1:
+The following records the original Phase 0/read-only Phase 1 scope and its
+architecture-review stopping point. It is not the current task boundary. Use
+[phase status](phase-status.md) and the active request for current scope.
+
+The initial work package was limited to Phase 0 and the read-only portion of Phase 1:
 
 1. establish repository safety and private-corpus rules;
 2. create domain/import/compiler/proof package boundaries;
@@ -119,8 +123,10 @@ Complete only Phase 0 and the read-only portion of Phase 1:
 5. export deterministic pure CSS;
 6. capture an evidence receipt and stop for architecture review.
 
-Do not add persistence, claims, branching, CLI mutation, MCP, publication, or
-Lineage integration until import/export fidelity passes.
+The initial package deferred persistence, claims, branching, CLI mutation, MCP,
+publication, and Lineage integration until import/export fidelity passed. This
+historical deferral does not prohibit maintenance of subsequently implemented
+capabilities; new phase scope still requires authorization.
 
 ## Failure modes
 
