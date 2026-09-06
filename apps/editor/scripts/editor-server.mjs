@@ -47,4 +47,3 @@ export async function launchEditor({ onReady } = {}) {
     return { ...addresses, close };
   } catch (error) { await close(); throw error; }
 }
-
