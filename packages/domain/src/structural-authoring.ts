@@ -176,7 +176,7 @@ export function applyStructural(
     const offsetPpm = numerator / slot.durationMs;
     if (!Number.isSafeInteger(offsetPpm) || offsetPpm <= 0 || offsetPpm >= 1_000_000
       || typeof value !== 'number' || value < 0 || value > 1
-      || !Number(value.toFixed(6)) === value) {
+      || Number(value.toFixed(6)) !== value) {
       return { ok: false, code: 'AUTHORING_KEYFRAME_INVALID' };
     }
     if (ruleTrack.keyframes.some((keyframe) => keyframe.offset * 1_000_000 === offsetPpm)) {

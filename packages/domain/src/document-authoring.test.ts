@@ -203,6 +203,9 @@ test.each([0.0079, 0.007899, 0.007901, 0.000001, 0, 1])('six-decimal opacity %s 
   const created = apply(initial, { kind: 'motion.track.create', elementId: 'object_91', payload: {
     property: 'opacity', durationMs: 1000, delayMs: 0, easing: 'linear', startValue: value, endValue: 1 } });
   expect(Number(created.document.rules[0]!.tracks[0]!.keyframes[0]!.value)).toBe(value);
+  const midpoint = apply(created, { kind: 'motion.keyframe.add', elementId: 'object_91',
+    trackId: created.document.tracks[0]!.id, payload: { timeMs: 500, value } });
+  expect(midpoint.document.rules[0]!.tracks[0]!.keyframes.some((frame) => frame.offset === 0.5 && Number(frame.value) === value)).toBe(true);
   const content = canonicalContentBytes(created.document);
   const undone = apply(created, { kind: 'motion.history.undo' });
   expect(canonicalContentBytes(undone.document)).toEqual(canonicalContentBytes(initial.document));
