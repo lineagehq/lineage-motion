@@ -108,6 +108,7 @@ export const verificationSuites = {
       'apps/editor/tests/phase3-workspace.spec.ts',
       'apps/editor/tests/phase3-collaboration.spec.ts',
       'apps/editor/tests/phase3-reconciliation.spec.ts',
+      'apps/editor/tests/replayed-cue-events.spec.ts',
       'apps/editor/tests/phase4-cues.spec.ts',
       'apps/editor/tests/phase4-reusable-cues.spec.ts',
       'apps/editor/tests/preview-transient-resize.spec.ts',
