@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawnTestServer, waitForTestServer, stopTestServer } from './test-server.ts';
+import { expect, test } from './test-fixture.ts';
+import { type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -11,18 +12,13 @@ let processHandle: ChildProcess; let directory: string; let editorUrl: string; l
 test.beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'lineage-motion-review-')); humanCapability = randomBytes(32).toString('base64url');
   const root = resolve(import.meta.dirname, '../../..');
-  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: '0',
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: randomBytes(32).toString('base64url') },
     stdio: ['ignore', 'pipe', 'pipe'] });
-  ({ editorUrl, serviceUrl } = await new Promise<{ editorUrl: string; serviceUrl: string }>((resolveAddress, reject) => { let output = '';
-    const timer = setTimeout(() => reject(new Error('REVIEW_SERVER_TIMEOUT')), 10_000);
-    processHandle.stdout!.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((item) => item.startsWith('{'));
-      if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); } });
-    processHandle.once('exit', (code) => reject(new Error(`REVIEW_SERVER_EXIT_${code}`))); }));
+  ({ editorUrl, serviceUrl } = await waitForTestServer(processHandle));
 });
-test.afterEach(async () => { processHandle.kill('SIGTERM'); if (processHandle.exitCode === null)
-  await new Promise((done) => processHandle.once('exit', done)); await rm(directory, { recursive: true, force: true }); });
+test.afterEach(async () => { await stopTestServer(processHandle); await rm(directory, { recursive: true, force: true }); });
 
 test('installed Chrome completes the private five-action review and sanitized handoff workflow', async ({ page, browserName }) => {
   const motion = new MotionServiceClient(serviceUrl, fetch, { actor: 'human', capability: humanCapability });

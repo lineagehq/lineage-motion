@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawnTestServer, waitForTestServer, stopTestServer } from './test-server.ts';
+import { expect, test } from './test-fixture.ts';
+import { type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -14,25 +15,17 @@ test.beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'lineage-motion-editor-'));
   const humanCapability = randomBytes(32).toString('base64url');
   const agentCapability = randomBytes(32).toString('base64url');
-  serviceServer = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  serviceServer = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'editor.sqlite'), PHASE3_EDITOR_PORT: '0',
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  editorUrl = await new Promise<string>((resolveAddress, reject) => {
-    let output = ''; const timer = setTimeout(() => reject(new Error('EDITOR_TEST_SERVER_TIMEOUT')), 10000);
-    serviceServer!.stdout!.on('data', (chunk) => { output += chunk.toString();
-      const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-      if (line) { clearTimeout(timer); resolveAddress((JSON.parse(line) as { editorUrl: string }).editorUrl); }
-    });
-    serviceServer!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`EDITOR_TEST_SERVER_EXIT_${code}`)); });
-  });
+  editorUrl = (await waitForTestServer(serviceServer!)).editorUrl;
   await expect.poll(async () => { try { return (await fetch(editorUrl)).ok; } catch { return false; } }).toBe(true);
 });
 
 test.afterEach(async () => {
-  if (serviceServer?.exitCode === null) { serviceServer.kill('SIGTERM');
-    await new Promise((resolveExit) => serviceServer!.once('exit', resolveExit)); }
+  await stopTestServer(serviceServer);
   await rm(directory, { recursive: true, force: true });
 });
 
