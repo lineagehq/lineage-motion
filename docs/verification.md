@@ -39,12 +39,7 @@ complete. Do not merge until every required check passes on the exact head
 commit. `main` requires a pull request, an up-to-date branch, resolved review
 conversations, and these checks:
 
-- `policy-fast`
-- `integration`
-- `recovery-parity`
-- `determinism-visual`
-- `browser`
-- `typecheck-build`
+- `verification-gate`
 - `Analyze (javascript-typescript)`
 
 The local runner remains available as `npm run verify:pr` when a complete
@@ -138,12 +133,32 @@ output, failed, canceled or unexpectedly skipped jobs cannot turn green.
 `browser-smoke` owns the normal startup and managed-app/real-CLI smoke tests; the broad
 browser leaf excludes them, so each ready-PR test is executed once.
 
-Required-context migration is pending live validation. The existing contexts
-listed above remain required until the replacement has passing live evidence.
-The migration changes only the verification contexts to `verification-gate`,
-retaining CodeQL and every other protection. Snapshot settings before migration,
-verify a failed required gate blocks merge, and restore the snapshot on failure.
-Publish the live context receipt here after migration.
+Required-context migration was validated on 2026-09-06 in [PR #26](https://github.com/lineagehq/lineage-motion/pull/26).
+The [ready run](https://github.com/lineagehq/lineage-motion/actions/runs/34063209679)
+and [rerun of the original draft event, attempt 4](https://github.com/lineagehq/lineage-motion/actions/runs/34062895481/attempts/4)
+both selected and passed full verification at `e35ccaee`.
+An [intentional failed prerequisite](https://github.com/lineagehq/lineage-motion/actions/runs/34063568095)
+at temporary probe commit `c6e2449` failed the aggregate even with the other jobs
+skipped; GitHub reported the ready PR as blocked. The probe is removed before
+merge. The migration replaced only the six verification contexts with
+`verification-gate`, retaining CodeQL, strict up-to-date checking, PR enforcement,
+conversation resolution, admin enforcement and force-push/deletion protections.
+All other protection fields matched the saved before/after snapshots.
+
+Three actual draft smoke runs at `e35ccaee` took **63, 76 and 56 seconds**
+including job setup. Initial workflow-to-first-runner delays were **4, 5 and
+4 seconds**, respectively; these are separate from smoke execution and do not
+claim to measure every dependency queue. These are attempts 1–3 of the draft
+run linked above.
+
+On the audit Mac, five warm exact-tip push measurements with the new policies
+were 12.463, 13.934, 12.940, 12.678 and 12.980 seconds: median **12.940s**, maximum
+**13.934s**. Five commit-policy measurements had median **0.104s**, maximum
+**0.123s**. An earlier heavily loaded series reached median **24.547s**, maximum
+**25.490s**, despite passing all checks; the budgets are measured iteration
+conditions, not guarantees under arbitrary host contention. Dependency setup
+remains inside push measurements; the original cold setup receipt is in
+[local hooks](local-hooks.md).
 
 Failure uploads contain only sanitized server diagnostics. Do not upload raw
 browser traces, session files or databases; they can carry live capabilities.
