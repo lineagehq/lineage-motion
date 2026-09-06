@@ -9,7 +9,7 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:editor": "vite --config apps/editor/vite.config.ts",
+    "dev:editor": "node --import tsx apps/editor/scripts/dev-editor.mjs",
     "build": "vite build --config apps/editor/vite.config.ts",
     "test:browser": "playwright test --config apps/editor/playwright.config.ts",
     "test:visual": "vitest run packages/visual-proof/src/visual.test.ts packages/visual-proof/src/hold-ripple.visual.test.ts packages/visual-proof/src/reusable-cues.visual.test.ts --sequence.concurrent false",
