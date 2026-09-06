@@ -14,7 +14,7 @@ export default defineConfig({
     viewport: { width: 1280, height: 900 },
   },
   webServer: {
-    command: 'npx vite --config apps/editor/vite.config.ts --host 127.0.0.1 --port 41745 --strictPort',
+    command: 'npx vite --config vite.config.ts --host 127.0.0.1 --port 41745 --strictPort',
     url: 'http://127.0.0.1:41745',
     reuseExistingServer: false,
   },
