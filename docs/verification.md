@@ -157,8 +157,8 @@ were 12.463, 13.934, 12.940, 12.678 and 12.980 seconds: median **12.940s**, maxi
 **0.123s**. An earlier heavily loaded series reached median **24.547s**, maximum
 **25.490s**, despite passing all checks; the budgets are measured iteration
 conditions, not guarantees under arbitrary host contention. Dependency setup
-remains inside push measurements; the original cold setup receipt is in
-[local hooks](local-hooks.md).
+remains inside push measurements; the original separate cold-clone run took **9.396s** including installation
+at `e22940c`, recorded in [the hook PR receipt](https://github.com/lineagehq/lineage-motion/pull/23).
 
 Failure uploads contain only sanitized server diagnostics. Do not upload raw
 browser traces, session files or databases; they can carry live capabilities.
