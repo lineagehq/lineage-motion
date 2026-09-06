@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { execFileSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { withoutInheritedGitEnvironment } from './git-environment.mjs';
@@ -29,6 +29,7 @@ async function stopRunning() {
 }
 
 export function run(command, args, cwd) {
+  if (shuttingDown) return Promise.resolve(1);
   return new Promise((resolveResult, reject) => {
     const child = spawn(command, args, { cwd, env: cleanEnvironment(), stdio: 'inherit', detached: true });
     running.add(child);
@@ -63,7 +64,6 @@ async function dependencies(root, snapshot) {
     const pending = mkdtempSync(join(cache, 'install-'));
     pendingInstalls.add(pending);
     try {
-      const { writeFileSync } = await import('node:fs');
       writeFileSync(join(pending, 'package.json'), packageBytes);
       writeFileSync(join(pending, 'package-lock.json'), lockBytes);
       if (await run('npm', ['ci', '--ignore-scripts', '--no-audit', '--no-fund'], pending)) {
