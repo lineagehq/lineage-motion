@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawn, spawnSync } from 'node:child_process';
-import { chmodSync, cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { chmodSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import test from 'node:test';
@@ -226,4 +226,46 @@ test('interrupting push stops verification processes and removes its snapshot', 
     assert.equal(alive, false, 'Verifier must stop on interruption');
   }
   assert.equal(git(root, 'worktree', 'list', '--porcelain').match(/^worktree /gm).length, 1);
+});
+
+
+test('cold-install interruption removes only its own staging directory and stops npm', async () => {
+  for (const signal of ['SIGINT', 'SIGTERM']) {
+    const root = fixture();
+    const bin = join(root, 'fake-bin');
+    put(root, 'fake-bin/npm', '#!/usr/bin/env node\n' +
+      'if(process.argv.includes("--version")){console.log("test-npm");process.exit(0);}' +
+      'process.on("SIGTERM",()=>{});' +
+      'require("node:fs").mkdirSync("node_modules",{recursive:true});' +
+      'console.log("install-pid:"+process.pid);setInterval(()=>{},1000);');
+    chmodSync(join(bin, 'npm'), 0o755);
+    const cache = join(root, '.git', 'motion-hook-dependencies');
+    mkdirSync(join(cache, 'install-unrelated'), { recursive: true });
+    const tip = git(root, 'rev-parse', 'HEAD');
+    const child = spawn('node', [join(source, 'scripts/check-push.mjs')], {
+      cwd: root, env: { ...env, PATH: bin + ':' + env.PATH },
+    });
+    child.stdin.end(`HEAD ${tip} refs/heads/new ${zeros}\n`);
+    child.stderr.resume();
+    const exited = new Promise((done) => child.once('exit', done));
+    let npmPid;
+    try {
+      npmPid = await new Promise((ready, reject) => {
+        const deadline = setTimeout(() => reject(new Error('No cold install startup')), 10000);
+        child.stdout.on('data', (bytes) => {
+          const match = bytes.toString().match(/install-pid:(\d+)/);
+          if (match) { clearTimeout(deadline); ready(Number(match[1])); }
+        });
+      });
+      assert.equal(readdirSync(cache).length, 2);
+      child.kill(signal);
+      assert.equal(await exited, 1);
+      assert.deepEqual(readdirSync(cache), ['install-unrelated']);
+      assert.throws(() => process.kill(npmPid, 0));
+      assert.equal(git(root, 'worktree', 'list', '--porcelain').match(/^worktree /gm).length, 1);
+    } finally {
+      child.kill('SIGKILL');
+      if (npmPid) { try { process.kill(-npmPid, 'SIGKILL'); } catch {} }
+    }
+  }
 });

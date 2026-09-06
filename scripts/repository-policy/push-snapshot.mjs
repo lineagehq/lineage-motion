@@ -12,10 +12,20 @@ export const git = (root, args) => execFileSync('git', args, {
 }).trim();
 
 const running = new Set();
-function stopRunning() {
-  for (const child of running) {
-    try { process.kill(-child.pid, 'SIGTERM'); } catch { /* Child already exited. */ }
-  }
+const pendingInstalls = new Set();
+let shuttingDown = false;
+async function stopRunning() {
+  shuttingDown = true;
+  const signal = (child, kind) => {
+    try { process.kill(-child.pid, kind); } catch { /* Process group already exited. */ }
+  };
+  await Promise.all([...running].map((child) => new Promise((done) => {
+    const finish = () => { clearTimeout(timer); signal(child, 'SIGKILL'); done(); };
+    const timer = setTimeout(() => signal(child, 'SIGKILL'), 250);
+    child.once('exit', finish);
+    child.once('error', finish);
+    signal(child, 'SIGTERM');
+  })));
 }
 
 export function run(command, args, cwd) {
@@ -25,7 +35,7 @@ export function run(command, args, cwd) {
     child.once('error', (error) => { running.delete(child); reject(error); });
     child.once('exit', (code, signal) => {
       running.delete(child);
-      resolveResult(code ?? (signal ? 1 : 0));
+      resolveResult(shuttingDown ? 1 : code ?? (signal ? 1 : 0));
     });
   });
 }
@@ -51,6 +61,7 @@ async function dependencies(root, snapshot) {
   const installed = join(cache, key);
   if (!existsSync(installed)) {
     const pending = mkdtempSync(join(cache, 'install-'));
+    pendingInstalls.add(pending);
     try {
       const { writeFileSync } = await import('node:fs');
       writeFileSync(join(pending, 'package.json'), packageBytes);
@@ -61,7 +72,7 @@ async function dependencies(root, snapshot) {
       try { renameSync(pending, installed); } catch (error) {
         if (!existsSync(installed)) throw error;
       }
-    } finally { rmSync(pending, { recursive: true, force: true }); }
+    } finally { rmSync(pending, { recursive: true, force: true }); pendingInstalls.delete(pending); }
   }
   symlinkSync(join(installed, 'node_modules'), join(snapshot, 'node_modules'), 'dir');
 }
@@ -75,7 +86,12 @@ export async function withPushSnapshot(root, tip, verify) {
   };
   // Normal completion and signals clean up this one owned worktree, never prune
   // or change another worktree's hooks/configuration.
-  const interrupted = () => { stopRunning(); cleanup(); process.exit(1); };
+  const interrupted = () => {
+    void stopRunning().finally(() => {
+      for (const pending of pendingInstalls) rmSync(pending, { recursive: true, force: true });
+      cleanup(); process.exit(1);
+    });
+  };
   process.once('SIGINT', interrupted);
   process.once('SIGTERM', interrupted);
   try {
