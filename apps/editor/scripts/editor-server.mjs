@@ -27,8 +27,11 @@ export async function launchEditor({ onReady } = {}) {
   process.on('SIGTERM', stop); process.on('SIGINT', stop);
   try {
     service = await startLocalMotionService({ databasePath, seed,
+      ...(process.env.MOTION_PROJECT_ID && process.env.MOTION_PROJECT_NAME ? { project: {
+        projectId: process.env.MOTION_PROJECT_ID, name: process.env.MOTION_PROJECT_NAME }, preserveExistingProjectIdentity: true } : {}),
       capabilities: { human: humanCapability, agent: agentCapability } });
     process.env.PHASE3_SERVICE_URL = service.url;
+    if (process.env.MOTION_PROJECT_ID) process.env.MOTION_PROJECT_ID = service.store.readProjectCatalog().projectId;
     vite = await createViteServer({ configFile: fileURLToPath(new URL('../vite.config.ts', import.meta.url)),
       server: { host: '127.0.0.1', port: editorPort, strictPort: true }, logLevel: 'silent' });
     // Vite 7 treats config port=0 as its default; bind the existing server directly.
@@ -41,6 +44,12 @@ export async function launchEditor({ onReady } = {}) {
     else await vite.listen();
     const address = vite.httpServer?.address();
     if (!address || typeof address === 'string') throw new Error('PHASE3_EDITOR_ADDRESS_UNAVAILABLE');
+    // Keep the OS-selected port when Vite reloads a configuration dependency.
+    // Its restart path reuses inlineConfig; leaving zero there selects Vite's default port.
+    if (editorPort === 0) {
+      vite.config.inlineConfig.server.port = address.port;
+      vite.config.server.port = address.port;
+    }
     const addresses = { editorUrl: `http://lineage-motion.localhost:${address.port}`, serviceUrl: service.url };
     cleanup = onReady?.(addresses);
     console.log(JSON.stringify(addresses));

@@ -3,6 +3,8 @@ declare module 'virtual:motion-document' {
     document: import('../../../packages/domain/src/index.js').MotionDocument;
     compiled: import('../../../packages/css-compiler/src/index.js').CompilerResult;
     serviceBacked: boolean;
+    normalProject?: boolean;
+    projectName?: string | null;
     humanCapability: string | null;
     shotWorkspace?: {
       schemaVersion: 'motion.editor-shot-workspace.v1';

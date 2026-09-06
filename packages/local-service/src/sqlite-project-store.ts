@@ -54,12 +54,12 @@ export class SqliteProjectStore extends SqliteProjectStoreBase implements Projec
   }
   readProjectCatalog() { return readProjectCatalog(this.database); }
   admitShot(command: ShotAdmissionCommand, auth: AuthContext) { return admitShot(this.database, command, auth, this.fault); }
-  initialize(seed: MotionDocument, project?: ProjectIdentity): void {
+  initialize(seed: MotionDocument, project?: ProjectIdentity, preserveExistingProjectIdentity = false): void {
     if (!validateMotionDocument(seed).ok) throw new Error('SEED_INVALID');
     const existing = this.database.prepare('SELECT document_id FROM documents').all() as Array<{ document_id: string }>;
     if (existing.length) { if (!existing.some(row => row.document_id === seed.documentId)) throw new Error('STORE_DOCUMENT_MISMATCH');
       this.database.exec('BEGIN IMMEDIATE');
-      try { initializeProject(this.database, seed, project); this.verify(); this.database.exec('COMMIT'); }
+      try { initializeProject(this.database, seed, preserveExistingProjectIdentity ? undefined : project); this.verify(); this.database.exec('COMMIT'); }
       catch (error) { this.database.exec('ROLLBACK'); throw error; }
       return; }
     const json = canonicalJson(seed); const digest = sha256Hex(canonicalBytes(seed)); this.database.exec('BEGIN IMMEDIATE');
