@@ -17,15 +17,13 @@ test('package installation prepares Husky hooks', async () => {
 
 test('pre-commit rejects line-limit and verification-manifest drift', async () => {
   const hook = await readRepositoryFile('.husky/pre-commit');
-  assert.match(hook, /npm run check:line-limit/);
-  assert.match(hook, /npm run check:verification-manifest/);
-  assert.match(hook, /npm run check:execution-artifacts/);
+  assert.match(hook, /node scripts\/check-staged\.mjs/);
   assert.notEqual((await stat(new URL('.husky/pre-commit', repositoryRoot))).mode & 0o111, 0);
 });
 
 test('pre-push runs the complete fast tier', async () => {
   const hook = await readRepositoryFile('.husky/pre-push');
-  assert.match(hook, /npm run verify:fast/);
+  assert.match(hook, /node scripts\/check-push\.mjs/);
   assert.notEqual((await stat(new URL('.husky/pre-push', repositoryRoot))).mode & 0o111, 0);
 });
 

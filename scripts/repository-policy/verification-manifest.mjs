@@ -17,6 +17,7 @@ export const verificationSuites = {
   'policy-tests': nodeTest([
     'scripts/repository-policy/execution-artifacts.test.mjs',
     'scripts/repository-policy/git-hooks.test.mjs',
+    'scripts/repository-policy/exact-hooks.test.mjs',
     'scripts/repository-policy/line-limit.test.mjs',
     'scripts/repository-policy/test-discovery.test.mjs',
     'scripts/repository-policy/verification-dag.test.mjs',

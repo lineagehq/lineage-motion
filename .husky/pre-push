@@ -1,1 +1,2 @@
-npm run verify:fast
+#!/bin/sh
+node scripts/check-push.mjs
