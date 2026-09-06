@@ -57,7 +57,8 @@ export async function reconcileCommit(event: CommitMetadata, subscriptionGenerat
   if (!gap && immutable.canonicalDigest !== event.digest) throw new Error('REMOTE_DIGEST_MISMATCH');
   if (gap && immutable.document.revision === event.revision && immutable.canonicalDigest !== event.digest)
     throw new Error('REMOTE_GAP_DIGEST_MISMATCH');
-  const applied = immutable.document.revision !== authoring.value.document.revision;
+  // A loaded branch head can be ahead of its replay cursor; undo also creates newer revisions.
+  const applied = immutable.document.revision > authoring.value.document.revision;
   if (applied) await applyImmutable(immutable, true);
   acknowledge();
   if (applied || gap) {

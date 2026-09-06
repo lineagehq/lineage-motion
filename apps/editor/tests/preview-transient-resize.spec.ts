@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test-fixture.ts';
 
 test('ignores a transient zero-width preview resize and recovers its projection', async ({ page }) => {
   const pageErrors: string[] = [];

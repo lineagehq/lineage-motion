@@ -98,6 +98,8 @@ export const verificationSuites = {
   browser: {
     kind: 'playwright', command: 'npx', args: ['playwright', 'test', '--config', 'apps/editor/playwright.config.ts'],
     files: [
+      'apps/editor/tests/server-lifecycle.spec.ts',
+      'apps/editor/tests/normal-startup.spec.ts',
       'apps/editor/tests/editor.spec.ts',
       'apps/editor/tests/editor-authoring.spec.ts',
       'apps/editor/tests/integrated-dogfood.spec.ts',
@@ -107,6 +109,7 @@ export const verificationSuites = {
       'apps/editor/tests/phase3-workspace.spec.ts',
       'apps/editor/tests/phase3-collaboration.spec.ts',
       'apps/editor/tests/phase3-reconciliation.spec.ts',
+      'apps/editor/tests/replayed-cue-events.spec.ts',
       'apps/editor/tests/phase4-cues.spec.ts',
       'apps/editor/tests/phase4-reusable-cues.spec.ts',
       'apps/editor/tests/preview-transient-resize.spec.ts',

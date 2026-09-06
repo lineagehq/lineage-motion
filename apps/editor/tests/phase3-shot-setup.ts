@@ -1,5 +1,6 @@
+import { spawnTestServer, waitForTestServer, stopTestServer } from './test-server.ts';
 import { expect, type Page } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -26,9 +27,8 @@ export async function runShotSetup({
   initialProcessHandle: ChildProcess | undefined;
 }) {
   await page.setViewportSize({ width: 1183, height: 900 });
-  initialProcessHandle?.kill('SIGTERM');
-  if (initialProcessHandle?.exitCode === null) await new Promise((resolveExit) => initialProcessHandle.once('exit', resolveExit));
-  const root = resolve(import.meta.dirname, '../../..'); const port = 43000 + Math.floor(Math.random() * 500);
+  await stopTestServer(initialProcessHandle);
+  const root = resolve(import.meta.dirname, '../../..'); const port = 0;
   const seed = createTrajectorySeed(root); const targetElementIds = seed.elements.map((element) => element.id).sort();
   const inheritedTargets = projectTrajectorySelection(seed, targetElementIds, 700);
   expect(inheritedTargets.eligible).toBe(true); if (!inheritedTargets.eligible) throw new Error(inheritedTargets.code ?? 'TRAJECTORY_SELECTION_INVALID');
@@ -43,18 +43,13 @@ export async function runShotSetup({
   }
   const runtimeSeedPath = join(directory, 'trajectory-inherited-timing.json');
   await writeFile(runtimeSeedPath, `${JSON.stringify(seed)}\n`);
-  const processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  const processHandle = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'trajectory.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
       LANDING_SHOT1_DOCUMENT_PATH: runtimeSeedPath },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const addresses = await new Promise<{ editorUrl: string; serviceUrl: string }>((resolveAddress, reject) => {
-    let output = ''; const timer = setTimeout(() => reject(new Error('TRAJECTORY_SERVER_TIMEOUT')), 10000);
-    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-      if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); } });
-    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`TRAJECTORY_SERVER_EXIT_${code}`)); });
-  });
+  const addresses = await waitForTestServer(processHandle!);
   const { editorUrl, serviceUrl } = addresses;
   await expect.poll(async () => { try { return (await fetch(editorUrl)).ok; } catch { return false; } }).toBe(true);
   const commandBytes: string[] = []; page.on('request', (request) => {

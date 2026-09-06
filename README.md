@@ -29,6 +29,40 @@ service, or Lineage database integration yet.
 > the same precise sequence-wide edits, and export deterministic browser-native
 > HTML/CSS without a production runtime.
 
+## Run the editor locally
+
+Install Node.js 22.22 or newer, then run:
+
+```sh
+npm ci
+npm run dev:editor
+```
+
+Open the named localhost address printed by the command. The included public
+starter is ready for editing: choose Cursor or Orb in Choose & Create, then
+create its opacity track. Changes are committed by the local service and survive
+Ctrl+C and restarting the same command.
+
+Use `npm run dev:editor -- --project "Second animation" --port 0` to open another
+isolated project on an available port. Project names select separate local data;
+worktrees are isolated even when their project names match. Reuse the same
+checkout and project name to reopen existing edits. Moving a checkout changes
+its local identity; retain its old data when relocating work.
+
+Data lives outside Git in `~/.local/share/lineage-motion`, in private directories
+keyed by checkout and project. Override the base using `--data-dir /external/path`.
+The printed local session file is private and contains the current agent
+connection capability; do not copy it into prompts, commits, or reports.
+It is removed at clean shutdown and recreated on launch. Stop with Ctrl+C;
+closing the browser alone leaves the service running.
+
+If the port is occupied, use `--port 0` or stop its other listener. If storage
+cannot open, choose a writable external data directory. If the browser cannot
+connect, keep the launcher running and use Retry connection. An already-open
+project must be stopped before another launcher can acquire its database lock.
+Direct Vite startup is a development inspection surface; use the command above
+for durable authoring.
+
 ## Start here
 
 - [Incubation plan](docs/incubation-plan.md)
