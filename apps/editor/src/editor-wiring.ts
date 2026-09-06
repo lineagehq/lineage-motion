@@ -68,7 +68,7 @@ createTrackButton.addEventListener('click', () => {
 });
 addMidpointButton.addEventListener('click', () => void withCreatedTrack((track) => ({
   ...operationEnvelope(), kind: 'motion.keyframe.add', elementId: track.elementId as StructuralAuthoringElementId, trackId: track.trackId,
-  payload: { timeMs: 1110, value: 0.5 },
+  payload: { timeMs: (track.keyframes[0]!.timeMs + track.keyframes.at(-1)!.timeMs) / 2, value: 0.5 },
 }), '[data-value]'));
 setDurationButton.addEventListener('click', () => {
   const durationMs = Number(durationInput.value);

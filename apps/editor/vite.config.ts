@@ -29,6 +29,8 @@ function compiledMotionPlugin() {
         document: motionDocument,
         compiled: compileMotionDocument(motionDocument),
         serviceBacked: Boolean(process.env.PHASE3_SERVICE_URL),
+        normalProject: Boolean(process.env.MOTION_PROJECT_ID),
+        projectName: process.env.MOTION_PROJECT_NAME ?? null,
         humanCapability: process.env.PHASE3_HUMAN_CAPABILITY ?? null,
         ...(landingShot1Workspace ? { shotWorkspace: {
           schemaVersion: 'motion.editor-shot-workspace.v1',

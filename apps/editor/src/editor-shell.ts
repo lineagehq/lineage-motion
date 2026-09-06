@@ -1,3 +1,4 @@
+import { escapeMarkup } from './project-entry.js';
 import payload from 'virtual:motion-document';
 import {
   authoring, creationChoices, reusableCueWorkspace, reusableHoldTargetOptions, reusableTargetOptions,
@@ -62,7 +63,7 @@ return `
         <section class="workflow-card choose-create" aria-labelledby="choose-create-heading">
           <div class="step-heading"><span>1</span><div><h2 id="choose-create-heading">Choose &amp; Create</h2><p data-structural-status>Select an available element to begin.</p></div></div>
           <fieldset class="target-choices" data-target-choices><legend>What should fade?</legend>
-            ${creationChoices.map((choice) => `<label><input type="radio" name="creation-target" value="${choice.elementId}"><span><strong>${choice.label}</strong><small>Opacity · <span data-choice-reason="${choice.elementId}">Available</span></small></span></label>`).join('')}
+            ${creationChoices.map((choice) => `<label><input type="radio" name="creation-target" value="${choice.elementId}"><span><strong>${escapeMarkup(choice.label)}</strong><small>Opacity · <span data-choice-reason="${choice.elementId}">Available</span></small></span></label>`).join('')}
             <div class="unavailable-choice" data-status-copy><span><strong>Status copy</strong><small>Opacity · <span data-choice-reason="${statusCopyElementId}">Already animated</span></small></span></div>
           </fieldset>
           <button class="primary-action" type="button" data-create-track disabled>Select an element</button>
@@ -93,7 +94,7 @@ return `
         </section>
         <section class="workflow-footer" aria-label="Change history">
           <div class="history"><button type="button" data-undo>Undo</button><button type="button" data-redo>Redo</button></div>
-          <output class="operation-status" data-operation-status role="status" aria-live="polite">Revision 0 ready.</output>
+          <output class="operation-status" data-operation-status role="status" aria-live="polite">Revision ${authoring.value.document.revision} ready.</output>
         </section>
       </div>
       <section class="preview-panel" aria-labelledby="preview-heading">

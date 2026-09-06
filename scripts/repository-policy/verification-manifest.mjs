@@ -61,6 +61,7 @@ export const verificationSuites = {
     'packages/domain/src/repository-safety.test.ts',
   ]),
   'service-integration': vitest([
+    'packages/local-service/src/project-reopen.test.ts',
     'packages/local-service/src/project-admission.test.ts',
     'packages/local-service/src/branch-claim.test.ts',
     'packages/local-service/src/durable-contract.test.ts',
@@ -117,6 +118,7 @@ export const verificationSuites = {
     'apps/editor/tests/normal-agent-smoke.spec.ts',
   ]),
   browser: playwright([
+      'apps/editor/tests/project-entry.spec.ts',
       'apps/editor/tests/editor.spec.ts',
       'apps/editor/tests/editor-authoring.spec.ts',
       'apps/editor/tests/integrated-dogfood.spec.ts',

@@ -69,7 +69,9 @@ export function updateStructuralControls(rows: TimelineRow[]): void {
   createTrackButton.textContent = selectedCreationElementId.value
     ? `Create ${creationChoices.find((choice) => choice.elementId === selectedCreationElementId.value)!.label} opacity track`
     : 'Select an element';
-  addMidpointButton.disabled = locked || !hasTrack || hasMidpoint;
+  const midpointAvailable = !track || Number.isSafeInteger((track.keyframes[0]!.timeMs + track.keyframes.at(-1)!.timeMs) / 2);
+  addMidpointButton.disabled = locked || !hasTrack || hasMidpoint || !midpointAvailable;
+  addMidpointButton.title = midpointAvailable ? '' : 'Choose an even duration so the midpoint falls on a whole millisecond.';
   removeMidpointButton.disabled = locked || !hasMidpoint;
   for (const control of [durationInput, delayInput, easingInput, setDurationButton, setDelayButton, setEasingButton]) {
     control.disabled = locked || !hasTrack;
@@ -141,7 +143,9 @@ export function eligibilityReason(reason: ReturnType<typeof projectTrackCreation
 
 export function findCreatedTrack(rows: TimelineRow[]): TimelineRow | undefined {
   const created = rows.filter((row) => creationChoices.some((choice) => choice.elementId === row.elementId)
-    && row.property === 'opacity');
+    && row.property === 'opacity' && (!payload.normalProject || (
+      authoring.value.document.rules.find(rule => rule.id === authoring.value.document.tracks.find(track => track.id === row.trackId)?.ruleId)?.sourceName.startsWith('created_')
+      && !authoring.value.document.cues.some(cue => cue.schemaVersion === 'motion.authoring-cue.v1' && cue.generatedTrackIds.includes(row.trackId)))));
   if (selectedCreationElementId.value) return created.find((row) => row.elementId === selectedCreationElementId.value);
   return created.find((row) => row.trackId === selectedTrackId.value) ?? (created.length === 1 ? created[0] : undefined);
 }
