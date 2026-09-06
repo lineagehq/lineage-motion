@@ -1,3 +1,4 @@
+import { projectHoldEligibility } from './authoring-eligibility.js';
 import { canonicalContentBytes, formatCanonicalDecimal, stableStringify } from './canonical.js';
 import { sha256Hex } from './sha256.js';
 import type { MotionDocument, MotionHold, RuleTrack } from './document.js';
@@ -6,7 +7,6 @@ import type {
   InternalTrackDeleteOperation, ReducerOperation, StructuralAuthoringOperation,
 } from './authoring-types.js';
 import {
-  STRUCTURAL_AUTHORING_ELEMENT_IDS, STRUCTURAL_AUTHORING_STATUS_ELEMENT_ID,
   projectTrackCreationEligibility, type StructuralAuthoringElementId, type TrackCreationEligibility,
 } from './index.js';
 
@@ -15,33 +15,25 @@ export function applyHold(
   operation: HoldInsertOperation | InternalHoldRemoveOperation,
 ): { ok: true; document: MotionDocument; inverse: ReducerOperation } | { ok: false; code: string } {
   if (operation.kind === 'motion.hold.insert') {
-    if (operation.payload.cueId !== 'cue_pair' || operation.payload.durationMs !== 600) {
-      return { ok: false, code: 'AUTHORING_HOLD_INVALID' };
-    }
-    if ((document.holds ?? []).length > 0) return { ok: false, code: 'AUTHORING_HOLD_COLLISION' };
-    const cue = document.cues.find((candidate) => candidate.id === 'cue_pair');
-    if (!cue || cue.schemaVersion !== 'motion.cue.v1' || cue.timeMs !== 2870 || document.durationMs !== 4660) {
-      return { ok: false, code: 'AUTHORING_HOLD_BOUNDARY_MISMATCH' };
-    }
-    if (document.durationMs > Number.MAX_SAFE_INTEGER - 600) {
-      return { ok: false, code: 'AUTHORING_HOLD_OVERFLOW' };
-    }
+    const eligibility = projectHoldEligibility(document, operation.payload.cueId, operation.payload.durationMs);
+    if (!eligibility.available) return { ok: false, code: eligibility.reason! };
+    const cue = document.cues.find((candidate) => candidate.id === operation.payload.cueId)!;
     const hold: MotionHold = {
       schemaVersion: 'motion.hold.v1',
-      id: structuralId('hold', `${document.documentId}\0cue_pair\0${2870}\0${600}`),
-      cueId: 'cue_pair', sourceTimeMs: 2870, durationMs: 600,
+      id: structuralId('hold', `${document.documentId}\0${cue.id}\0${cue.timeMs}\0${operation.payload.durationMs}`),
+      cueId: cue.id, sourceTimeMs: cue.timeMs, durationMs: operation.payload.durationMs,
     };
     if (canonicalIdentitySet(document).has(hold.id)) return { ok: false, code: 'AUTHORING_ID_COLLISION' };
     const next = structuredClone(document);
     next.holds = [hold];
-    next.durationMs += 600;
-    next.cues = next.cues.map((candidate) => candidate.schemaVersion === 'motion.cue.v1' && candidate.timeMs >= 2870
-      ? { ...candidate, timeMs: candidate.timeMs + 600 } : candidate);
+    next.durationMs += hold.durationMs;
+    next.cues = next.cues.map((candidate) => candidate.schemaVersion === 'motion.cue.v1' && candidate.timeMs >= hold.sourceTimeMs
+      ? { ...candidate, timeMs: candidate.timeMs + hold.durationMs } : candidate);
     const contentDigest = sha256Hex(canonicalContentBytes(next));
     return { ok: true, document: next, inverse: {
       schemaVersion: operation.schemaVersion, operationId: operation.operationId,
       documentId: operation.documentId, expectedRevision: operation.expectedRevision,
-      kind: 'motion.internal.hold.remove', payload: { holdId: hold.id, contentDigest },
+      kind: 'motion.internal.trajectory.restore', payload: { expectedContentDigest: contentDigest, restore: structuredClone(document) },
     } };
   }
   const hold = document.holds?.[0];
@@ -58,7 +50,7 @@ export function applyHold(
   return { ok: true, document: next, inverse: {
     schemaVersion: operation.schemaVersion, operationId: operation.operationId,
     documentId: operation.documentId, expectedRevision: operation.expectedRevision,
-    kind: 'motion.hold.insert', payload: { cueId: 'cue_pair', durationMs: 600 },
+    kind: 'motion.hold.insert', payload: { cueId: hold.cueId, durationMs: hold.durationMs },
   } };
 }
 
@@ -91,8 +83,11 @@ export function applyStructural(
   const next = structuredClone(document);
   const payload: Record<string, unknown> = 'payload' in operation ? operation.payload : {};
   if (operation.kind === 'motion.track.create') {
-    if (payload.property !== 'opacity' || payload.durationMs !== 1000 || payload.delayMs !== 610
-      || payload.easing !== 'linear' || payload.startValue !== 0 || payload.endValue !== 1) {
+    if (payload.property !== 'opacity' || !Number.isSafeInteger(payload.durationMs) || (payload.durationMs as number) <= 0
+      || !Number.isSafeInteger(payload.delayMs) || (payload.delayMs as number) < 0
+      || (payload.durationMs as number) + (payload.delayMs as number) > document.durationMs
+      || payload.easing !== 'linear' || ![payload.startValue, payload.endValue].every((value) => typeof value === 'number'
+        && value >= 0 && value <= 1 && Number(value.toFixed(6)) === value)) {
       return { ok: false, code: 'AUTHORING_TRACK_CREATE_INVALID' };
     }
     const eligibility = projectTrackCreationEligibility(document, element.id, String(payload.property));
@@ -103,6 +98,7 @@ export function applyStructural(
         SHARED_PROPERTY_UNSUPPORTED: 'AUTHORING_SHARED_PROPERTY_UNSUPPORTED',
         PROPERTY_CONFLICT: 'AUTHORING_PROPERTY_CONFLICT', TRACK_ALREADY_EXISTS: 'AUTHORING_TRACK_ALREADY_EXISTS',
         TRACK_LIMIT_REACHED: 'AUTHORING_TRACK_LIMIT_REACHED', ID_COLLISION: 'AUTHORING_ID_COLLISION',
+        HOLD_LOCKED: 'AUTHORING_HOLD_LOCKED',
       };
       return { ok: false, code: codes[eligibility.reason!] };
     }
@@ -111,11 +107,12 @@ export function applyStructural(
     const sourceName = `created_${sha256Hex(base).slice(0, 16)}`;
     const rule = { id: ruleId, sourceName, tracks: [{
       id: ruleTrackId, property: 'opacity', interpolation: 'continuous' as const,
-      keyframes: [{ id: startId, offset: 0, value: '0' }, { id: endId, offset: 1, value: '1' }],
+      keyframes: [{ id: startId, offset: 0, value: formatCanonicalDecimal(operation.payload.startValue) },
+        { id: endId, offset: 1, value: formatCanonicalDecimal(operation.payload.endValue) }],
     }] };
     const application = { id: applicationId,
-      bindings: [{ elementId: element.id, delayOverridesMs: [610] }], selectorHint: element.selectorHint,
-      slots: [{ id: slotId, ruleId, durationMs: 1000, delayMs: 610, iterationCount: 1 as const,
+      bindings: [{ elementId: element.id, delayOverridesMs: [operation.payload.delayMs] }], selectorHint: element.selectorHint,
+      slots: [{ id: slotId, ruleId, durationMs: operation.payload.durationMs, delayMs: operation.payload.delayMs, iterationCount: 1 as const,
         direction: 'normal' as const, fillMode: 'both' as const, playState: 'running' as const,
         timingFunction: { kind: 'keyword' as const, value: 'linear' as const } }] };
     const expanded = { id: trackId, elementId: element.id, ruleId, slotId, property: 'opacity',
@@ -150,8 +147,8 @@ export function applyStructural(
       operationId: operation.operationId, documentId: operation.documentId,
       expectedRevision: operation.expectedRevision, kind: 'motion.track.create',
       elementId: operation.elementId,
-      payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear',
-        startValue: 0, endValue: 1 } } };
+      payload: { property: 'opacity', durationMs: slot.durationMs, delayMs: slot.delayMs, easing: 'linear',
+        startValue: Number(ruleTrack.keyframes[0]!.value), endValue: Number(ruleTrack.keyframes.at(-1)!.value) } } };
   }
   if (operation.kind === 'motion.internal.keyframe.restore') {
     const restored = operation.keyframe;
@@ -179,7 +176,7 @@ export function applyStructural(
     const offsetPpm = numerator / slot.durationMs;
     if (!Number.isSafeInteger(offsetPpm) || offsetPpm <= 0 || offsetPpm >= 1_000_000
       || typeof value !== 'number' || value < 0 || value > 1
-      || !Number.isSafeInteger(value * 1_000_000)) {
+      || Number(value.toFixed(6)) !== value) {
       return { ok: false, code: 'AUTHORING_KEYFRAME_INVALID' };
     }
     if (ruleTrack.keyframes.some((keyframe) => keyframe.offset * 1_000_000 === offsetPpm)) {
@@ -285,7 +282,7 @@ export function derivedBundleIds(documentId: string, elementId: StructuralAuthor
   };
 }
 
-function resolveIsolatedOpacityBundle(document: MotionDocument, trackId: string):
+export function resolveIsolatedOpacityBundle(document: MotionDocument, trackId: string):
   | { ok: true; rule: MotionDocument['rules'][number]; ruleTrack: RuleTrack;
     application: MotionDocument['applications'][number]; slotIndex: number;
     slot: MotionDocument['applications'][number]['slots'][number];
@@ -293,9 +290,6 @@ function resolveIsolatedOpacityBundle(document: MotionDocument, trackId: string)
   | { ok: false; code: string } {
   const expanded = document.tracks.find((track) => track.id === trackId);
   if (!expanded) return { ok: false, code: 'AUTHORING_TRACK_NOT_FOUND' };
-  if (!STRUCTURAL_AUTHORING_ELEMENT_IDS.includes(expanded.elementId as StructuralAuthoringElementId)) {
-    return { ok: false, code: 'AUTHORING_BUNDLE_MISMATCH' };
-  }
   const elementId = expanded.elementId as StructuralAuthoringElementId;
   const ids = derivedBundleIds(document.documentId, elementId);
   if (expanded.id !== ids.trackId
@@ -317,7 +311,8 @@ function resolveIsolatedOpacityBundle(document: MotionDocument, trackId: string)
   const binding = application.bindings.find((candidate) =>
     candidate.elementId === elementId);
   const sourceName = `created_${sha256Hex(ids.base).slice(0, 16)}`;
-  if (!slot || !ruleTrack || !binding || rule.id !== ids.ruleId || rule.sourceName !== sourceName
+  if (!slot || slot.iterationCount !== 1 || slot.direction !== 'normal' || slot.durationMs <= 0
+    || !ruleTrack || !binding || rule.id !== ids.ruleId || rule.sourceName !== sourceName
     || application.id !== ids.applicationId
     || slot.id !== ids.slotId || ruleTrack.id !== ids.ruleTrackId || slot.ruleId !== rule.id
     || rule.tracks.length !== 1 || application.slots.length !== 1 || application.bindings.length !== 1

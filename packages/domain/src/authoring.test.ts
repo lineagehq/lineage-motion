@@ -128,8 +128,8 @@ describe('typed authoring operations', () => {
     const base = { ...strictEnvelope(state, 'hold:strict'), kind: 'motion.hold.insert',
       payload: { cueId: 'cue_pair', durationMs: 600 } };
     for (const malformed of [
-      { ...base, payload: { ...base.payload, durationMs: 601 } },
-      { ...base, payload: { ...base.payload, cueId: 'cue_hold' } },
+      { ...base, payload: { ...base.payload, durationMs: 0 } },
+      { ...base, payload: { ...base.payload, cueId: '' } },
       { ...base, payload: { ...base.payload, extra: true } },
       { ...base, extra: true },
     ]) {
@@ -230,7 +230,7 @@ describe('typed authoring operations', () => {
       payload: { property: 'opacity', durationMs: 1000, delayMs: 610, easing: 'linear', startValue: 0, endValue: 1 } };
     const malformed = [
       { ...create, extra: true },
-      { ...create, elementId: 'el_other' },
+      { ...create, elementId: '' },
       { ...create, payload: { ...create.payload, durationMs: '1000' } },
       { ...create, payload: { ...create.payload, arbitrary: true } },
       { ...create, kind: 'motion.internal.track.delete', trackId: 'x', payload: { bundleDigest: 'x' } },

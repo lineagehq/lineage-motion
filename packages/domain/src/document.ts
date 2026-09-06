@@ -74,9 +74,9 @@ const cueSchema = z.object({
 const holdSchema = z.object({
   schemaVersion: z.literal('motion.hold.v1'),
   id: identifier,
-  cueId: z.literal('cue_pair'),
-  sourceTimeMs: z.literal(2870),
-  durationMs: z.literal(600),
+  cueId: identifier,
+  sourceTimeMs: z.number().int().nonnegative().safe(),
+  durationMs: z.number().int().positive().safe(),
 });
 const motionDocumentSchema = z.object({
   schemaVersion: z.literal('motion.document.v1'),
@@ -87,6 +87,7 @@ const motionDocumentSchema = z.object({
   elements: z.array(z.object({
     id: identifier,
     selectorHint: z.string(),
+    label: z.string().min(1).max(160).optional(),
     structuralFingerprint: identifier,
     editableText: z.string().optional(),
   })),

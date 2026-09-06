@@ -54,7 +54,7 @@ const envelope = (operationId: string, expectedRevision: number) => ({
 });
 
 describe('typed structural authoring operations', () => {
-  test('projects the exact target choices and creates deterministic Orb or Cursor bundles with a one-track cap', async () => {
+  test('creates independent deterministic Orb and Cursor bundles without a fixture-wide cap', async () => {
     const source = await readFile(new URL('../../../fixtures/public-synthetic/preview.html', import.meta.url), 'utf8');
     const imported = importMotionHtml(source);
     const initial = createAuthoringState(imported.document!);
@@ -87,13 +87,12 @@ describe('typed structural authoring operations', () => {
       && track.property === 'opacity')!;
     expect(orbTrack.id).not.toBe(cursorTrack.id);
     expect(projectTrackCreationEligibility(orbFirst.state.document, cursor, 'opacity'))
-      .toMatchObject({ available: false, reason: 'TRACK_LIMIT_REACHED' });
+      .toMatchObject({ available: true, reason: null });
     const beforeRejected = structuredClone(orbFirst.state);
     const rejected = dispatchAuthoringOperation(orbFirst.state, {
       ...create(cursor, 'choice:second'), expectedRevision: 1,
     });
-    expect(rejected).toMatchObject({ ok: false,
-      diagnostic: { code: 'AUTHORING_TRACK_LIMIT_REACHED' } });
+    expect(rejected).toMatchObject({ ok: true });
     expect(orbFirst.state).toEqual(beforeRejected);
   });
 
