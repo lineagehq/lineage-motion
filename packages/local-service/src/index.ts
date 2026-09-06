@@ -18,6 +18,7 @@ export type LocalMotionService = { url: string; store: ProjectStore; lockHolderP
 const legacyTestCapabilities = { human: 'human-editor', agent: 'cli-agent' };
 
 export async function startLocalMotionService(options: { databasePath: string; seed: MotionDocument;
+  preserveExistingProjectIdentity?: boolean;
   project?: { projectId: string; name: string }; port?: number; host?: '127.0.0.1' | '::1'; fault?: (point: FaultPoint) => void;
   capabilities?: ServiceCapabilities; now?: () => number }): Promise<LocalMotionService> {
   const capabilities = options.capabilities
@@ -29,7 +30,7 @@ export async function startLocalMotionService(options: { databasePath: string; s
   try {
     lock = await acquireStoreLock(lockPath);
     store = new SqliteProjectStore(databasePath, options.fault, options.project);
-    store.initialize(options.seed, options.project);
+    store.initialize(options.seed, options.project, options.preserveExistingProjectIdentity);
   } catch (error) { store?.close(); await lock?.release(); throw error; }
   const subscribers = new Map<string, Set<ServerResponse>>();
   const reviewSubscribers = new Map<string, Set<ServerResponse>>();

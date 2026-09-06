@@ -89,9 +89,13 @@ export function projectAuthoringTargets(document: MotionDocument): AuthoringTarg
     const unit = Math.max(1, Math.floor(document.durationMs / 5));
     const cue = (semantic: CueSemantic) => projectCueActionEligibility(document, semantic);
     const peerAction = (make: (peer: string) => CueSemantic): ActionEligibility => {
-      const candidates = peers.map((peer) => cue(make(peer.id)));
-      return candidates.find((candidate) => candidate.available) ?? candidates[0]
-        ?? { available: false, reason: 'CUE_SECOND_TARGET_REQUIRED' };
+      let firstRejection: ActionEligibility | undefined;
+      for (const peer of peers) {
+        const candidate = cue(make(peer.id));
+        if (candidate.available) return candidate;
+        firstRejection ??= candidate;
+      }
+      return firstRejection ?? { available: false, reason: 'CUE_SECOND_TARGET_REQUIRED' };
     };
     const fade = projectTrackCreationEligibility(document, id, 'opacity');
 

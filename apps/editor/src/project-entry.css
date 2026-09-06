@@ -1,0 +1,31 @@
+.project-entry, .project-actions { margin: 0 0 1rem; padding: 1.2rem; border: 1px solid #334155; border-radius: 14px; background: #10151e; color: #eef2f8; }
+.project-heading { display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+.project-heading h2 { margin: .2rem 0 .7rem; }
+.project-entry label, .project-actions label { display: grid; gap: .4rem; font-size: .85rem; font-weight: 600; }
+.project-entry form { display: grid; gap: .75rem; max-width: 48rem; margin-top: 1rem; }
+.project-entry textarea { font: inherit; width: 100%; box-sizing: border-box; }
+.project-entry input, .project-entry select, .project-entry textarea, .project-actions input, .project-actions select { padding: .6rem; border: 1px solid #475569; border-radius: 7px; min-width: 0; }
+.project-entry summary, .whole-pause summary { cursor: pointer; padding: .65rem 0; font-weight: 600; }
+.project-entry output, .project-actions output { display: block; margin-top: .7rem; }
+.action-buttons { display: flex; flex-wrap: wrap; gap: .5rem; margin: .8rem 0; }
+.action-buttons > div { display: flex; flex-direction: column; flex: 1 0 8rem; max-width: 12rem; gap: .3rem; }
+.action-buttons small { font-size: .75rem; color: #a7b0c0; }
+.action-buttons button[aria-pressed=true] { background: #17322f; border-color: #81d8c9; color: #b9fff2; }
+.action-fields, .whole-pause form { display: flex; align-items: end; gap: .8rem; flex-wrap: wrap; }
+.action-fields label { flex: 1 0 8rem; }
+.project-actions [hidden], .project-entry [hidden] { display: none !important; }
+.whole-pause { margin-top: 1rem; border-top: 1px solid #334155; }
+.whole-pause p { flex-basis: 100%; }
+.project-entry dialog { border: 1px solid #475569; border-radius: 14px; padding: 1.5rem; max-width: 30rem; }
+.project-entry dialog::backdrop { background: #10182880; }
+@media (max-width: 650px) { .project-heading { align-items: stretch; flex-direction: column; } }
+
+[data-hold-control][hidden], [data-status-copy][hidden] { display: none !important; }
+
+.project-entry input, .project-entry select, .project-entry textarea, .project-actions input, .project-actions select { background: #0b1220; color: #f8fafc; }
+.project-actions > h2 { margin: 0 0 .8rem; font-size: 1.2rem; }
+.project-actions > form > button { margin: .7rem .3rem .2rem 0; }
+[data-project-action-history] article { display: flex; align-items: center; flex-wrap: wrap; gap: .4rem; padding: .5rem 0; }
+[data-project-action-history] strong { flex: 1 0 7rem; }
+.project-actions [data-apply-action]:not(:disabled), .project-entry form button { background: #17322f; color: #b9fff2; border-color: #4c8279; }
+.project-actions .action-fields input { width: 100%; }

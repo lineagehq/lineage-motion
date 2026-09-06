@@ -92,4 +92,5 @@ export function renderProjection(): void {
   updateStructuralControls(timeline.rows);
   updateSelection();
   scheduleCueCanvas();
+  document.dispatchEvent(new Event('motion:projection'));
 }

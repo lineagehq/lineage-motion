@@ -62,6 +62,7 @@ export const verificationSuites = {
     'packages/domain/src/repository-safety.test.ts',
   ]),
   'service-integration': vitest([
+    'packages/local-service/src/project-reopen.test.ts',
     'packages/local-service/src/project-admission.test.ts',
     'packages/local-service/src/branch-claim.test.ts',
     'packages/local-service/src/durable-contract.test.ts',
@@ -77,6 +78,12 @@ export const verificationSuites = {
     'packages/local-service/src/review-handoff-recovery.test.ts',
   ]),
   parity: vitest([
+    'packages/motion-cli/src/arguments.test.ts',
+    'packages/motion-cli/src/managed-session.test.ts',
+    'packages/motion-cli/src/managed-claims.test.ts',
+    'packages/motion-cli/src/managed-cli.test.ts',
+    'packages/motion-cli/src/managed-authoring.test.ts',
+    'packages/motion-cli/src/managed-admission.test.ts',
     'packages/motion-cli/src/cli.test.ts',
     'packages/motion-cli/src/export-artifact.test.ts',
     'packages/motion-cli/src/review-handoff.test.ts',
@@ -115,6 +122,7 @@ export const verificationSuites = {
     'apps/editor/tests/normal-agent-smoke.spec.ts',
   ]),
   browser: playwright([
+      'apps/editor/tests/project-entry.spec.ts',
       'apps/editor/tests/editor.spec.ts',
       'apps/editor/tests/editor-authoring.spec.ts',
       'apps/editor/tests/integrated-dogfood.spec.ts',
