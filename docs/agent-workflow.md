@@ -19,9 +19,15 @@ to operate that process.
 4. **Let CI fan out.** Pull-request CI owns the complete public verification
    graph for the exact head commit. A local `npm run verify:pr` is for offline
    preflight or reproducing a CI failure, not routine duplication.
-5. **Handoff once.** Record the outcome, focused evidence, and the three most
-   realistic failure modes in the pull request. Refer to exact-head CI instead
-   of copying its logs or producing separate receipts for every role.
+5. **Handoff once.** Record the outcome, focused evidence, and material unresolved
+   risks in the pull request. Refer to exact-head CI instead of copying its logs
+   or producing separate receipts for every role.
+
+Continue through in-scope fixes and affected verification; an early draft pull
+request is not completion. Stop when the requested outcome is verified or a
+concrete blocker requires user input. Reuse existing authorization for the
+workflow. Merge, private-input, and new-phase boundaries still apply. An
+audit-only request ends with findings unless implementation is also requested.
 
 ## Verification ownership
 
@@ -31,7 +37,7 @@ to operate that process.
 | Commit | Pre-commit hook | File-size and test-ownership policies | The staged tree changed |
 | Push | Pre-push hook | `verify:fast` | The pushed commit changed |
 | Pull request | GitHub Actions | Full public graph on the exact head | The head commit changed or a proven flaky failure needs investigation |
-| Handoff | Pull-request author | Claim, three risks, concise evidence | The claim or head commit changed |
+| Handoff | Pull-request author | Outcome, material risks, concise evidence | The claim or head commit changed |
 
 A passing result belongs to its commit, not to the person or agent who ran it.
 Subsequent reviewers should inspect that evidence and run only a missing,

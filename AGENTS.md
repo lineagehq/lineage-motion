@@ -1,8 +1,9 @@
 # Agent Notes
 
-Use an adversarial proof standard. Before declaring work complete, state the
-user-facing claim, name the top three realistic failure modes, and gather direct
-evidence with tests, screenshots, traces, compiler receipts, or inspection.
+Verify the requested outcome with evidence appropriate to the changed boundary.
+Report the outcome, relevant evidence, and material unresolved risks. For
+import/compiler fidelity or revision/claim correctness, explicitly challenge
+the realistic failure modes with tests, screenshots, traces, or receipts.
 
 Routine implementation follows the single-pass workflow in
 `docs/agent-workflow.md`. Product plans describe requirements and prior
@@ -47,7 +48,10 @@ generated execution boards, per-task state, or agent transcripts under
 
 ## Scope discipline
 
-- Work in the current phase defined by `docs/incubation-plan.md`.
+- Use the active request and accepted scope for the change. Consult
+  `docs/phase-status.md` when expanding capabilities; `docs/incubation-plan.md`
+  describes the roadmap and historical initial work package. Historical plans
+  do not block maintenance of existing behavior.
 - Do not add persistence, branching, claims, MCP, Lineage integration, video
   export, or package publication before their phase gate is authorized.
 - Prefer one complete vertical slice over generalized architecture.
@@ -69,8 +73,9 @@ generated execution boards, per-task state, or agent transcripts under
   because another agent or stage is taking over.
 - Use `npm run verify:pr` only for an offline preflight or to reproduce a CI
   failure locally.
-- Handoff evidence is one compact claim, three risks, and links or summaries of
-  focused local evidence plus exact-head CI. Do not paste complete command logs.
+- Handoff evidence is the outcome, material unresolved risks, and links or
+  summaries of focused local evidence plus exact-head CI when available. State
+  missing evidence explicitly. Do not paste complete command logs.
 
 For import/compiler work, the minimum receipt should include:
 
