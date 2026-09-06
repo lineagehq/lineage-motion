@@ -1,3 +1,4 @@
+import { parseShotAdmissionCommand } from '../../motion-protocol/src/project.ts';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 
 import { canonicalJson, sha256Hex, type MotionDocument } from '../../domain/src/index.ts';
@@ -16,7 +17,7 @@ export type LocalMotionService = { url: string; store: ProjectStore; lockHolderP
 const legacyTestCapabilities = { human: 'human-editor', agent: 'cli-agent' };
 
 export async function startLocalMotionService(options: { databasePath: string; seed: MotionDocument;
-  port?: number; host?: '127.0.0.1' | '::1'; fault?: (point: FaultPoint) => void;
+  project?: { projectId: string; name: string }; port?: number; host?: '127.0.0.1' | '::1'; fault?: (point: FaultPoint) => void;
   capabilities?: ServiceCapabilities; now?: () => number }): Promise<LocalMotionService> {
   const capabilities = options.capabilities
     ? validateServiceCapabilities(options.capabilities)
@@ -26,8 +27,8 @@ export async function startLocalMotionService(options: { databasePath: string; s
   let store: ProjectStore | undefined;
   try {
     lock = await acquireStoreLock(lockPath);
-    store = new SqliteProjectStore(databasePath, options.fault);
-    store.initialize(options.seed);
+    store = new SqliteProjectStore(databasePath, options.fault, options.project);
+    store.initialize(options.seed, options.project);
   } catch (error) { store?.close(); await lock?.release(); throw error; }
   const subscribers = new Map<string, Set<ServerResponse>>();
   const reviewSubscribers = new Map<string, Set<ServerResponse>>();
@@ -36,6 +37,22 @@ export async function startLocalMotionService(options: { databasePath: string; s
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     try {
       if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { ok: true });
+      if (url.pathname === '/api/project/v1/catalog' && request.method === 'GET') {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
+        return json(response, 200, store!.readProjectCatalog());
+      }
+      if (url.pathname === '/api/project/v1/shots' && request.method === 'POST') {
+        const auth = authenticate(request, capabilities);
+        if (!auth) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM', diagnosticCode: 'ACTOR_FORBIDDEN' });
+        let command;
+        try { command = parseShotAdmissionCommand(await readJson(request)); }
+        catch { return json(response, 422, { ok: false, code: 'VALIDATION', diagnosticCode: 'PROJECT_COMMAND_INVALID' }); }
+        let result;
+        try { result = store!.admitShot(command, { ...auth, now: options.now?.() ?? Date.now() }); }
+        catch { return json(response, 500, { ok: false, code: 'STORAGE_FAILURE', diagnosticCode: 'STORAGE_FAILURE' }); }
+        return json(response, result.ok ? 200 : result.code === 'UNAUTHORIZED_CLAIM' ? 403
+          : result.code === 'STALE_CATALOG_REVISION' ? 409 : 422, result);
+      }
       if (request.method === 'POST' && url.pathname === '/api/review/v1/commands') {
         const auth = authenticate(request, capabilities);
         if (!auth) return json(response, 403, reviewFailure('UNAUTHORIZED_CLAIM', 'ACTOR_FORBIDDEN', 'authorization', false));

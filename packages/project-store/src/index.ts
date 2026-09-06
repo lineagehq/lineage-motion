@@ -1,3 +1,4 @@
+import type { ProjectCatalog, ShotAdmissionCommand, ShotAdmissionResponse } from '../../motion-protocol/src/project.ts';
 import type { MotionDocument, OperationPreparation, OperationPreparationRequest,
   WorkspaceProjection } from '../../domain/src/index.ts';
 import type { ActiveClaimList, ActivityPage, BranchList, CommandFailure, CommandSuccess, CommitMetadata,
@@ -10,7 +11,9 @@ export type CommitResult = { response: CommandSuccess; event: CommitMetadata; re
   | { response: CommandFailure };
 export type AuthContext = RequestAuth & { now: number };
 export interface ProjectStore {
-  initialize(seed: MotionDocument): void;
+  initialize(seed: MotionDocument, project?: { projectId: string; name: string }): void;
+  readProjectCatalog(): ProjectCatalog;
+  admitShot(command: ShotAdmissionCommand, auth: AuthContext): ShotAdmissionResponse;
   execute(command: MotionCommand, auth: AuthContext): CommitResult;
   compareAndCommit(command: MotionCommand, auth?: AuthContext): CommitResult;
   readHead(documentId: string, branchId?: string): ImmutableRevision | null;

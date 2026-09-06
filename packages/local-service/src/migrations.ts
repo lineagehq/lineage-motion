@@ -74,4 +74,16 @@ CREATE TABLE review_handoffs(handoff_id TEXT PRIMARY KEY, document_id TEXT NOT N
   private_request_json TEXT NOT NULL, sanitized_response_json TEXT NOT NULL, private_context_digest TEXT NOT NULL,
   UNIQUE(document_id,operation_id));
 `,
+}, {
+  version: 5,
+  checksum: 'project-shot-admission-v5',
+  sql: `
+CREATE TABLE project_catalog(singleton INTEGER PRIMARY KEY CHECK(singleton=1), project_id TEXT NOT NULL UNIQUE,
+  name TEXT NOT NULL, catalog_revision INTEGER NOT NULL CHECK(catalog_revision>=0), seed_document_id TEXT NOT NULL);
+CREATE TABLE project_shots(document_id TEXT PRIMARY KEY REFERENCES documents(document_id), name TEXT NOT NULL,
+  source_kind TEXT NOT NULL CHECK(source_kind IN ('legacy','starter','html-css')));
+INSERT INTO project_shots SELECT document_id,substr(document_id,1,120),'legacy' FROM documents;
+CREATE TABLE shot_admissions(operation_id TEXT PRIMARY KEY, request_digest TEXT NOT NULL, private_context_digest TEXT NOT NULL,
+  document_id TEXT NOT NULL UNIQUE REFERENCES documents(document_id), receipt_json TEXT NOT NULL);
+`,
 }] as const;
