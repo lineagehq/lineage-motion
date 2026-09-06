@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawnTestServer, waitForTestServer, stopTestServer } from './test-server.ts';
+import { expect, test } from './test-fixture.ts';
+import { type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -19,34 +20,26 @@ let humanCapability = ''; let agentCapability = '';
 test.beforeEach(async () => {
   directory = await mkdtemp(join(tmpdir(), 'lineage-motion-browser-'));
   humanCapability = randomBytes(32).toString('base64url'); agentCapability = randomBytes(32).toString('base64url');
-  const root = resolve(import.meta.dirname, '../../..'); const port = 42000 + Math.floor(Math.random() * 1000);
-  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  const root = resolve(import.meta.dirname, '../../..'); const port = 0;
+  processHandle = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const addresses = await new Promise<{ editorUrl: string; serviceUrl: string }>((resolveAddress, reject) => {
-    let output = ''; const timer = setTimeout(() => reject(new Error('PHASE3_SERVER_TIMEOUT')), 10000);
-    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString();
-      const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-      if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); }
-    });
-    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`PHASE3_SERVER_EXIT_${code}`)); });
-  });
+  const addresses = await waitForTestServer(processHandle!);
   ({ editorUrl, serviceUrl } = addresses);
   await expect.poll(async () => { try { return (await fetch(editorUrl)).ok; } catch { return false; } }).toBe(true);
 });
 
 
 test.afterEach(async () => {
-  if (processHandle?.exitCode === null) { processHandle.kill('SIGTERM'); await new Promise((resolveExit) => processHandle!.once('exit', resolveExit)); }
+  await stopTestServer(processHandle);
   await rm(directory, { recursive: true, force: true });
 });
 
 test('exact-duration Shot workspace retains a post-endpoint native inspection position without mutation', async ({ page }) => {
-  processHandle?.kill('SIGTERM');
-  if (processHandle?.exitCode === null) await new Promise((resolveExit) => processHandle!.once('exit', resolveExit));
-  const root = resolve(import.meta.dirname, '../../..'); const port = 43500 + Math.floor(Math.random() * 250);
+  await stopTestServer(processHandle);
+  const root = resolve(import.meta.dirname, '../../..'); const port = 0;
   const seed = createTrajectorySeed(root); seed.durationMs = 2100; seed.cues = seed.cues.filter((cue) => cue.timeMs <= seed.durationMs);
   for (const rule of seed.rules) {
     for (const track of rule.tracks.filter((candidate) => candidate.property === 'transform')) {
@@ -58,18 +51,13 @@ test('exact-duration Shot workspace retains a post-endpoint native inspection po
   }
   const runtimeSeedPath = join(directory, 'trajectory-exact-duration.json');
   await writeFile(runtimeSeedPath, `${JSON.stringify(seed)}\n`);
-  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'trajectory-exact-duration.sqlite'),
       PHASE3_EDITOR_PORT: String(port), PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability,
       LANDING_SHOT1_WORKSPACE: '1', LANDING_SHOT1_DOCUMENT_PATH: runtimeSeedPath },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const address = await new Promise<string>((resolveAddress, reject) => {
-    let output = ''; const timer = setTimeout(() => reject(new Error('EXACT_DURATION_SERVER_TIMEOUT')), 10000);
-    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-      if (line) { clearTimeout(timer); resolveAddress((JSON.parse(line) as { editorUrl: string }).editorUrl); } });
-    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`EXACT_DURATION_SERVER_EXIT_${code}`)); });
-  });
+  const address = (await waitForTestServer(processHandle!)).editorUrl;
   await expect.poll(async () => { try { return (await fetch(address)).ok; } catch { return false; } }).toBe(true);
   const commands: string[] = []; page.on('request', (request) => {
     if (request.url().endsWith('/api/v1/commands')) commands.push(request.postData() ?? '');
@@ -111,9 +99,8 @@ test('exact-duration Shot workspace retains a post-endpoint native inspection po
 });
 
 test('an incompatible Shot revision stays fail-closed and offers non-destructive recovery', async ({ page }) => {
-  processHandle?.kill('SIGTERM');
-  if (processHandle?.exitCode === null) await new Promise((resolveExit) => processHandle!.once('exit', resolveExit));
-  const root = resolve(import.meta.dirname, '../../..'); const port = 43200 + Math.floor(Math.random() * 250);
+  await stopTestServer(processHandle);
+  const root = resolve(import.meta.dirname, '../../..'); const port = 0;
   const seed = createTrajectorySeed(root);
   for (const rule of seed.rules) {
     for (const track of rule.tracks.filter((candidate) => candidate.property === 'transform')) {
@@ -124,17 +111,12 @@ test('an incompatible Shot revision stays fail-closed and offers non-destructive
     }
   }
   const seedPath = join(directory, 'trajectory-incompatible.json'); await writeFile(seedPath, `${JSON.stringify(seed)}\n`);
-  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'incompatible.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
       LANDING_SHOT1_DOCUMENT_PATH: seedPath }, stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const addresses = await new Promise<{ editorUrl: string }>((resolveAddress, reject) => {
-    let output = ''; const timer = setTimeout(() => reject(new Error('INCOMPATIBLE_SERVER_TIMEOUT')), 10000);
-    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-      if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); } });
-    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`INCOMPATIBLE_SERVER_EXIT_${code}`)); });
-  });
+  const addresses = await waitForTestServer(processHandle!);
   const commands: string[] = []; page.on('request', (request) => { if (request.url().endsWith('/api/v1/commands')) commands.push(request.postData() ?? ''); });
   await page.goto(addresses.editorUrl); await expect(page.locator('[data-editor-ready="true"]')).toBeVisible();
   const workspace = page.locator('[data-shot-workspace]'); const recovery = workspace.locator('[data-shot-recovery]');
@@ -154,9 +136,8 @@ test('an incompatible Shot revision stays fail-closed and offers non-destructive
 });
 
 test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared canonical moments', async ({ page }) => {
-  processHandle?.kill('SIGTERM');
-  if (processHandle?.exitCode === null) await new Promise((resolveExit) => processHandle!.once('exit', resolveExit));
-  const root = resolve(import.meta.dirname, '../../..'); const port = 43500 + Math.floor(Math.random() * 300);
+  await stopTestServer(processHandle);
+  const root = resolve(import.meta.dirname, '../../..'); const port = 0;
   const seed = createTrajectorySeed(root); const targetElementIds = seed.elements.map((element) => element.id).sort();
   const track = seed.tracks.find((candidate) => candidate.elementId === targetElementIds[0] && candidate.property === 'transform');
   const ruleTrack = track && seed.rules.find((rule) => rule.id === track.ruleId)?.tracks.find((candidate) => candidate.property === 'transform');
@@ -169,18 +150,12 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
     expanded.keyframeIds = ruleTrack.keyframes.map((keyframe) => keyframe.id);
   }
   const seedPath = join(directory, 'trajectory-asymmetric.json'); await writeFile(seedPath, `${JSON.stringify(seed)}\n`);
-  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'asymmetric.sqlite'), PHASE3_EDITOR_PORT: String(port),
       PHASE3_HUMAN_CAPABILITY: humanCapability, PHASE3_AGENT_CAPABILITY: agentCapability, LANDING_SHOT1_WORKSPACE: '1',
       LANDING_SHOT1_DOCUMENT_PATH: seedPath }, stdio: ['ignore', 'pipe', 'pipe'],
   });
-  const addresses = await new Promise<{ editorUrl: string }>((resolveAddress, reject) => { let output = ''; let errorOutput = '';
-    const timer = setTimeout(() => reject(new Error('ASYMMETRIC_SERVER_TIMEOUT')), 10000);
-    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString(); const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-      if (line) { clearTimeout(timer); resolveAddress(JSON.parse(line)); } });
-    processHandle!.stderr!.on('data', (chunk) => { errorOutput += chunk.toString(); });
-    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`ASYMMETRIC_SERVER_EXIT_${code}_${errorOutput}`)); });
-  });
+  const addresses = await waitForTestServer(processHandle!);
   await expect.poll(async () => { try { return (await fetch(addresses.editorUrl)).ok; } catch { return false; } }, { timeout: 10000 }).toBe(true);
   const asymmetricCommands: Array<{ schemaVersion: string; kind: string;
     intent?: { elementId?: string; elementIds?: string[] }; payload?: { targets?: Array<{ elementId: string }> } }> = [];
@@ -305,14 +280,8 @@ test('Shot 1 keeps asymmetric primary inventories and gates grouping to shared c
 });
 
 test('non-service editor keeps local interaction state but rejects every persistent commit', async ({ page }) => {
-  processHandle?.kill('SIGTERM');
-  if (processHandle?.exitCode === null) await new Promise((resolveExit) => processHandle!.once('exit', resolveExit));
-  const root = resolve(import.meta.dirname, '../../..'); const port = 43800 + Math.floor(Math.random() * 150);
-  processHandle = spawn('npm', ['exec', 'vite', '--', '--config', resolve(root, 'apps/editor/vite.config.ts'),
-    '--host', '127.0.0.1', '--port', String(port), '--strictPort'], { cwd: root, env: { ...process.env,
-      PHASE3_SERVICE_URL: '', PHASE3_HUMAN_CAPABILITY: '', LANDING_SHOT1_WORKSPACE: '1' }, stdio: ['ignore', 'pipe', 'pipe'] });
-  const url = `http://lineage-motion.localhost:${port}`;
-  await expect.poll(async () => { try { return (await fetch(url)).ok; } catch { return false; } }, { timeout: 10000 }).toBe(true);
+  await stopTestServer(processHandle);
+  const url = process.env.MOTION_STATIC_URL!;
   const persistentRequests: string[] = []; page.on('request', (request) => {
     if (request.url().includes('/api/v1/')) persistentRequests.push(request.url());
   });

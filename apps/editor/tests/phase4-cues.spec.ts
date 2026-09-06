@@ -1,5 +1,6 @@
-import { expect, test } from '@playwright/test';
-import { spawn, type ChildProcess } from 'node:child_process';
+import { spawnTestServer, waitForTestServer, stopTestServer } from './test-server.ts';
+import { expect, test } from './test-fixture.ts';
+import { type ChildProcess } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -10,25 +11,17 @@ let processHandle: ChildProcess | undefined; let directory = ''; let editorUrl =
 test.beforeAll(async () => {
   directory = await mkdtemp(join(tmpdir(), 'lineage-motion-cursor-cues-'));
   const root = resolve(import.meta.dirname, '../../..');
-  processHandle = spawn(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
+  processHandle = spawnTestServer(process.execPath, [resolve(root, 'node_modules/vite-node/vite-node.mjs'), resolve(root, 'apps/editor/scripts/serve-editor.mjs')], {
     cwd: root, env: { ...process.env, PHASE3_DATABASE_PATH: join(directory, 'project.sqlite'), PHASE3_EDITOR_PORT: '0',
       PHASE3_HUMAN_CAPABILITY: randomBytes(32).toString('base64url'),
       PHASE3_AGENT_CAPABILITY: randomBytes(32).toString('base64url'), PHASE4_CURSOR_CLICK_REVEAL: '1' },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
-  editorUrl = await new Promise<string>((resolveAddress, reject) => {
-    let output = ''; const timer = setTimeout(() => reject(new Error('PHASE4_EDITOR_TIMEOUT')), 10000);
-    processHandle!.stdout!.on('data', (chunk) => { output += chunk.toString();
-      const line = output.split('\n').find((candidate) => candidate.startsWith('{'));
-      if (line) { clearTimeout(timer); resolveAddress((JSON.parse(line) as { editorUrl: string }).editorUrl); }
-    });
-    processHandle!.once('exit', (code) => { clearTimeout(timer); reject(new Error(`PHASE4_EDITOR_EXIT_${code}`)); });
-  });
+  editorUrl = (await waitForTestServer(processHandle!)).editorUrl;
 });
 
 test.afterAll(async () => {
-  if (processHandle?.exitCode === null) { processHandle.kill('SIGTERM');
-    await new Promise((resolveExit) => processHandle!.once('exit', resolveExit)); }
+  await stopTestServer(processHandle);
   if (directory) await rm(directory, { recursive: true, force: true });
 });
 
