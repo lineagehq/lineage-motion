@@ -1,9 +1,14 @@
 import { createHash, randomBytes } from 'node:crypto';
 import { chmodSync, mkdirSync, realpathSync, writeFileSync, rmSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { isAbsolute, join, relative, resolve } from 'node:path';
+import { isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { parseArgs } from 'node:util';
 import { fileURLToPath } from 'node:url';
+
+function isInsideCheckout(root, candidate) {
+  const path = relative(root, candidate);
+  return !path || (path !== '..' && !path.startsWith(`..${sep}`) && !isAbsolute(path));
+}
 
 // This command owns configuration; the lower-level launcher remains available to tests.
 try {
@@ -21,12 +26,10 @@ try {
     const port = Number(values.port);
     if (!/^\d+$/.test(values.port) || !Number.isInteger(port) || port > 65535) throw new Error('PORT_INVALID');
     const base = resolve(values['data-dir'] ?? join(homedir(), '.local', 'share', 'lineage-motion'));
-    const inside = relative(root, base);
-    if (!inside || (!inside.startsWith('..') && !isAbsolute(inside))) throw new Error('DATA_DIRECTORY_INSIDE_CHECKOUT');
+    if (isInsideCheckout(root, base)) throw new Error('DATA_DIRECTORY_INSIDE_CHECKOUT');
     mkdirSync(base, { recursive: true, mode: 0o700 });
     const resolvedBase = realpathSync(base);
-    const realInside = relative(root, resolvedBase);
-    if (!realInside || (!realInside.startsWith('..') && !isAbsolute(realInside))) throw new Error('DATA_DIRECTORY_INSIDE_CHECKOUT');
+    if (isInsideCheckout(root, resolvedBase)) throw new Error('DATA_DIRECTORY_INSIDE_CHECKOUT');
     const digest = (value) => createHash('sha256').update(value).digest('hex').slice(0, 24);
     const directory = join(resolvedBase, digest(root), digest(project));
     mkdirSync(directory, { recursive: true, mode: 0o700 }); chmodSync(directory, 0o700);

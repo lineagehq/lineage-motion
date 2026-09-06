@@ -2,6 +2,7 @@ import { expect, test } from '@playwright/test';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
+import { randomUUID } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 
@@ -114,5 +115,31 @@ test('the same project name in a second worktree has independent storage', async
     for (const app of running) await app.stop();
     await rm(join(checkout, 'node_modules'));
     execFileSync('git', ['worktree', 'remove', checkout], { cwd: root, stdio: 'ignore' });
+  }
+});
+
+
+test('data directory containment rejects dot-prefix children and symlinks into the checkout', async () => {
+  const name = `..local-data-${randomUUID()}`;
+  const child = join(root, name);
+  try {
+    // Both absolute and relative spelling must fail before creating an in-Git directory.
+    await expect(launch('Boundary', ['--data-dir', child])).rejects.toThrow('outside the checkout');
+    await expect(launch('Boundary', ['--data-dir', name])).rejects.toThrow('outside the checkout');
+    await expect(stat(child)).rejects.toThrow();
+    await expect(launch('Boundary', ['--data-dir', root])).rejects.toThrow('outside the checkout');
+    await mkdir(child);
+    const alias = join(directory, 'outside-alias'); await symlink(child, alias, 'dir');
+    await expect(launch('Boundary', ['--data-dir', alias])).rejects.toThrow('outside the checkout');
+    expect(await readdir(child)).toEqual([]);
+    const checkoutAlias = join(directory, 'checkout-alias'); await symlink(root, checkoutAlias, 'dir');
+    await expect(launch('Boundary', ['--data-dir', checkoutAlias])).rejects.toThrow('outside the checkout');
+    // A real external child beginning with two dots is valid; the path component matters.
+    const allowed = join(directory, '..allowed'); await mkdir(allowed);
+    const allowedAlias = join(directory, 'allowed-alias'); await symlink(allowed, allowedAlias, 'dir');
+    const app = await launch('Boundary', ['--data-dir', allowedAlias]); await app.stop();
+  } finally {
+    for (const app of running) await app.stop();
+    await rm(child, { recursive: true, force: true });
   }
 });
