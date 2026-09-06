@@ -304,7 +304,7 @@ describe('branch and claim CLI', () => {
     const reacquired = await invoke(['claim-acquire', ...common, '--operation-id', 'cli-reacquire-lifecycle', '--scope', 'document',
       '--claim-secret', secret]);
     expect(reacquired).toMatchObject({ code: 0, response: { ok: true, leaseVersion: 1 } });
-    const revoked = await invoke(['claim-revoke', ...common, '--operation-id', 'cli-human-revoke', '--claim-id',
+    const revoked = await invoke(['claim-revoke', ...common.slice(0, -2), '--operation-id', 'cli-human-revoke', '--claim-id',
       String(reacquired.response!.claimId), '--lease-version', '1', '--actor', 'human',
       '--capability', capabilities.human]);
     expect(revoked).toMatchObject({ code: 0, response: { ok: true, leaseVersion: 2,
