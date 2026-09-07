@@ -40,6 +40,16 @@ unintended mutation, lost input, and bypass of other draft/pending-write guards.
 The correction receives its own branch and PR, independent review, local hooks,
 full ready-PR CI and affected integrated acceptance before delivery.
 
+### Approved offline-evidence substitution
+
+On 2026-09-07 the owner approved replacing only the browser-tool-blocked
+manual offline playback portions of P5/P6 with automated standalone/offline
+playback tests plus interactive compiler-preview QA. This exception applies
+where the browser's local-file URL policy prevents the manual check; it does
+not authorize a policy workaround or a claim that manual offline playback ran.
+All other acceptance criteria, strict up-to-date PR checks, merge ordering,
+and exact-final-main local and full CI verification remain required.
+
 ## Dependencies and parallel work
 
 ```mermaid
