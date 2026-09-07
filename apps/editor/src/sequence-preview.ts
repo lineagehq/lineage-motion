@@ -5,7 +5,7 @@ type Runtime = { ready: Promise<void>; seek(ms: number): void; play(): void; pau
   readState(): { currentTimeMs: number; activeClipId: string; playing: boolean } };
 export function sequencePreview(host: HTMLElement, capability: string) {
   host.innerHTML = '<h3>Full animation preview</h3><p>Play all uses the saved storyboard. Edit individual motion in Shot preview below.</p>'
-    + '<div class="sequence-screen"><iframe title="Full animation preview" sandbox="allow-scripts allow-same-origin" hidden></iframe></div>'
+    + '<div class="sequence-screen"><iframe title="Full animation preview" sandbox="allow-scripts allow-same-origin" style="visibility:hidden"></iframe></div>'
     + '<div class="sequence-transport"><button type="button" data-sequence-play>Play all</button><button type="button" data-sequence-pause>Pause all</button>'
     + '<label>Full animation time<input type="range" min="0" max="0" step="1" value="0" data-sequence-scrub></label><output data-sequence-time>0 s</output>'
     + '<button type="button" data-sequence-download>Download full animation</button></div><output data-sequence-preview-status role="status"></output>';
@@ -45,7 +45,7 @@ export function sequencePreview(host: HTMLElement, capability: string) {
   new ResizeObserver(fit).observe(screen); block(true);
   return { block, needsRetry: () => failed, async load(next: SequenceSnapshot | null): Promise<Map<string, string>> {
     const own = ++generation; failed = false; wasPlaying = false; runtime?.pause(); runtime = null; snapshot = next; bundle = null;
-    if (timer !== null) clearInterval(timer); timer = null; block(true); frame.hidden = true;
+    if (timer !== null) clearInterval(timer); timer = null; block(true); frame.style.visibility = 'hidden'; fit();
     if (!next?.sequence.clips.length) { status.value = 'Add a compatible shot to play the full animation.'; return new Map(); }
     status.value = 'Preparing the saved full animation…';
     try {
@@ -65,7 +65,7 @@ export function sequencePreview(host: HTMLElement, capability: string) {
       await controller.ready; if (own !== generation) { controller.pause(); return new Map(); }
       controller.pause(); controller.seek(0); runtime = controller;
       scrub.max = String(next.sequence.clips.reduce((sum, clip) => sum + clip.source.durationMs + clip.endHoldMs, 0));
-      frame.hidden = false; fit(); block(false); sync(); timer = window.setInterval(sync, 60);
+      frame.style.visibility = 'visible'; fit(); block(false); sync(); timer = window.setInterval(sync, 60);
       status.value = `Saved full animation · revision ${next.sequence.revision}.`; return thumbs;
     } catch { if (own === generation) { failed = true; status.value = 'Full preview unavailable. Refresh the storyboard to retry.'; } return new Map(); }
   } };

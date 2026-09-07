@@ -42,6 +42,7 @@ export function mountSequenceStoryboard(root: HTMLElement, capability: string): 
   const storageKey = `motion-storyboard:${location.host}`;
   const shotPending = () => publicationState.value !== 'settled' || pendingRevision.value !== null || Boolean(root.querySelector('[data-operation-pending="true"]'));
   const shotDirty = () => captureDraft().dirty || Boolean(activeWaypointDraft.value) || Boolean(root.querySelector('[data-project-draft="true"]'));
+  const departureBlocked = () => busy || Boolean(pendingCommand);
   const blocked = () => busy || Boolean(pendingCommand) || shotPending() || refreshFailed || transitioning || previewLoading;
   const conflict = () => dirty && (snapshot?.sequence.revision !== draftRevision || (snapshot?.sequence.sequenceId ?? '') !== draftSequenceId);
   const message = (value: string) => { feedback.value = value; };
@@ -82,13 +83,12 @@ export function mountSequenceStoryboard(root: HTMLElement, capability: string): 
         const current = sources?.shots.find(shot => shot.source.documentId === clip.source.documentId);
         if (current?.viewport) void edit({ kind: 'clip.update-source', clipId, source: current.source }); },
       open: id => guard(() => {
-        if (shotPending()) return message('Wait for the shot change to finish.');
         const current = sources?.shots.find(shot => shot.source.documentId === id);
         if (!current) return message('This source shot is unavailable. Refresh the storyboard before opening it.');
         remember(); const choice = root.querySelector<HTMLSelectElement>('[data-project-shot]')!;
         if (![...choice.options].some(option => option.value === id)) choice.add(new Option(current.name, id));
         choice.value = id; choice.dispatchEvent(new Event('change', { bubbles: true }));
-      }),
+      }, true),
     }); controls();
   }
   function renderSources() {
@@ -169,8 +169,8 @@ export function mountSequenceStoryboard(root: HTMLElement, capability: string): 
     if (dirty && !fromDraft) return message('Apply or discard the storyboard draft first.');
     await execute({ ...command('sequence.edit'), kind: 'sequence.edit', edit });
   }
-  function guard(action: () => void) {
-    if (blocked()) return message('Wait for the current change or retry its unconfirmed result first.');
+  function guard(action: () => void, departure = false) {
+    if (departure ? departureBlocked() : blocked()) return message('Wait for the current change or retry its unconfirmed result first.');
     if (dirty) { destination = action; dialog.showModal(); } else action();
   }
   const mark = (event: Event) => { const target = event.target as HTMLInputElement; draftFields.add(target.form === create ? 'create' : target.form === nameForm ? 'sequenceName' : target.name); if (!dirty) { draftRevision = snapshot?.sequence.revision ?? -1; draftSequenceId = snapshot?.sequence.sequenceId ?? ''; } dirty = true; controls(); };
@@ -179,9 +179,9 @@ export function mountSequenceStoryboard(root: HTMLElement, capability: string): 
   get('[data-sequence-refresh]').addEventListener('click', () => void refresh(snapshot?.sequence.sequenceId ?? '', true));
   get('[data-sequence-discard]').addEventListener('click', () => { hydrate(); create.reset(); message('Storyboard draft discarded.'); });
   get('[data-sequence-stay]').addEventListener('click', () => { destination = null; dialog.close(); });
-  get('[data-sequence-leave-discard]').addEventListener('click', () => { if (blocked()) return; hydrate(); dialog.close(); const action = destination; destination = null; action?.(); });
+  get('[data-sequence-leave-discard]').addEventListener('click', () => { if (departureBlocked()) return; hydrate(); dialog.close(); const action = destination; destination = null; action?.(); });
   get('[data-sequence-retry]').addEventListener('click', () => { if (pendingCommand) void execute(pendingCommand); });
-  get('[data-sequence-import]').addEventListener('click', () => guard(() => { const entry = root.querySelector<HTMLDetailsElement>('[data-new-shot]')!; entry.open = true; entry.scrollIntoView({ block: 'start' }); entry.querySelector<HTMLInputElement>('input')?.focus(); }));
+  get('[data-sequence-import]').addEventListener('click', () => guard(() => { const entry = root.querySelector<HTMLDetailsElement>('[data-new-shot]')!; entry.open = true; entry.scrollIntoView({ block: 'start' }); entry.querySelector<HTMLInputElement>('input')?.focus(); }, true));
   get('[data-sequence-add]').addEventListener('click', () => {
     const chosen = sources?.shots.find(shot => shot.source.documentId === source.value); if (!chosen?.viewport) return;
     void edit({ kind: 'clip.add', clip: { clipId: `clip_${crypto.randomUUID()}`, name: chosen.name, source: chosen.source, endHoldMs: 0 }, index: snapshot!.sequence.clips.length });
@@ -213,13 +213,13 @@ export function mountSequenceStoryboard(root: HTMLElement, capability: string): 
       initialClip: first ? { clipId: `clip_${crypto.randomUUID()}`, name: first.name, source: first.source, endHoldMs: 0 } : null });
   });
   root.querySelector<HTMLSelectElement>('[data-project-shot]')!.addEventListener('change', event => {
-    if (!dirty && !blocked()) return;
+    if (!dirty && !departureBlocked()) return;
     event.stopImmediatePropagation(); const shot = event.currentTarget as HTMLSelectElement; const next = shot.value;
     shot.value = new URLSearchParams(location.search).get('shot') ?? shot.options[0]?.value ?? '';
-    guard(() => { shot.value = next; shot.dispatchEvent(new Event('change', { bubbles: true })); });
+    guard(() => { shot.value = next; shot.dispatchEvent(new Event('change', { bubbles: true })); }, true);
   }, true);
   root.querySelector('[data-shot-create]')!.addEventListener('submit', event => {
-    if (dirty || blocked()) { event.preventDefault(); event.stopImmediatePropagation(); message('Apply or discard the storyboard draft before creating a shot.'); }
+    if (dirty || departureBlocked()) { event.preventDefault(); event.stopImmediatePropagation(); message(departureBlocked() ? 'Wait for the current storyboard change or retry its unconfirmed result first.' : 'Apply or discard the storyboard draft before creating a shot.'); }
   }, true);
   window.addEventListener('beforeunload', event => { if (dirty || busy || pendingCommand) event.preventDefault(); });
   window.addEventListener('pagehide', () => { disposed = true; });
