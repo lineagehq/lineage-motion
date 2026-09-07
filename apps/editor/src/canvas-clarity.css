@@ -43,3 +43,22 @@
 .normal-editor .trajectory-waypoint[aria-pressed="true"] .trajectory-waypoint-label { opacity: 1; }
 .normal-editor.shot-active .preview-selection span { display: none; }
 .normal-editor .canvas-reduced pre { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+/* Normal project controls stay distinct from their surrounding panels. */
+.normal-editor :is(.project-entry, .project-actions, .sequence-storyboard, .workflow,
+  .canvas-entry, .transport, .shot-export, .canvas-reduced) button:not(:disabled):not([aria-pressed="true"]),
+.normal-editor :is(.project-entry, .project-actions, .sequence-storyboard, .workflow,
+  .branch-controls) :is(input:not([type="radio"]):not([type="checkbox"]):not([type="range"]), select, textarea):not(:disabled) {
+  border-color: #71809a;
+}
+.normal-editor .collaboration-details > summary {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 5px 0;
+}
+@media (max-width: 700px) {
+  .normal-editor :is(.project-entry, .project-actions, .sequence-storyboard, .workflow,
+    .canvas-entry, .transport, .shot-export, .canvas-reduced) button {
+    min-height: 44px;
+  }
+}

@@ -57,6 +57,7 @@ export async function dispatch(
 ): Promise<{ ok: boolean; code?: string }> {
   const publicationRejection = rejectUnavailablePublication();
   if (publicationRejection) return { ok: false, code: publicationRejection };
+  const appliedMessage = successMessage(operation);
   const beforeCreated = findCreatedTrack(buildTimeline(authoring.value.document).rows);
   let authoritativePreviewAlreadyMounted = false;
   let result: ReturnType<typeof dispatchAuthoringOperation>;
@@ -178,7 +179,7 @@ export async function dispatch(
   renderProjection();
   if (shotConfig.value) renderShotWorkspace();
   if (operation.kind === 'motion.track.create') resolveAcceptedCreationDraft();
-  status.value = `${successMessage(operation.kind)} Revision ${authoring.value.document.revision}.`;
+  status.value = `${appliedMessage} Revision ${authoring.value.document.revision}.`;
   status.dataset.kind = 'success';
   if (cueWorkspace && (operation.kind === 'motion.history.undo' || operation.kind === 'motion.history.redo')) {
     const restored = operation.kind === 'motion.history.undo' ? 'Undid the last change' : 'Redid the last change';

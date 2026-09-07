@@ -144,6 +144,7 @@ export const verificationSuites = {
       'apps/editor/tests/sequence-storyboard.spec.ts',
       'apps/editor/tests/shot-export.spec.ts',
       'apps/editor/tests/normal-canvas.spec.ts',
+      'apps/editor/tests/control-access.spec.ts',
       'apps/editor/tests/project-entry.spec.ts',
       'apps/editor/tests/editor.spec.ts',
       'apps/editor/tests/editor-authoring.spec.ts',

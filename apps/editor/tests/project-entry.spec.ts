@@ -101,29 +101,43 @@ test('failed import leaves catalog unchanged and switching requires discarding a
   await expect(page.locator('[data-project-shot]')).toHaveValue(next);
 });
 
-test('chosen source pause ripples later cues, rejects invalid timing, and undoes exactly', async ({ page }) => {
+for (const [cueId, cueLabel, boundary, duration] of [['trajectory_start', 'Start', 0, 300], ['trajectory_landed', 'Landed', 700, 450]] as const) test(`chosen source pause at ${cueLabel} reports its submitted values, ripples, and undoes exactly`, async ({ page }) => {
   const app = await launch(); await page.goto(app.url);
   await page.locator('[data-new-shot] summary').click(); await page.getByLabel('Shot name', { exact: true }).fill('Boundary study');
   await page.getByRole('button', { name: 'Create shot', exact: true }).click();
   await expect(page.locator('[data-project-shot] option:checked')).toHaveText('Boundary study');
   const before = await page.evaluate(() => ({ state: window.__motionEditor.inspectAuthoring(), timeline: window.__motionEditor.canonicalProjection }));
   await page.getByText('Pause the whole shot', { exact: true }).click();
-  await page.locator('[data-whole-pause] select').selectOption('trajectory_landed');
+  await page.locator('[data-whole-pause] select').selectOption(cueId);
   await page.getByLabel('Pause duration (ms)').fill('0');
   await expect(page.getByRole('button', { name: 'Insert whole-shot pause' })).toBeDisabled();
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().exportDigest)).toBe(before.state.exportDigest);
-  await page.getByLabel('Pause duration (ms)').fill('450');
-  await page.getByRole('button', { name: 'Insert whole-shot pause' }).press('Enter');
-  await expect(page.locator('[data-action-status]')).toContainText('Whole-shot pause applied');
+  await page.getByLabel('Pause duration (ms)').fill(String(duration));
+  let release!: () => void; const gate = new Promise<void>(resolve => { release = resolve; });
+  let reached!: () => void; const pending = new Promise<void>(resolve => { reached = resolve; });
+  await page.route('**/api/v1/commands', async route => { reached(); await gate; await route.continue(); });
+  try {
+    await page.getByRole('button', { name: 'Insert whole-shot pause' }).press('Enter'); await pending;
+    await expect(page.getByLabel('Pause duration (ms)')).toBeDisabled();
+    // Adversarial async probe: alter form state despite the ordinary pending-input guard.
+    await page.getByLabel('Pause duration (ms)').evaluate((input: HTMLInputElement) => { input.value = '900'; });
+    await page.locator('[data-whole-pause] select').evaluate((select: HTMLSelectElement, value) => { select.value = value; }, cueId === 'trajectory_start' ? 'trajectory_landed' : 'trajectory_start');
+    await expect(page.locator('[data-action-status]')).not.toContainText('Whole-shot pause applied');
+  } finally { release(); }
+  await expect(page.locator('[data-action-status]')).toContainText(`Whole-shot pause applied: ${duration} ms before ${cueLabel}.`);
+  await expect(page.locator('[data-operation-status]')).toContainText(`${duration} ms hold inserted before ${cueLabel}. Revision 1.`);
+  await page.unroute('**/api/v1/commands');
   const after = await page.evaluate(() => window.__motionEditor.canonicalProjection);
-  expect(after.durationMs).toBe(before.timeline.durationMs + 450);
-  for (const cue of before.timeline.cues) expect(after.cues.find(item => item.id === cue.id)?.timeMs).toBe(cue.timeMs >= 700 ? cue.timeMs + 450 : cue.timeMs);
+  expect(after.durationMs).toBe(before.timeline.durationMs + duration);
+  for (const cue of before.timeline.cues) expect(after.cues.find(item => item.id === cue.id)?.timeMs).toBe(cue.timeMs >= boundary ? cue.timeMs + duration : cue.timeMs);
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest)).toBe(before.state.contentDigest);
+  await expect(page.locator('[data-action-status]')).toBeEmpty();
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(3);
   expect(await page.evaluate(() => window.__motionEditor.canonicalProjection)).toEqual(after);
+  await expect(page.locator('[data-action-status]')).toBeEmpty();
 });
 
 test('normal actions preserve keyboard focus and can be updated, detached, deleted, and undone', async ({ page }) => {

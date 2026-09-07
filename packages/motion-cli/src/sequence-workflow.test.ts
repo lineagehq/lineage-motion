@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { unzipSync, strFromU8 } from 'fflate';
 import { MotionServiceClient, makeTrackCreateCommand } from '../../motion-protocol/src/index.ts';
 import { sha256Hex } from '../../domain/src/sha256.ts';
-import { sequenceFixture } from './sequence-test-support.ts';
+import { sequenceFixture, shotHtml } from './sequence-test-support.ts';
 import { invoke } from './managed-test-support.ts';
 import { sequenceOptions } from './sequence-discovery.ts';
 
@@ -63,5 +63,58 @@ test('ordinary managed CLI discovers and edits two pinned shots through every st
     const privateDirectory = join(dirname(f.sessionPath), 'agent-sequence-claims', 'story');
     expect((await stat(privateDirectory)).mode & 0o777).toBe(0o700);
     for (const file of await readdir(privateDirectory)) expect((await stat(join(privateDirectory, file))).mode & 0o777).toBe(0o600);
+  } finally { await f.cleanup(); }
+}, 45_000);
+
+test('dimension rejection guides public discovery and preserves exact requests, claims and revisions', async () => {
+  const f = await sequenceFixture();
+  try {
+    // Public synthetic moving shots cover equal aspect ratio and each dimension independently.
+    for (const [index, [width, height]] of [[800, 450], [640, 360], [800, 360], [640, 450]].entries()) {
+      expect(f.service.store.admitShot({ protocolVersion: 'motion.project-protocol.v1', kind: 'motion.shot.admit',
+        operationId: `admit-size-${index}`, projectId: 'sequence_project', expectedCatalogRevision: index + 1,
+        documentId: `size_${index}`, name: `Moving tile ${width} by ${height}`,
+        source: { kind: 'html-css', html: shotHtml(2).replace('320px', `${width}px`).replace('180px', `${height}px`) }, claim: null }, f.auth)).toMatchObject({ ok: true });
+    }
+    const help = (await invoke(['sequence-clip-add', '--help'])).json;
+    expect(help.viewport).toContain('exact width AND height');
+    expect(help.viewportMismatch).toContain('new operation ID');
+    for (const name of ['sequence-create', 'sequence-clip-update-source', 'sequence-sources', 'sequence']) {
+      expect((await invoke([name, '--help'])).json.viewport).toBe(help.viewport);
+    }
+    expect((await f.mutate('sequence-create', 0, 'create-wide', ['--name', 'Wide story', '--viewport-width', '800', '--viewport-height', '450'])).code).toBe(0);
+    const listed = (await f.read('sequences')).json.sequences;
+    const target = (await f.read('sequence', ['--sequence-id', listed[0].sequenceId])).json;
+    const sources = (await f.read('sequence-sources')).json.shots;
+    const pin = (shot: any) => ['--source-document-id', shot.source.documentId, '--source-revision', String(shot.source.revision)];
+    const add = (shot: any) => ['--clip-id', 'opening', '--name', 'Opening', '--index', '0', ...pin(shot)];
+    const compatible = sources.find((shot: any) => shot.viewport?.widthCssPixels === target.sequence.viewport.widthCssPixels
+      && shot.viewport?.heightCssPixels === target.sequence.viewport.heightCssPixels);
+    for (const index of [1, 2, 3]) {
+      const incompatible = sources.find((shot: any) => shot.source.documentId === `size_${index}`);
+      const rejected = await f.mutate('sequence-clip-add', target.sequence.revision, `mismatch-${index}`, add(incompatible));
+      expect(rejected.code).toBe(2);
+      expect(rejected.stdout).toBe('{"code":"SEQUENCE_VIEWPORT_MISMATCH","ok":false}\n');
+      expect(rejected.stderr).toContain('npm run motion -- sequence-sources');
+      expect(rejected.stderr).toContain('separate sequence');
+      expect(rejected.stdout).not.toContain('guidance');
+      expect((await f.read()).json).toEqual(target);
+      const retry = await f.mutate('sequence-clip-add', target.sequence.revision, `mismatch-${index}`, add(incompatible));
+      expect(retry.stdout).toBe(rejected.stdout); expect(retry.stderr).toBe(rejected.stderr); expect(retry.code).toBe(2);
+    }
+    expect((await f.mutate('sequence-clip-add', 0, 'mismatch-1', add(compatible))).json.diagnostic.code).toBe('CLI_CLAIM_REQUEST_CONFLICT');
+    expect((await f.mutate('sequence-clip-add', 0, 'wrong-claim', add(compatible), 'missing')).json.diagnostic.code).toBe('CLI_SEQUENCE_CLAIM_NOT_FOUND');
+    expect((await f.read()).json).toEqual(target);
+    const accepted = await f.mutate('sequence-clip-add', target.sequence.revision, 'corrected-add', add(compatible));
+    expect(accepted.code).toBe(0); expect(accepted.json).toMatchObject({ ok: true, revision: 1 }); expect(accepted.stderr).not.toContain('SEQUENCE_VIEWPORT_MISMATCH');
+    expect((await f.mutate('sequence-clip-add', 0, 'corrected-add', add(compatible))).stdout).toBe(accepted.stdout);
+    const saved = (await f.read()).json;
+    expect(saved.sequence.clips).toHaveLength(1); expect(saved.sequence.clips[0].source).toEqual(compatible.source);
+    const stale = await f.mutate('sequence-clip-add', 0, 'stale-add', [...add(compatible).map(value => value === 'opening' ? 'second' : value)]);
+    expect(stale.code).toBe(3); expect(stale.json.code).toBe('SEQUENCE_STALE_REVISION');
+    // Rejected requests are revalidated, but their original expected revision is never advanced.
+    const oldRequest = await f.mutate('sequence-clip-add', 0, 'mismatch-1', add(sources.find((shot: any) => shot.source.documentId === 'size_1')));
+    expect(oldRequest.code).toBe(3); expect(oldRequest.json.code).toBe('SEQUENCE_STALE_REVISION');
+    expect((await f.read()).json).toEqual(saved);
   } finally { await f.cleanup(); }
 }, 45_000);
