@@ -1,9 +1,11 @@
 # Phase status and scope
 
-This is the current scope index, updated 2026-09-06 from the merged repository
-at `864b027` (storyboard and drag-harness repair merged). Use the active request
-and existing authorization for maintenance of implemented behavior. Consult this index when expanding capabilities, and
-update it with a decision and evidence link when scope or gate acceptance changes.
+This is the current scope index, updated 2026-09-06 for the approved animation
+delivery. [Final handoff PR #38](https://github.com/lineagehq/lineage-motion/pull/38)
+records the exact delivered main revision and its final verification conclusions.
+Use the active request and existing authorization for maintenance of implemented
+behavior. Consult this index when expanding capabilities, and update it with a
+decision and evidence link when scope or gate acceptance changes.
 The [incubation plan](incubation-plan.md) remains the roadmap.
 
 ## Implemented scope and evidence
@@ -24,13 +26,14 @@ and export through UI/CLI, bounded two-shot hard-cut composition, and tiered
 local/CI verification. The plan authorizes necessary sequence persistence and
 recoverable migrations, PR creation/monitoring/merging, and the specified
 required-check migration while retaining other branch protections and CodeQL.
-The shot workflow and sequence foundation/storyboard are merged. The agent
-sequence workflow (PR #34) and complete journeys (PR #37) are implemented and
-locally accepted, with final integration checks still pending at this snapshot.
-The [delivery evidence index](animation-delivery-evidence.md) records these
-boundaries and their tests. Node M remains in progress: final local smoke and
-full public regression must be recorded for the actual delivered main commit
-in the final handoff PR before overall completion can be claimed.
+The shot workflow, sequence foundation/storyboard and agent sequence workflow
+are implemented, with integrated UI-only, CLI-only, mixed and keyboard journey
+acceptance. The [delivery evidence index](animation-delivery-evidence.md) records
+these boundaries and their tests. Final local smoke and full public regression
+on the actual delivered main commit form the required completion evidence gate;
+consult [PR #38](https://github.com/lineagehq/lineage-motion/pull/38) for its recorded
+outcome and merged revision. This scope index does not substitute historical
+passing results for that final verification.
 Private inputs, Lineage integration, publication and the other plan exclusions
 remain outside that authorization.
 

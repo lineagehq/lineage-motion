@@ -2,12 +2,14 @@
 
 This index maps the approved [A–M delivery plan](animation-delivery-plan.md) to
 public proof. It describes product behavior, not an execution transcript.
-At this documentation snapshot, main is `864b027`; the shot workflow and
-sequence foundation/storyboard are merged. Agent sequence work in
-[PR #34](https://github.com/lineagehq/lineage-motion/pull/34) and complete journeys
-in [PR #37](https://github.com/lineagehq/lineage-motion/pull/37) have local acceptance;
-final integration checks remain required. A passing older head does not prove a
-new main commit. Node M is not yet complete.
+The shot workflow, sequence foundation/storyboard, agent sequence operations
+([PR #34](https://github.com/lineagehq/lineage-motion/pull/34)) and complete journeys
+([PR #37](https://github.com/lineagehq/lineage-motion/pull/37)) have implementation
+and acceptance evidence. The exact delivered main revision, merged PRs and final
+local/CI conclusions are recorded in the
+[final handoff, PR #38](https://github.com/lineagehq/lineage-motion/pull/38).
+A passing older head does not prove a new main commit; overall completion requires
+that resulting-main evidence, rather than this documentation alone.
 
 ## Scenario to proof
 
@@ -25,13 +27,14 @@ owns their suites; [verification](verification.md) describes how to run them.
 | J: storyboard drafts, selection, playback, native clock and unrelated shot navigation survive failure | `apps/editor/tests/sequence-storyboard.spec.ts` |
 | K: agent assembly/retry, UI/CLI canonical and ZIP parity, restart, native cut frames | `packages/motion-cli/src/sequence-workflow.test.ts`, `sequence-selection.test.ts`, `sequence-recovery.test.ts` in the same directory; `apps/editor/tests/sequence-parity.spec.ts` |
 | L: five fresh complete workflows, keyboard operation, service-off artifact and meaningful motion timing | `apps/editor/tests/animation-delivery.spec.ts`, `animation-delivery-helpers.ts`, `animation-delivery-motion.spec.ts` in the same directory |
-| M: actual delivered main remains integrated and protected | Required final local mixed smoke, full public manual regression, exact commit/CI links and protection inspection in the final handoff PR; pending at this snapshot |
+| M: actual delivered main remains integrated and protected | Required final local mixed smoke, full public manual regression, exact commit/CI links and protection inspection in [PR #38](https://github.com/lineagehq/lineage-motion/pull/38); required for completion |
 
 ## Complete journey measurements
 
 The L source accepted in `671168f` was tested on production inputs from
 `e37f90802a080c11f491e1fa48c121f9ca847376`. Later ancestry integration changed only
-an unrelated Phase 3 test helper; it did not change these runtime inputs.
+tests and documentation, including an unrelated Phase 3 test helper and the split
+of two independent CLI test cases; it did not change these runtime inputs.
 Each browser ran five fresh journeys plus an adversarial motion-metric test.
 Pinned Chromium **151.0.7922.34** passed all six in **40.4s**; installed Chrome
 **152.0.7977.76** passed all six in **44.1s**. Node was **v22.22.3**. Type checking
