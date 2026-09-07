@@ -1,4 +1,5 @@
 import { parseShotAdmissionCommand } from '../../motion-protocol/src/project.ts';
+import { sequenceRoute } from './sequence-routes.ts';
 import { exportShot } from './shot-export.ts';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 
@@ -39,6 +40,7 @@ export async function startLocalMotionService(options: { databasePath: string; s
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     try {
       if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { ok: true });
+      if (await sequenceRoute(request, response, url, store!, capabilities, options.now?.() ?? Date.now())) return;
       if (request.method === 'POST' && url.pathname === '/api/export/v1/shot') {
         if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'EXPORT_UNAUTHORIZED' });
         let input;

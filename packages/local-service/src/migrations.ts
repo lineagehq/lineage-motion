@@ -1,3 +1,4 @@
+import { sequenceMigration } from './sequence-migration.ts';
 export const MIGRATIONS = [{
   version: 1,
   checksum: 'phase3-fixed-main-v1',
@@ -86,4 +87,4 @@ INSERT INTO project_shots SELECT document_id,substr(document_id,1,120),'legacy' 
 CREATE TABLE shot_admissions(operation_id TEXT PRIMARY KEY, request_digest TEXT NOT NULL, private_context_digest TEXT NOT NULL,
   document_id TEXT NOT NULL UNIQUE REFERENCES documents(document_id), receipt_json TEXT NOT NULL);
 `,
-}] as const;
+}, sequenceMigration] as const;

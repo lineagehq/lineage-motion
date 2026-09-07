@@ -1,4 +1,5 @@
 import { verifyProjectCatalog } from './project-catalog.ts';
+import { verifySequences } from './sequence-reads.ts';
 import { chmodSync, rmSync } from 'node:fs';
 import { DatabaseSync } from 'node:sqlite';
 import { canonicalBytes, canonicalJson, projectWorkspace, sha256Hex, type AuthoringState } from '../../domain/src/index.ts';
@@ -66,7 +67,8 @@ export abstract class SqliteProjectStoreBase {
     try { const row = this.readLastRevision(documentId); return { revision: row.revision, canonicalDigest: row.digest }; }
     catch { return null; }
   }
-  snapshot(): unknown { const tables = ['documents', 'branches', 'revisions', 'events', 'claims', 'project_catalog', 'project_shots', 'shot_admissions'] as const;
+  snapshot(): unknown { const tables = ['documents', 'branches', 'revisions', 'events', 'claims', 'project_catalog', 'project_shots', 'shot_admissions',
+    'sequences', 'sequence_revisions', 'sequence_operations', 'sequence_claims'] as const;
     return { ...Object.fromEntries(tables.map((table) => [table, this.database.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all()])),
       review_annotations: this.database.prepare(`SELECT annotation_id,document_id,branch_id,anchor_revision,version,state
         FROM review_annotations ORDER BY rowid`).all(),
@@ -133,6 +135,7 @@ export abstract class SqliteProjectStoreBase {
       if (sha256Hex(canonicalBytes(JSON.parse(row.canonical_json))) !== row.canonical_digest) throw new Error('STORE_DIGEST_MISMATCH');
     }
     verifyProjectCatalog(this.database);
+    verifySequences(this.database);
   }
   protected verify(): void { this.verifyPreMigration(); }
 }

@@ -1,3 +1,7 @@
+import { executeSequence } from './sequence-store.ts';
+import { readSequence, listSequences } from './sequence-reads.ts';
+import { validateSequenceSources } from './sequence-sources.ts';
+import type { SequenceCommand } from '../../motion-protocol/src/sequence.ts';
 import { initializeProject, readProjectCatalog, type ProjectIdentity } from './project-catalog.ts';
 import { admitShot } from './shot-admission.ts';
 import type { ShotAdmissionCommand } from '../../motion-protocol/src/project.ts';
@@ -52,6 +56,9 @@ export class SqliteProjectStore extends SqliteProjectStoreBase implements Projec
       } catch (error) { this.database.exec('ROLLBACK'); throw error; }
     }
   }
+  readSequence(sequenceId: string, now: number) { return readSequence(this.database, sequenceId, now); }
+  listSequences(now: number) { return listSequences(this.database, this.readProjectCatalog().projectId, now); }
+  executeSequence(command: SequenceCommand, auth: AuthContext) { return executeSequence(this.database, command, auth, document => validateSequenceSources(this, document), this.fault); }
   readProjectCatalog() { return readProjectCatalog(this.database); }
   admitShot(command: ShotAdmissionCommand, auth: AuthContext) { return admitShot(this.database, command, auth, this.fault); }
   initialize(seed: MotionDocument, project?: ProjectIdentity, preserveExistingProjectIdentity = false): void {
