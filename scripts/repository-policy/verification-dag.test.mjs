@@ -96,3 +96,15 @@ test('runs an explicit suite with its dependencies', async () => {
   assert.deepEqual(executed, ['policy', 'leaf']);
   assert.equal(receipt.passed, true);
 });
+
+test('one invocation shares a diagnostic identity across suites and the next invocation gets a fresh identity', async () => {
+  const calls = [];
+  const definitions = { suites: { browser: {}, smoke: {} }, tiers: {} };
+  const run = () => runVerification({ repositoryRoot: '/synthetic', selectedSuites: ['browser', 'smoke'], definitions,
+    spawn: async (name, _suite, _root, runId) => { calls.push({ name, runId }); return name === 'browser' ? 1 : 0; } });
+  await run(); await run();
+  assert.equal(calls[0].runId, calls[1].runId);
+  assert.equal(calls[2].runId, calls[3].runId);
+  assert.notEqual(calls[0].runId, calls[2].runId);
+  assert.deepEqual(calls.map(call => call.name), ['browser', 'smoke', 'browser', 'smoke']);
+});

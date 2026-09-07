@@ -10,6 +10,7 @@ export async function stageBrowserDiagnostics(source: string, destination: strin
   await mkdir(destination, { recursive: true });
   let count = 0;
   let rejected = false;
+  let reason: 'unsafe-candidate' | 'renderer-unavailable' | 'source-unavailable' | 'no-candidates' = 'unsafe-candidate';
   let browser: Awaited<ReturnType<typeof chromium.launch>> | undefined;
   const walk = async (directory: string, depth = 0): Promise<void> => {
     if (depth > 7) throw new Error('depth');
@@ -40,7 +41,7 @@ export async function stageBrowserDiagnostics(source: string, destination: strin
           const summary = [
             `Commit ${data.commit} | ${data.suite} | attempt ${data.attempt} | dirty ${data.dirty}`,
             `${data.source}:${data.line} ${data.assertion.matcher} expected=${data.assertion.expected} actual=${data.assertion.actual}`,
-            ...data.events.slice(-12).map(event => `${event.ms}ms ${event.kind} ${event.control} rev=${event.revision} history=${event.undoCount}/${event.redoCount} publication=${event.publication} pending=${event.pendingRevision} accepted=${event.accepted} HTTP=${event.status}`),
+            ...data.events.filter(event => ['pointerdown', 'pointerup', 'click', 'handler', 'enqueue', 'start', 'result', 'projection'].includes(event.kind)).slice(-12).map(event => `${event.ms}ms ${event.kind} ${event.control} rev=${event.revision} history=${event.undoCount}/${event.redoCount} publication=${event.publication} pending=${event.pendingRevision} accepted=${event.accepted} outcome=${event.outcome}`),
           ].join('\n\n');
           await page.locator('pre').evaluate((element, text) => { element.textContent = text; }, summary);
           await page.screenshot({ path: join(output, 'diagnostic-state.png') });
@@ -48,13 +49,16 @@ export async function stageBrowserDiagnostics(source: string, destination: strin
       } catch { rejected = true; }
     }
   };
-  try { browser = await chromium.launch(); await walk(source); }
-  catch { rejected = true; }
-  finally { await browser?.close(); }
+  try {
+    try { browser = await chromium.launch(); } catch { reason = 'renderer-unavailable'; throw new Error('renderer'); }
+    try { await walk(source); } catch { reason = 'source-unavailable'; throw new Error('source'); }
+  } catch { rejected = true; }
+  finally { await browser?.close().catch(() => { rejected = true; reason = 'renderer-unavailable'; }); }
+  if (!rejected && count === 0) { rejected = true; reason = 'no-candidates'; }
   if (rejected) {
     await rm(destination, { recursive: true, force: true });
     await mkdir(destination, { recursive: true });
-    await writeFile(join(destination, 'rejected.json'), JSON.stringify({ status: 'rejected', reason: 'Unsafe or unknown diagnostic candidate; no candidate uploaded' }));
+    await writeFile(join(destination, 'rejected.json'), JSON.stringify({ status: 'rejected', reason, message: 'No candidate uploaded' }));
   }
   return { rejected, count };
 }
