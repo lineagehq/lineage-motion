@@ -137,6 +137,7 @@ export const verificationSuites = {
     'apps/editor/tests/normal-agent-smoke.spec.ts',
   ]),
   browser: playwright([
+      'apps/editor/tests/sequence-parity.spec.ts',
       'apps/editor/tests/sequence-storyboard.spec.ts',
       'apps/editor/tests/shot-export.spec.ts',
       'apps/editor/tests/normal-canvas.spec.ts',
