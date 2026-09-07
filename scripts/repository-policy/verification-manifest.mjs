@@ -124,6 +124,7 @@ export const verificationSuites = {
   ]),
   browser: playwright([
       'apps/editor/tests/shot-export.spec.ts',
+      'apps/editor/tests/normal-canvas.spec.ts',
       'apps/editor/tests/project-entry.spec.ts',
       'apps/editor/tests/editor.spec.ts',
       'apps/editor/tests/editor-authoring.spec.ts',

@@ -446,10 +446,10 @@ export async function applyShotHold(): Promise<void> {
   const inventory = canonicalShotInventory()?.[0];
   const landing = inventory?.waypoints.map((point) => point.timeMs)
     .filter((timeMs) => timeMs > config.startMs && timeMs < settled).at(-1) ?? config.landedMs;
-  const selected = projectTrajectorySelection(authoring.value.document, config.targetElementIds, 2100); if (!selected.eligible) {
+  const selected = projectTrajectorySelection(authoring.value.document, config.targetElementIds, config.settledMs); if (!selected.eligible) {
     shotStatus.value = selected.code ?? 'TRAJECTORY_SELECTION_INVALID'; showShotControlFailure('Hold', selected.code); return; }
   const intent: OperationIntentPayload = { kind: 'motion.settled-hold.set', elementIds: [...config.targetElementIds],
-    sourceTimeMs: 2100, settledTimeMs: settled, landingTimeMs: landing, boundaryTimeMs: 2100 };
+    sourceTimeMs: config.settledMs, settledTimeMs: settled, landingTimeMs: landing, boundaryTimeMs: config.settledMs };
   const result = await prepareAndDispatchIntent(intent);
   if (!result.ok) showShotControlFailure('Hold', result.code);
   shotStatus.value = result.ok ? `Settled hold applied at revision ${authoring.value.document.revision}.` : `${result.code} · unchanged.`; renderShotWorkspace();

@@ -1,3 +1,4 @@
+import { displayTime } from './editor-time.js';
 import payload from 'virtual:motion-document';
 import { compileMotionDocument, type CompilerResult } from '../../../packages/css-compiler/src/index.js';
 import {
@@ -58,7 +59,7 @@ export async function mountPreview(compiledHtml: string, compilerCss: string): P
   const mountedState = controller.readState();
   if (Number.isFinite(requestedPlayheadMs) && requestedPlayheadMs >= 0
     && (mountedState.playheadMs !== requestedPlayheadMs || mountedState.currentTimes.some((time) => time !== requestedPlayheadMs))) {
-    controller.scrub(requestedPlayheadMs); playhead.value = `${requestedPlayheadMs} ms`;
+    controller.scrub(requestedPlayheadMs); playhead.value = displayTime(requestedPlayheadMs);
   }
   configurePreviewCanvas();
   await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
@@ -71,7 +72,8 @@ export function configurePreviewCanvas(): void {
   if (!Number.isSafeInteger(source.widthCssPixels) || source.widthCssPixels <= 0
     || !Number.isSafeInteger(source.heightCssPixels) || source.heightCssPixels <= 0) throw new Error('PREVIEW_SOURCE_SIZE_INVALID');
   if (!Number.isFinite(availableWidth) || availableWidth <= 0) throw new Error('PREVIEW_PROJECTION_INVALID');
-  const runway = shotConfig.value ? 72 : 0;
+  const normal = Boolean(document.querySelector('.normal-editor'));
+  const runway = shotConfig.value ? (normal ? availableWidth < 520 ? 32 : 40 : 72) : 16;
   const previewPanel = required<HTMLElement>('.preview-panel');
   const panelTop = previewPanel.getBoundingClientRect().top;
   const chromeHeight = required<HTMLElement>('.preview-title').offsetHeight + (shotConfig.value
@@ -81,13 +83,18 @@ export function configurePreviewCanvas(): void {
       + required<HTMLElement>('[data-shot-history-slot]').offsetHeight
     : required<HTMLElement>('.transport').offsetHeight);
   const visiblePanelTop = getComputedStyle(previewPanel).position === 'static' || panelTop >= window.innerHeight ? 0 : Math.max(0, panelTop);
-  const availableHeight = Math.max(240, window.innerHeight - visiblePanelTop - chromeHeight - 48);
+  const availableHeight = normal && shotConfig.value ? Math.max(300, Math.min(560, window.innerHeight * 0.55))
+    : Math.max(240, window.innerHeight - visiblePanelTop - chromeHeight - 48);
   const scale = Math.min((availableWidth - runway * 2) / source.widthCssPixels,
     (availableHeight - runway * 2) / source.heightCssPixels);
   if (!Number.isFinite(scale) || scale <= 0) throw new Error('PREVIEW_PROJECTION_INVALID');
   previewCanvas.style.width = `${source.widthCssPixels}px`; previewCanvas.style.height = `${source.heightCssPixels}px`;
-  previewCanvas.style.left = `${runway}px`; previewCanvas.style.top = `${runway}px`;
-  previewCanvas.style.transform = `scale(${scale})`; previewStage.style.height = `${source.heightCssPixels * scale + runway * 2}px`;
+  const displayHeight = source.heightCssPixels * scale;
+  const stageHeight = Math.max(displayHeight + runway * 2, Number.parseFloat(getComputedStyle(previewStage).minHeight) || 0);
+  previewCanvas.style.left = `${(availableWidth - source.widthCssPixels * scale) / 2}px`;
+  previewCanvas.style.top = `${(stageHeight - displayHeight) / 2}px`;
+  previewCanvas.style.setProperty('--overlay-inverse-scale', String(1 / scale));
+  previewCanvas.style.transform = `scale(${scale})`; previewStage.style.height = `${stageHeight}px`;
   previewStage.dataset.runwayCssPixels = String(runway);
   iframe.style.width = `${source.widthCssPixels}px`; iframe.style.height = `${source.heightCssPixels}px`;
 }

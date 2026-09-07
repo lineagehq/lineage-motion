@@ -1,3 +1,4 @@
+import { mountNormalCanvas } from './normal-canvas.js';
 import { applyCueOperation } from '../../../packages/domain/src/cue-operations.js';
 import { projectAuthoringTargets, projectCueActionEligibility, projectHoldEligibility, type AuthoringAction } from '../../../packages/domain/src/authoring-eligibility.js';
 import { cueTargetSnapshots, validateMotionDocument, type AuthoringCue, type CueSemantic } from '../../../packages/domain/src/index.js';
@@ -43,6 +44,7 @@ export function mountProjectActions(root: HTMLElement): void {
       <p data-pause-reason></p><button type="submit">Insert whole-shot pause</button><button type="button" data-discard-pause>Discard pause draft</button></form>
     </details><section aria-label="Created actions"><h3>Created actions</h3><div data-project-action-history></div></section><output data-action-status role="status" aria-live="polite"></output>`;
   root.querySelector('.workflow')!.prepend(host);
+  mountNormalCanvas(root);
   // The original opacity controls remain available for detailed track editing.
   root.querySelector<HTMLElement>('[data-hold-control]')!.hidden = true;
   root.querySelector<HTMLElement>('[data-status-copy]')!.hidden = true;
@@ -194,27 +196,31 @@ export function mountProjectActions(root: HTMLElement): void {
   host.querySelector('[data-discard-action]')!.addEventListener('click', () => { form.reset(); editing = null; target.disabled = false; selected = null; form.querySelector('[data-apply-action]')!.textContent = 'Apply action'; form.dataset.projectDraft = 'false'; render(); });
   form.addEventListener('submit', async event => {
     event.preventDefault(); if (!selected || busy || stale(form)) return;
+    const returnFocus = document.activeElement as HTMLElement | null; let accepted = false;
     busy = true; host.dataset.operationPending = 'true'; updateValidity();
     try {
       const result = selected === 'fade' ? await dispatch({ ...operationEnvelope(), kind: 'motion.track.create', elementId: target.value,
         payload: { property: 'opacity', durationMs: number('end') - number('start'), delayMs: number('start'), easing: 'linear', startValue: 0, endValue: 1 } })
         : await prepareAndDispatchIntent(editing ? { kind: 'motion.cue.update', cueId: editing.id, semantic: semantic() }
           : { kind: 'motion.cue.create', creationKey: `action-${crypto.randomUUID()}`, semantic: semantic() });
+      accepted = result.ok;
       feedback.value = result.ok ? `${labels[selected]} applied. Revision ${authoring.value.document.revision}.` : `Action was not applied: ${result.code}.`;
       if (result.ok) { form.dataset.projectDraft = 'false';
         if (editing) editing = authoring.value.document.cues.find(cue => cue.id === editing!.id) as AuthoringCue;
       }
-    } finally { busy = false; delete host.dataset.operationPending; render(); feedback.focus({ preventScroll: true }); }
+    } finally { busy = false; delete host.dataset.operationPending; render(); (accepted ? feedback : returnFocus?.isConnected ? returnFocus : feedback).focus({ preventScroll: true }); }
   });
   host.querySelector('[data-discard-pause]')!.addEventListener('click', () => { pause.reset(); pause.dataset.projectDraft = 'false'; render(); });
   pause.addEventListener('submit', async event => {
-    event.preventDefault(); if (busy || stale(pause)) return; busy = true; host.dataset.operationPending = 'true'; updateValidity();
+    event.preventDefault(); if (busy || stale(pause)) return;
+    const returnFocus = document.activeElement as HTMLElement | null; let accepted = false; busy = true; host.dataset.operationPending = 'true'; updateValidity();
     try {
       const result = await dispatch({ ...operationEnvelope(), kind: 'motion.hold.insert', payload: {
         cueId: cue.value, durationMs: Number((pause.elements.namedItem('duration') as HTMLInputElement).value) } });
+      accepted = result.ok;
       feedback.value = result.ok ? `Whole-shot pause applied. Duration ${authoring.value.document.durationMs} ms.` : `Pause was not applied: ${result.code}.`;
       if (result.ok) pause.dataset.projectDraft = 'false';
-    } finally { busy = false; delete host.dataset.operationPending; render(); feedback.focus({ preventScroll: true }); }
+    } finally { busy = false; delete host.dataset.operationPending; render(); (accepted ? feedback : returnFocus?.isConnected ? returnFocus : feedback).focus({ preventScroll: true }); }
   });
   document.addEventListener('motion:projection', render); render();
 }
