@@ -192,7 +192,7 @@ export function mountSequenceStoryboard(root: HTMLElement, capability: string): 
   });
   get('[data-sequence-save-hold]').addEventListener('click', () => {
     const input = properties.elements.namedItem('hold') as HTMLInputElement; const [whole, fraction = ''] = input.value.split('.'); const ms = Number(whole || 0) * 1000 + Number(fraction.padEnd(3, '0'));
-    if (!/^(?:\d+|\d*\.\d{1,3})$/.test(input.value) || !Number.isSafeInteger(ms) || ms < 0) { input.setCustomValidity('Enter a nonnegative number of seconds, precise to a millisecond.'); input.reportValidity(); message('Hold not applied. Enter seconds to a maximum of three decimal places.'); return; }
+    if (!/^(?:\d+|\d*\.\d{1,3})$/.test(input.value) || !Number.isSafeInteger(ms) || ms < 0) { input.setCustomValidity('Enter zero or more seconds with at most three decimal places.'); input.reportValidity(); message('Hold not applied. Enter zero or more seconds with at most three decimal places.'); return; }
     input.setCustomValidity(''); void edit({ kind: 'clip.hold', clipId: selected, endHoldMs: ms }, true);
   });
   properties.addEventListener('input', () => (properties.elements.namedItem('hold') as HTMLInputElement).setCustomValidity(''));
