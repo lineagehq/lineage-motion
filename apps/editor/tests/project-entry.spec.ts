@@ -133,9 +133,11 @@ for (const [cueId, cueLabel, boundary, duration] of [['trajectory_start', 'Start
   await page.getByRole('button', { name: 'Undo', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
   expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().contentDigest)).toBe(before.state.contentDigest);
+  await expect(page.locator('[data-action-status]')).toBeEmpty();
   await page.getByRole('button', { name: 'Redo', exact: true }).click();
   await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(3);
   expect(await page.evaluate(() => window.__motionEditor.canonicalProjection)).toEqual(after);
+  await expect(page.locator('[data-action-status]')).toBeEmpty();
 });
 
 test('normal actions preserve keyboard focus and can be updated, detached, deleted, and undone', async ({ page }) => {

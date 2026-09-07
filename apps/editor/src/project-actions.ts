@@ -57,6 +57,7 @@ export function mountProjectActions(root: HTMLElement): void {
   const cue = pause.elements.namedItem('cue') as HTMLSelectElement;
   const feedback = host.querySelector<HTMLOutputElement>('[data-action-status]')!; feedback.tabIndex = -1;
   let selected: AuthoringAction | null = null; let busy = false; let editing: AuthoringCue | null = null; let lastTarget = '';
+  let holdFeedbackRevision: number | null = null;
   const markDraft = (current: HTMLFormElement) => {
     if (current.dataset.projectDraft !== 'true') { current.dataset.baseRevision = String(authoring.value.document.revision); current.dataset.baseBranch = activeBranchId.value; }
     current.dataset.projectDraft = 'true';
@@ -120,6 +121,9 @@ export function mountProjectActions(root: HTMLElement): void {
     pause.querySelector('[data-pause-reason]')!.textContent = stale(pause) ? 'The shot changed. Discard this pause draft before choosing a new boundary.' : explanation(pauseEligibility.reason);
   };
   const render = () => {
+    if (holdFeedbackRevision !== null && holdFeedbackRevision !== authoring.value.document.revision) {
+      feedback.value = ''; holdFeedbackRevision = null;
+    }
     if (editing && form.dataset.projectDraft !== 'true' && !authoring.value.document.cues.some(cue => cue.id === editing!.id)) { editing = null; selected = null; form.dataset.projectDraft = 'false'; }
     const items = projectAuthoringTargets(authoring.value.document); const previous = target.value;
     target.replaceChildren(...items.map(item => new Option(item.label, item.elementId))); target.value = items.some(item => item.elementId === previous) ? previous : items[0]?.elementId ?? '';
@@ -221,7 +225,7 @@ export function mountProjectActions(root: HTMLElement): void {
       const result = await dispatch({ ...operationEnvelope(), kind: 'motion.hold.insert', payload: { cueId, durationMs } });
       accepted = result.ok;
       feedback.value = result.ok ? `Whole-shot pause applied: ${durationMs} ms before ${cueLabel}. Shot duration ${authoring.value.document.durationMs} ms.` : `Pause was not applied: ${result.code}.`;
-      if (result.ok) pause.dataset.projectDraft = 'false';
+      if (result.ok) { pause.dataset.projectDraft = 'false'; holdFeedbackRevision = authoring.value.document.revision; }
     } finally { busy = false; delete host.dataset.operationPending; render(); (accepted ? feedback : returnFocus?.isConnected ? returnFocus : feedback).focus({ preventScroll: true }); }
   });
   document.addEventListener('motion:projection', render); render();
