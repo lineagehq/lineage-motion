@@ -32,26 +32,57 @@ test('finds exactly this checkout from nested directories and requires explicit 
     expect(loadSession(f.project, f.dataDir, otherCheckout).service).toBe('http://127.0.0.1:1236');
   } finally { await f.cleanup(); }
 });
-test('rejects nonlocal endpoints, malformed sessions, unsafe permissions and symlinks without leaking secrets', async () => {
-  const f = await fixture(); const path = await f.writeSession('http://127.0.0.1:1234');
+test.each([
+  ['remote HTTPS endpoint', 'https://example.com'],
+  ['localhost hostname', 'http://localhost:1234'],
+  ['non-root path', 'http://127.0.0.1:1234/redirect'],
+  ['embedded credentials', 'http://secret@127.0.0.1:1234'],
+  ['query credentials', 'http://127.0.0.1:1234/?token=secret'],
+  ['file URL', 'file:///secret'],
+])('rejects %s without leaking capability or local path', async (_scenario, serviceUrl) => {
+  const f = await fixture();
   try {
-    const session = JSON.parse(await readFile(path, 'utf8'));
-    for (const serviceUrl of ['https://example.com', 'http://localhost:1234', 'http://127.0.0.1:1234/redirect',
-      'http://secret@127.0.0.1:1234', 'http://127.0.0.1:1234/?token=secret', 'file:///secret']) {
-      await writeFile(path, JSON.stringify({ ...session, serviceUrl }));
-      const response = await invoke(['head', '--data-dir', f.dataDir, '--document-id', 'doc']);
-      expect(response.json.diagnostic.code).toBe('CLI_SESSION_UNSAFE');
-      expect(response.stdout + response.stderr).not.toContain(f.capability);
-      expect(response.stdout + response.stderr).not.toContain(f.directory);
-    }
-    await writeFile(path, JSON.stringify(session)); await chmod(path, 0o644);
+    await f.writeSession(serviceUrl);
+    const response = await invoke(['head', '--data-dir', f.dataDir, '--document-id', 'doc']);
+    expect(response.json.diagnostic.code).toBe('CLI_SESSION_UNSAFE');
+    expect(response.stdout + response.stderr).not.toContain(f.capability);
+    expect(response.stdout + response.stderr).not.toContain(f.directory);
+  } finally { await f.cleanup(); }
+});
+
+test('rejects unsafe session file permissions', async () => {
+  const f = await fixture();
+  try {
+    const path = await f.writeSession('http://127.0.0.1:1234');
+    await chmod(path, 0o644);
     expect(() => loadSession(undefined, f.dataDir)).toThrow('CLI_SESSION_UNSAFE');
-    await chmod(path, 0o600); await writeFile(path, '{ malformed private-sentinel');
+  } finally { await f.cleanup(); }
+});
+
+test('rejects malformed session JSON', async () => {
+  const f = await fixture();
+  try {
+    const path = await f.writeSession('http://127.0.0.1:1234');
+    await writeFile(path, '{ malformed private-sentinel');
     expect(() => loadSession(undefined, f.dataDir)).toThrow('CLI_SESSION_INVALID');
-    const target = join(f.directory, 'unsafe.json'); await writeFile(target, JSON.stringify(session), { mode: 0o600 });
+  } finally { await f.cleanup(); }
+});
+
+test('rejects a symlinked session file', async () => {
+  const f = await fixture();
+  try {
+    const path = await f.writeSession('http://127.0.0.1:1234');
+    const target = join(f.directory, 'unsafe.json');
+    await writeFile(target, await readFile(path), { mode: 0o600 });
     await rm(path); await symlink(target, path);
     expect(() => loadSession(undefined, f.dataDir)).toThrow('CLI_SESSION_UNSAFE');
-    await rm(path); await f.writeSession('http://127.0.0.1:1234');
+  } finally { await f.cleanup(); }
+});
+
+test('rejects unsafe session parent-directory permissions', async () => {
+  const f = await fixture();
+  try {
+    const path = await f.writeSession('http://127.0.0.1:1234');
     await chmod(dirname(path), 0o777);
     expect(() => loadSession(undefined, f.dataDir)).toThrow('CLI_SESSION_UNSAFE');
   } finally { await f.cleanup(); }
@@ -59,11 +90,11 @@ test('rejects nonlocal endpoints, malformed sessions, unsafe permissions and sym
 test('does not forward a capability across a redirect', async () => {
   const f = await fixture(); let targetRequests = 0;
   const target = createServer((_request, response) => { targetRequests++; response.end('{}'); });
-  await new Promise<void>((resolve) => target.listen(0, '127.0.0.1', resolve));
   const redirect = createServer((_request, response) => {
     response.writeHead(302, { location: `http://127.0.0.1:${(target.address() as {port: number}).port}` }); response.end(); });
-  await new Promise<void>((resolve) => redirect.listen(0, '127.0.0.1', resolve));
   try {
+    await new Promise<void>((resolve) => target.listen(0, '127.0.0.1', resolve));
+    await new Promise<void>((resolve) => redirect.listen(0, '127.0.0.1', resolve));
     await f.writeSession(`http://127.0.0.1:${(redirect.address() as {port: number}).port}`);
     const result = await invoke(['head', '--data-dir', f.dataDir, '--document-id', 'doc']);
     expect(result.code).toBe(7); expect(targetRequests).toBe(0); expect(result.stdout + result.stderr).not.toContain(f.capability);
@@ -72,8 +103,9 @@ test('does not forward a capability across a redirect', async () => {
 });
 
 test('accepts only the legacy session or the exact stored-project-ID extension and binds its fingerprint', async () => {
-  const f = await fixture(); const path = await f.writeSession('http://127.0.0.1:1234');
+  const f = await fixture();
   try {
+    const path = await f.writeSession('http://127.0.0.1:1234');
     const original = JSON.parse(await readFile(path, 'utf8'));
     const oldContext = loadSession(undefined, f.dataDir); expect(oldContext.projectId).toBeUndefined();
     await writeFile(path, JSON.stringify({ ...original, projectId: 'saved_project_01' }));
@@ -97,9 +129,9 @@ test('catalog validation prefers stored identity over launcher display name and 
     response.end(JSON.stringify({ schemaVersion: 'motion.project-catalog.v1', projectId: 'stored_project', name,
       catalogRevision: 0, catalogDigest: 'a'.repeat(64), shots: [] }));
   });
-  await new Promise<void>((resolve) => service.listen(0, '127.0.0.1', resolve));
-  const path = await f.writeSession(`http://127.0.0.1:${(service.address() as {port: number}).port}`);
   try {
+    await new Promise<void>((resolve) => service.listen(0, '127.0.0.1', resolve));
+    const path = await f.writeSession(`http://127.0.0.1:${(service.address() as {port: number}).port}`);
     const original = JSON.parse(await readFile(path, 'utf8'));
     await writeFile(path, JSON.stringify({ ...original, projectId: 'stored_project' }));
     expect((await invoke(['project', '--data-dir', f.dataDir])).json).toMatchObject({ projectId: 'stored_project', name: 'My animation' });
