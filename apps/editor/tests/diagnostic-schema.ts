@@ -1,0 +1,58 @@
+import { z } from 'zod';
+const count = z.number().int().min(0).max(1e9).nullable();
+const sources = [
+  'apps/editor/tests/animation-delivery-motion.spec.ts',
+  'apps/editor/tests/animation-delivery.spec.ts',
+  'apps/editor/tests/browser-diagnostics.spec.ts',
+  'apps/editor/tests/control-access.spec.ts',
+  'apps/editor/tests/editor-authoring.spec.ts',
+  'apps/editor/tests/editor.spec.ts',
+  'apps/editor/tests/integrated-dogfood.spec.ts',
+  'apps/editor/tests/moments.spec.ts',
+  'apps/editor/tests/normal-agent-smoke.spec.ts',
+  'apps/editor/tests/normal-canvas.spec.ts',
+  'apps/editor/tests/normal-startup.spec.ts',
+  'apps/editor/tests/phase3-collaboration.spec.ts',
+  'apps/editor/tests/phase3-publication.spec.ts',
+  'apps/editor/tests/phase3-reconciliation.spec.ts',
+  'apps/editor/tests/phase3-workspace.spec.ts',
+  'apps/editor/tests/phase3.spec.ts',
+  'apps/editor/tests/phase4-cues.spec.ts',
+  'apps/editor/tests/phase4-reusable-cues.spec.ts',
+  'apps/editor/tests/preview-transient-resize.spec.ts',
+  'apps/editor/tests/project-entry.spec.ts',
+  'apps/editor/tests/replayed-cue-events.spec.ts',
+  'apps/editor/tests/review-handoff.spec.ts',
+  'apps/editor/tests/sequence-parity.spec.ts',
+  'apps/editor/tests/sequence-storyboard.spec.ts',
+  'apps/editor/tests/server-lifecycle.spec.ts',
+  'apps/editor/tests/shot-export.spec.ts',
+] as const;
+const control = z.enum(['undo', 'redo', 'other', 'none']);
+export const eventSchema = z.object({
+  ms: z.number().int().min(0).max(86_400_000),
+  kind: z.enum(['pointerdown', 'pointerup', 'click', 'projection', 'feedback', 'mutation', 'request', 'response', 'requestfailed', 'final', 'handler', 'enqueue', 'start', 'result']),
+  outcome: z.enum(['unknown', 'applied', 'stale', 'publication-pending', 'publication-failed', 'rejected']),
+  accepted: z.boolean().nullable(), expectedRevision: count,
+  control, revision: count, undoCount: count, redoCount: count, pendingRevision: count,
+  publication: z.enum(['settled', 'pending', 'failed', 'unknown']),
+  undoEnabled: z.boolean(), redoEnabled: z.boolean(), focus: control,
+  status: z.number().int().min(0).max(599),
+  requestId: count, endpoint: z.enum(['commands', 'workspace', 'revision', 'head', 'branches', 'claims', 'activity', 'events', 'other']),
+}).strict();
+export const bundleSchema = z.object({
+  version: z.literal(1), run: z.string().uuid(), suite: z.enum(['browser', 'browser-smoke', 'direct']),
+  ciRun: z.string().regex(/^[0-9]{1,20}$/).nullable(), ciAttempt: z.string().regex(/^[0-9]{1,5}$/).nullable(),
+  droppedEvents: z.number().int().min(0), dirty: z.boolean(), commit: z.string().regex(/^[a-f0-9]{40}$/), test: z.string().regex(/^[a-f0-9]{64}$/),
+  source: z.enum(sources),
+  line: z.number().int().positive(), attempt: z.number().int().min(0).max(100),
+  browser: z.enum(['chromium', 'firefox', 'webkit']),
+  viewport: z.object({ width: z.number().int().min(1).max(10000), height: z.number().int().min(1).max(10000) }).strict(),
+  assertion: z.object({ matcher: z.enum(['toBe', 'toEqual', 'toHaveText', 'toBeVisible', 'toBeEnabled', 'other']),
+    expected: z.union([z.number().finite(), z.boolean(), z.null()]),
+    actual: z.union([z.number().finite(), z.boolean(), z.null()]),
+  }).strict(),
+  screenshot: z.literal('Rendered diagnostic state; no editor pixels'),
+  events: z.array(eventSchema).max(200),
+}).strict();
+export type DiagnosticEvent = z.infer<typeof eventSchema>;

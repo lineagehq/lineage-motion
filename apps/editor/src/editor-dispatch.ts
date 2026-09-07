@@ -1,3 +1,4 @@
+import { recordEditorDiagnostic } from './editor-diagnostics.ts';
 import payload from 'virtual:motion-document';
 import { compileMotionDocument, type CompilerResult } from '../../../packages/css-compiler/src/index.js';
 import {
@@ -55,8 +56,13 @@ export async function dispatch(
   historyAnchor?: { viewportTop: number; scrollY: number },
   previewPromotion?: PreviewCssCommitPromotion,
 ): Promise<{ ok: boolean; code?: string }> {
+  recordEditorDiagnostic('enqueue', operation.kind, operation.expectedRevision);
   const publicationRejection = rejectUnavailablePublication();
-  if (publicationRejection) return { ok: false, code: publicationRejection };
+  if (publicationRejection) {
+    recordEditorDiagnostic('result', operation.kind, operation.expectedRevision, false,
+      publicationRejection === 'PUBLICATION_PENDING' ? 'publication-pending' : 'publication-failed');
+    return { ok: false, code: publicationRejection };
+  }
   const appliedMessage = successMessage(operation);
   const beforeCreated = findCreatedTrack(buildTimeline(authoring.value.document).rows);
   let authoritativePreviewAlreadyMounted = false;
@@ -64,6 +70,7 @@ export async function dispatch(
   if (serviceClient) {
     const command = serviceCommandForOperation(operation);
     const commandTask = reconciliation.value.then(async () => {
+      recordEditorDiagnostic('start', operation.kind, operation.expectedRevision);
       const queuedPublicationRejection = rejectUnavailablePublication();
       if (queuedPublicationRejection) return { response: null, applied: false,
         authoritativePreviewAlreadyMounted: false, publicationRejection: queuedPublicationRejection };
@@ -106,6 +113,10 @@ export async function dispatch(
     });
     reconciliation.value = commandTask.then(() => undefined, () => undefined);
     const outcome = await commandTask; const response = outcome.response;
+    recordEditorDiagnostic('result', operation.kind, operation.expectedRevision, outcome.applied,
+      outcome.applied ? 'applied' : response && !response.ok && response.code === 'STALE_REVISION' ? 'stale'
+        : 'publicationRejection' in outcome ? outcome.publicationRejection === 'PUBLICATION_PENDING'
+          ? 'publication-pending' : 'publication-failed' : 'rejected');
     if ('publicationRejection' in outcome && outcome.publicationRejection) {
       return { ok: false, code: outcome.publicationRejection };
     }

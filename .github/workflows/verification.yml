@@ -84,13 +84,13 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: node scripts/run-verification.mjs --suite determinism --suite browser-smoke
+      - if: failure()
+        run: node --import tsx scripts/stage-browser-diagnostics.ts
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: smoke-diagnostics
-          path: |
-            apps/editor/test-results/**/server-diagnostics.txt
-            apps/editor/test-results/**/attachments/server-diagnostics-*.txt
+          path: artifacts/safe-browser-diagnostics/
           if-no-files-found: ignore
           retention-days: 7
 
@@ -160,13 +160,13 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - run: node scripts/run-verification.mjs --suite browser --suite browser-smoke
+      - if: failure()
+        run: node --import tsx scripts/stage-browser-diagnostics.ts
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
           name: browser-diagnostics
-          path: |
-            apps/editor/test-results/**/server-diagnostics.txt
-            apps/editor/test-results/**/attachments/server-diagnostics-*.txt
+          path: artifacts/safe-browser-diagnostics/
           if-no-files-found: ignore
           retention-days: 7
 
