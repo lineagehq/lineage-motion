@@ -1,3 +1,5 @@
+export const sequenceViewportGuidance = 'Shots must match the sequence viewport in exact width AND height (CSS pixels); equal aspect ratio is insufficient. Run npm run motion -- sequences to discover sequence IDs, npm run motion -- sequence --sequence-id ID to inspect the target viewport/revision, and npm run motion -- sequence-sources to inspect source IDs/revisions/viewports in the same project. Choose a supported source with both dimensions matching, or explicitly create a separate sequence matching the source using sequence-create --help. No resizing is performed.';
+export const sequenceViewportRecovery = 'SEQUENCE_VIEWPORT_MISMATCH: ' + sequenceViewportGuidance + ' The rejected edit leaves the sequence unchanged. A corrected request needs a new operation ID; keep the explicit target, expected revision and claim unless separately reconciled. Retry an uncertain request only with its original arguments, operation ID, revision and handle. See npm run motion -- sequence-clip-add --help and docs/agent-sequence-guide.md.';
 const context = ['--project NAME', '--data-dir DIRECTORY', '--sequence-id ID'];
 const mutation = ['--operation-id ID', '--expected-revision N', '--claim HANDLE (managed session)'];
 export const sequenceOptions: Record<string, string[]> = {
@@ -25,6 +27,8 @@ export function sequenceDetail(name: string): unknown | null {
     ...(name === 'sequence-clip-add' ? { optionalOptions: ['--end-hold-seconds N (default 0)'] } : {}),
     selection: 'An omitted sequence ID is accepted only when exactly one exists. Creation always requires an explicit new ID.',
     sourcePins: 'Read sequence-sources; supply the exact source document ID and its expected revision. Unsupported sources include a reason. Source changes require explicit update-source.',
+    viewport: sequenceViewportGuidance,
+    viewportMismatch: sequenceViewportRecovery,
     recovery: 'Retry the identical normalized arguments, operation ID, revision and handle. Resolved pins and claim secrets remain in private immutable local records.',
     units: 'Seconds must convert exactly to integer milliseconds; --end-hold-ms is also accepted, never together.',
     output: name === 'sequence-export' ? 'Committed standalone ZIP; stdout includes receipt and archive digest, never HTML/CSS, credentials or output paths.' : 'Validated canonical service projection or operation receipt.',
