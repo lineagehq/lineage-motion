@@ -1,3 +1,4 @@
+import { previewTransportEnd } from './editor-time.js';
 import payload from 'virtual:motion-document';
 import { compileMotionDocument, type CompilerResult } from '../../../packages/css-compiler/src/index.js';
 import {
@@ -67,7 +68,10 @@ export function openShotWorkspace(config: { startMs: number; landedMs: number; s
   shotPrimaryElementId.value = shotConfig.value.targetElementIds[0]!;
   shotSelection.value = [shotPrimaryElementId.value]; shotMomentMs.value = config.landedMs; shotWorkspace.hidden = false; shotMoments.hidden = false;
   activateShotLayout(); configurePreviewCanvas();
-  scrubber.max = String(shotConfig.value.settledMs + 1);
+  scrubber.max = String(previewTransportEnd(authoring.value.document.durationMs, shotConfig.value.settledMs));
+  const holdInput = required<HTMLInputElement>('[data-shot-settled]');
+  holdInput.max = String(config.settledMs - 1);
+  if (document.querySelector('.normal-editor')) holdInput.value = String(Math.round(config.landedMs + (config.settledMs - config.landedMs) / 2));
   if (!alignShotPreviewToMoment(shotMomentMs.value)) return { ok: false, code: 'PREVIEW_MOMENT_ALIGNMENT_INVALID' };
   renderShotWorkspace(); configurePreviewCanvas(); renderShotWorkspace(); return { ok: true };
 }

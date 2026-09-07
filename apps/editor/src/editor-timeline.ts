@@ -1,3 +1,4 @@
+import { displayTime, previewTransportEnd } from './editor-time.js';
 import payload from 'virtual:motion-document';
 import { compileMotionDocument, type CompilerResult } from '../../../packages/css-compiler/src/index.js';
 import {
@@ -242,7 +243,7 @@ export function currentTarget(): TimelineRow {
 
 export function scrub(timeMs: number): void {
   stopPlaybackFeedback();
-  controller.scrub(timeMs); scrubber.value = String(timeMs); playhead.value = `${timeMs} ms`;
+  controller.scrub(timeMs); scrubber.value = String(timeMs); playhead.value = displayTime(timeMs);
   updatePreviewPlaybackState();
   republishShotGeometry();
   schedulePreviewSelection();
@@ -256,19 +257,21 @@ export function stopPlaybackFeedback(): void {
 
 export function syncPlaybackFeedback(): void {
   const state = controller.readState();
-  const nativeTime = state.currentTimes.find((time): time is number => typeof time === 'number');
+  const times = state.currentTimes.filter((time): time is number => typeof time === 'number');
+  const nativeTime = document.querySelector('.normal-editor') && times.length ? Math.max(...times) : times[0];
   if (nativeTime === undefined) return;
-  const shotEndMs = shotConfig.value?.settledMs;
+  const shotEndMs = document.querySelector('.normal-editor')
+    ? previewTransportEnd(authoring.value.document.durationMs) : shotConfig.value?.settledMs;
   if (shotEndMs !== undefined && nativeTime >= shotEndMs) {
     controller.pause();
     controller.scrub(shotEndMs);
-    scrubber.value = String(shotEndMs); playhead.value = `${shotEndMs} ms`;
+    scrubber.value = String(shotEndMs); playhead.value = displayTime(shotEndMs);
     updatePreviewPlaybackState(shotEndMs, true);
     schedulePreviewSelection();
     return;
   }
   const visibleTime = Math.max(0, Math.min(Number(scrubber.max), Math.round(nativeTime)));
-  scrubber.value = String(visibleTime); playhead.value = `${visibleTime} ms`;
+  scrubber.value = String(visibleTime); playhead.value = displayTime(visibleTime);
   updatePreviewPlaybackState(nativeTime, state.playStates.every((playState) => playState !== 'running'));
   schedulePreviewSelection();
 }
@@ -293,7 +296,7 @@ export function alignShotPreviewToMoment(timeMs: number): boolean {
     || state.playStates.some((playState) => playState !== 'paused')) {
     shotStatus.value = `PREVIEW_MOMENT_ALIGNMENT_INVALID · revision ${authoring.value.document.revision} unchanged.`; return false;
   }
-  scrubber.value = String(timeMs); playhead.value = `${timeMs} ms`; updatePreviewPlaybackState(); schedulePreviewSelection(); return true;
+  scrubber.value = String(timeMs); playhead.value = displayTime(timeMs); updatePreviewPlaybackState(); schedulePreviewSelection(); return true;
 }
 
 export function renderTrack(row: TimelineRow): HTMLElement {

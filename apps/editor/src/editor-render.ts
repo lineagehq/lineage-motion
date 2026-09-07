@@ -1,3 +1,4 @@
+import { previewTransportEnd } from './editor-time.js';
 import payload from 'virtual:motion-document';
 import { compileMotionDocument, type CompilerResult } from '../../../packages/css-compiler/src/index.js';
 import {
@@ -62,7 +63,7 @@ export function renderProjection(): void {
   const timeline = buildTimeline(authoring.value.document);
   const timelineElement = required<HTMLElement>('[data-timeline]');
   timelineElement.dataset.durationMs = String(timeline.durationMs);
-  scrubber.max = String(shotConfig.value ? shotConfig.value.settledMs + 1 : timeline.durationMs);
+  scrubber.max = String(previewTransportEnd(timeline.durationMs, shotConfig.value?.settledMs));
   timelineElement.replaceChildren(...timeline.rows.map(renderTrack));
   required('[data-track-count]').textContent = `${timeline.rows.length} tracks`;
   const cues = required('[data-cues]');

@@ -62,6 +62,9 @@ export function setPublicationState(state: PublicationState, failureCode: string
   const main = document.querySelector('main')!;
   main.dataset.publicationPending = String(state === 'pending');
   main.dataset.publicationState = state;
+  for (const button of document.querySelectorAll<HTMLButtonElement>('[data-branch-form] button, [data-revoke-form] button'))
+    button.disabled = state !== 'settled';
+  document.dispatchEvent(new Event('motion:feedback'));
   if (state === 'failed' && shotConfig.value) shotStatus.value = 'Change could not be published. Your previous motion is still active.';
 }
 
@@ -89,6 +92,7 @@ export function publishServiceDiagnostic(diagnostic: MotionDiagnostic): void {
     ? `${diagnostic.code}: local change not applied; refreshed to revision ${authoring.value.document.revision}.`
     : `${diagnostic.code}: revision ${authoring.value.document.revision} unchanged.`;
   status.dataset.kind = 'error';
+  document.dispatchEvent(new Event('motion:feedback'));
 }
 
 export function publishClientDiagnostic(code: string, category: MotionDiagnostic['category'], retryable: boolean): void {
