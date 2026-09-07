@@ -1,3 +1,10 @@
+import { ZodError } from 'zod';
+import { admitShot } from './shot-admission.ts';
+import { openManagedClaim, type ManagedClaim } from './managed-claims.ts';
+import { resolveProject } from './project-context.ts';
+import { sessionFetch, listProjects } from './session-context.ts';
+import { commandDiscovery, commandDetail, operationKinds, mutationNames, isPreparableOperation } from './command-discovery.ts';
+import { parseOptions, parseArgumentValues, type Options } from './arguments.ts';
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 
@@ -11,75 +18,57 @@ type Io = { stdout(value: string): void; stderr(value: string): void };
 class IneligiblePreparation extends Error { constructor(readonly preparation: unknown) { super('CLI_PREPARATION_INELIGIBLE'); } }
 class CommandInputError extends Error { constructor(readonly response: CommandFailure) { super(response.diagnostic.code); } }
 
-const operationKinds = [
-  'motion.track.create', 'motion.keyframe-value.set', 'motion.keyframe-time.set', 'motion.keyframe.add',
-  'motion.keyframe.remove', 'motion.slot-duration.set', 'motion.binding-delay.set', 'motion.slot-easing.set',
-  'motion.hold.insert', 'motion.transform-pose.set', 'motion.transform-waypoints.translate',
-  'motion.transform-waypoint.add', 'motion.transform-waypoint.remove',
-  'motion.keyframe-group-time.set', 'motion.keyframe-group-easing.set', 'motion.settled-hold.set',
-  'motion.cue.create', 'motion.cue.update', 'motion.cue.delete', 'motion.cue.detach',
-  'motion.history.undo', 'motion.history.redo', 'motion.branch.create', 'motion.claim.acquire',
-  'motion.claim.renew', 'motion.claim.release', 'motion.claim.revoke',
-] as const;
-
-const mutationNames: Record<string, (typeof operationKinds)[number]> = {
-  'track-create': 'motion.track.create', 'keyframe-value-set': 'motion.keyframe-value.set',
-  'keyframe-time-set': 'motion.keyframe-time.set', 'keyframe-add': 'motion.keyframe.add',
-  'keyframe-remove': 'motion.keyframe.remove', 'slot-duration-set': 'motion.slot-duration.set',
-  'binding-delay-set': 'motion.binding-delay.set', 'slot-easing-set': 'motion.slot-easing.set',
-  'hold-insert': 'motion.hold.insert', 'pose-set': 'motion.transform-pose.set',
-  'waypoints-translate': 'motion.transform-waypoints.translate', 'moment-time-set': 'motion.keyframe-group-time.set',
-  'waypoint-add': 'motion.transform-waypoint.add', 'waypoint-remove': 'motion.transform-waypoint.remove',
-  'segment-easing-set': 'motion.keyframe-group-easing.set', 'settled-hold-set': 'motion.settled-hold.set',
-  'cue-create': 'motion.cue.create', 'cue-update': 'motion.cue.update', 'cue-delete': 'motion.cue.delete',
-  'cue-detach': 'motion.cue.detach', undo: 'motion.history.undo', redo: 'motion.history.redo',
-  'branch-create': 'motion.branch.create', 'claim-acquire': 'motion.claim.acquire',
-  'claim-renew': 'motion.claim.renew', 'claim-release': 'motion.claim.release', 'claim-revoke': 'motion.claim.revoke',
-};
-
-const readNames = ['workspace', 'head', 'branches', 'claims', 'activity', 'history', 'export-proof'] as const;
-const baseOptions = ['--service', '--capability', '--document-id', '--branch-id'] as const;
-const commandDiscovery = {
-  schemaVersion: 'motion.cli-command-list.v1',
-  reads: readNames.map((name) => ({ name, requiredOptions: baseOptions })),
-  utilities: [
-    { name: 'operation-kinds', requiredOptions: [] },
-    { name: 'validate', requiredOptions: [...baseOptions, '--command-file'] },
-    { name: 'dispatch', requiredOptions: [...baseOptions, '--command-file'] },
-    { name: 'claim-secret', requiredOptions: [] },
-  ],
-  mutations: Object.entries(mutationNames).map(([name, kind]) => ({ name, kind,
-    requiredOptions: mutationRequiredOptions(kind),
-    construction: 'service-discovery-and-options',
-  })),
-} as const;
-
 export async function runCli(argv: string[], io: Io = {
   stdout: (value) => process.stdout.write(value), stderr: (value) => process.stderr.write(value),
 }): Promise<number> {
   if (!argv.length || argv[0] === 'help' || argv[0] === '--help') {
+    if (argv.length > 1) return writeLocalFailure(io, 'CLI_OPTIONS_INVALID');
     io.stdout(canonicalJson(commandDiscovery)); return 0;
   }
   if (argv[1] === '--help') {
+    if (argv.length !== 2) return writeLocalFailure(io, 'CLI_OPTIONS_INVALID');
     const detail = commandDetail(argv[0]!);
     if (!detail) return writeLocalFailure(io, 'CLI_COMMAND_UNKNOWN');
     io.stdout(canonicalJson(detail)); return 0;
   }
-  if (argv[0] === 'claim-secret') { io.stdout(`${randomBytes(32).toString('base64url')}\n`); return 0; }
+  if (argv[0] === 'claim-secret') { if (argv.length !== 1) return writeLocalFailure(io, 'CLI_OPTIONS_INVALID'); io.stdout(`${randomBytes(32).toString('base64url')}\n`); return 0; }
   if (argv[0] === 'operation-kinds') {
+    try { parseArgumentValues(argv); } catch { return writeLocalFailure(io, 'CLI_OPTIONS_INVALID'); }
     io.stdout(canonicalJson({ schemaVersion: 'motion.operation-kind-list.v1', operations: operationKinds })); return 0;
   }
-  const options = parseOptions(argv); if (!options) return writeLocalFailure(io, 'CLI_OPTIONS_INVALID');
+  let managed: ManagedClaim | undefined;
   try {
-    const client = new MotionServiceClient(options.service, (...args) => fetch(...args), {
+    if (argv[0] === 'projects') {
+      const values = parseArgumentValues(argv);
+      if ([...values.keys()].some((name) => name !== '--data-dir')) throw new Error('CLI_OPTIONS_INVALID');
+      io.stdout(canonicalJson(listProjects(values.get('--data-dir')?.[0]))); return 0;
+    }
+    if (!commandDetail(argv[0]!)) return writeLocalFailure(io, 'CLI_OPTIONS_INVALID');
+    const options = parseOptions(argv);
+    if (argv[0]!.startsWith('review-') && (options.has('--validate') || options.has('--validate-only')))
+      throw new Error('CLI_OPTIONS_INVALID');
+    if (argv[0] === 'shot-admit') {
+      const response = await admitShot(options); io.stdout(canonicalJson(response));
+      return response.ok ? 0 : response.code === 'STALE_CATALOG_REVISION' ? 3
+        : response.code === 'UNAUTHORIZED_CLAIM' ? 4 : response.code === 'OPERATION_ID_CONFLICT' ? 5
+          : response.code === 'STORAGE_FAILURE' ? 7 : 2;
+    }
+    const project = await resolveProject(argv[0]!, options);
+    if (project !== undefined) { io.stdout(canonicalJson(project)); return 0; }
+    managed = await openManagedClaim(argv[0]!, options);
+    const client = new MotionServiceClient(options.service, options.session ? sessionFetch : (...args) => fetch(...args), {
       actor: options.actor, capability: options.capability, ...(options.claimSecret ? { claimSecret: options.claimSecret } : {}),
     });
-    const reviewClient = new ReviewServiceClient(options.service, (...args) => fetch(...args), {
+    const reviewClient = new ReviewServiceClient(options.service, options.session ? sessionFetch : (...args) => fetch(...args), {
       actor: options.actor, capability: options.capability, ...(options.claimSecret ? { claimSecret: options.claimSecret } : {}),
     });
     if (argv[0] === 'review-dispatch') {
       const parsed = parseReviewCommand(readJsonFile(requireText(options.commandFile)));
       if (!parsed.ok) { io.stdout(canonicalJson(parsed.response)); return reviewExitCode(parsed.response); }
+      if (options.session && (parsed.command.documentId !== options.documentId || parsed.command.branchId !== options.branchId
+        || (options.expectedRevision !== undefined && parsed.command.expectedBranchRevision !== options.expectedRevision)
+        || (options.operationId !== undefined && parsed.command.operationId !== options.operationId)))
+        throw new Error('CLI_COMMAND_IDENTITY_MISMATCH');
       const response = await reviewClient.dispatch(parsed.command); io.stdout(canonicalJson(response)); return reviewExitCode(response);
     }
     if (argv[0] === 'review-annotations') { io.stdout(canonicalJson(await reviewClient.annotations(
@@ -88,23 +77,29 @@ export async function runCli(argv: string[], io: Io = {
       nonnegativeInteger(options.read('--left-revision')), nonnegativeInteger(options.read('--right-revision'))))); return 0; }
     if (argv[0] === 'review-handoff') { const parsed = parseHandoffRequest(readJsonFile(requireText(options.commandFile)));
       if (!parsed.ok) { io.stdout(canonicalJson(parsed.response)); return reviewExitCode(parsed.response); }
+      if (options.session && (parsed.identity.documentId !== options.documentId || parsed.identity.branchId !== options.branchId
+        || (options.expectedRevision !== undefined && parsed.identity.revision !== options.expectedRevision)
+        || (options.operationId !== undefined && parsed.operationId !== options.operationId)))
+        throw new Error('CLI_COMMAND_IDENTITY_MISMATCH');
       io.stdout(canonicalJson(await reviewClient.handoff({ operationId: parsed.operationId, ...parsed.identity }))); return 0; }
     const read = await runRead(argv[0]!, options, client);
     if (read !== undefined) { io.stdout(canonicalJson(read)); return 0; }
     let command: MotionCommand;
     if (argv[0] === 'dispatch') command = readCommandFile(options.commandFile);
     else if (argv[0] === 'validate') {
-      command = readCommandFile(options.commandFile); const response = await client.validate(command, options.claimSecret);
+      command = readCommandFile(options.commandFile); managed?.assertIdentity(command); const response = await client.validate(command, options.claimSecret);
       io.stdout(canonicalJson(response)); return response.valid ? 0 : exitCode(response.response as CommandResponse);
     } else command = await buildCommand(argv[0]!, options, client);
-    if ((options.has('--validate') || options.has('--validate-only')) && command.command.schemaVersion === 'motion.operation-intent.v1') {
+    managed?.assertIdentity(command);
+    if (options.has('--validate') || options.has('--validate-only')) {
       const validation = await client.validate(command, options.claimSecret);
       if (!validation.valid || options.has('--validate-only')) {
         io.stdout(canonicalJson(validation)); return validation.valid ? 0 : exitCode(validation.response as CommandResponse);
       }
     }
-    const response = await client.dispatch(command, options.claimSecret); io.stdout(canonicalJson(response)); return exitCode(response);
+    const response = await client.dispatch(command, options.claimSecret); managed?.observe(response); io.stdout(canonicalJson(response)); return exitCode(response);
   } catch (error) {
+    if (error instanceof ZodError) return writeLocalFailure(io, 'CLI_COMMAND_INPUT_INVALID');
     if (error instanceof MotionPreparationError) {
       io.stdout(canonicalJson(error.response)); return exitCode(error.response);
     }
@@ -117,70 +112,6 @@ export async function runCli(argv: string[], io: Io = {
   }
 }
 
-function isPreparableOperation(kind: (typeof operationKinds)[number]): boolean {
-  return ['motion.transform-pose.set', 'motion.transform-waypoints.translate', 'motion.transform-waypoint.add',
-    'motion.transform-waypoint.remove', 'motion.keyframe-group-time.set',
-    'motion.keyframe-group-easing.set', 'motion.settled-hold.set', 'motion.cue.create', 'motion.cue.update',
-    'motion.cue.delete', 'motion.cue.detach'].includes(kind);
-}
-
-function mutationRequiredOptions(kind: (typeof operationKinds)[number]): string[] {
-  const common = [...baseOptions, '--operation-id', '--expected-revision'];
-  if (kind === 'motion.transform-pose.set') return [...common, '--element-id', '--moment-ms', '--translate-x-microunits',
-    '--translate-y-microunits', '--scale-ppm', '--rotate-microdegrees', '--viewport-width', '--viewport-height'];
-  if (kind === 'motion.transform-waypoints.translate') return [...common, '--element-id (repeatable)', '--moment-ms',
-    '--delta-x-ppm', '--delta-y-ppm', '--viewport-width', '--viewport-height'];
-  if (kind === 'motion.transform-waypoint.add' || kind === 'motion.transform-waypoint.remove') {
-    return [...common, '--element-id (repeatable)', '--time-ms'];
-  }
-  if (kind === 'motion.keyframe-group-time.set') return [...common, '--element-id (repeatable)', '--source-time-ms',
-    '--target-time-ms', '--landing-time-ms', '--settled-time-ms'];
-  if (kind === 'motion.keyframe-group-easing.set') return [...common, '--element-id (repeatable)', '--moment-ms',
-    '--expected-easing', '--easing'];
-  if (kind === 'motion.settled-hold.set') return [...common, '--element-id (repeatable)', '--source-time-ms',
-    '--settled-time-ms', '--landing-time-ms', '--boundary-time-ms=2100'];
-  if (kind === 'motion.cue.create') return [...common, '--creation-key', '--semantic', 'semantic options'];
-  if (kind === 'motion.cue.update') return [...common, '--cue-id', '--semantic', 'semantic options'];
-  if (kind === 'motion.cue.delete' || kind === 'motion.cue.detach') return [...common, '--cue-id'];
-  if (kind === 'motion.branch.create') return [...common, '--new-branch-id'];
-  if (kind === 'motion.claim.acquire') return [...common, '--scope', '--claim-secret'];
-  if (kind === 'motion.claim.renew' || kind === 'motion.claim.release')
-    return [...common, '--claim-id', '--lease-version', '--claim-secret'];
-  if (kind === 'motion.claim.revoke') return [...common, '--claim-id', '--lease-version'];
-  if (kind === 'motion.track.create') return [...common, '--element-id'];
-  if (kind === 'motion.keyframe-value.set') return [...common, '--track-id', '--keyframe-id', '--value'];
-  if (kind === 'motion.keyframe-time.set') return [...common, '--track-id', '--keyframe-id', '--time-ms'];
-  if (kind === 'motion.keyframe.add') return [...common, '--track-id', '--time-ms', '--value'];
-  if (kind === 'motion.keyframe.remove') return [...common, '--track-id', '--keyframe-id'];
-  if (kind === 'motion.slot-duration.set') return [...common, '--track-id', '--duration-ms'];
-  if (kind === 'motion.binding-delay.set') return [...common, '--track-id', '--delay-ms'];
-  if (kind === 'motion.slot-easing.set') return [...common, '--track-id', '--easing'];
-  return common;
-}
-
-function commandDetail(name: string): unknown | null {
-  if ((readNames as readonly string[]).includes(name)) return {
-    schemaVersion: 'motion.cli-command.v1', name, category: 'read', requiredOptions: baseOptions,
-    output: name === 'head' || name === 'history' ? 'motion.workspace-projection.v1' : `motion.${name}-projection.v1`,
-  };
-  if (name === 'operation-kinds') return { schemaVersion: 'motion.cli-command.v1', name,
-    category: 'utility', requiredOptions: [], output: 'motion.operation-kind-list.v1' };
-  if (name === 'validate' || name === 'dispatch') return { schemaVersion: 'motion.cli-command.v1', name,
-    category: 'utility', requiredOptions: [...baseOptions, '--command-file'], input: 'motion.protocol.v1 command file' };
-  const kind = mutationNames[name]; if (!kind) return null;
-  return { schemaVersion: 'motion.cli-command.v1', name, kind, category: 'mutation',
-    requiredOptions: mutationRequiredOptions(kind),
-    construction: 'service-discovery-and-options', stableIdsFrom: ['workspace', 'claims'],
-    ...(isPreparableOperation(kind) ? { preparation: 'MotionServiceClient.prepareOperation',
-      dispatch: 'motion.operation-intent.v1', optionalOptions: ['--validate', '--validate-only'],
-      valueFormats: { easing: 'keyword:<value> | steps:<count>:<position> | cubic-bezier:<x1>:<y1>:<x2>:<y2>',
-        reveal: '--semantic reveal --target-id <id> (repeatable) --start-ms <n> --complete-ms <n>',
-        cursorPath: '--semantic cursor-path --cursor-target-id <id> --start-ms <n> --arrive-ms <n> --easing <format> --waypoint <time:xPpm:yPpm> (repeatable)',
-        click: '--semantic click --cursor-target-id <id> --pulse-target-id <id> --arrive-ms <n> --press-ms <n> --release-ms <n> --pulse-end-ms <n> --press-scale-ppm <n> --pulse-radius-ppm <n> --pulse-opacity-ppm <n> [--reveal-cue-id <id>]',
-      } } : {}),
-  };
-}
-
 function writeLocalFailure(io: Io, code: string): number {
   const fieldPath = code === 'CLI_COMMAND_UNKNOWN' ? 'command' : code.includes('REVISION') ? 'expectedRevision'
     : code.includes('ELEMENT') ? 'elementId' : code.includes('TRACK') ? 'trackId'
@@ -190,28 +121,6 @@ function writeLocalFailure(io: Io, code: string): number {
       ? 'target' : 'protocol', retryable: false, ...(fieldPath ? { fieldPath } : {}),
   } }));
   return 2;
-}
-
-type Options = {
-  service: string; actor: ActorKind; capability: string; documentId: string | undefined; branchId: string;
-  operationId: string | undefined; expectedRevision: number | undefined; claimSecret: string | undefined;
-  commandFile: string | undefined;
-  read(name: string): string | undefined; readAll(name: string): string[]; has(name: string): boolean;
-};
-
-function parseOptions(argv: string[]): Options | null {
-  const read = (name: string) => { const index = argv.lastIndexOf(name); return index >= 0 ? argv[index + 1] : undefined; };
-  const readAll = (name: string) => argv.flatMap((value, index) => value === name && argv[index + 1] ? [argv[index + 1]!] : []);
-  const has = (name: string) => argv.includes(name);
-  const service = read('--service'); const actor = (read('--actor') ?? (argv[0]?.startsWith('claim-') ? 'agent' : 'human')) as ActorKind;
-  const capability = read('--capability') ?? (actor === 'human' ? process.env.MOTION_HUMAN_CAPABILITY : process.env.MOTION_AGENT_CAPABILITY)
-    ?? (process.env.VITEST ? actor === 'human' ? 'human-editor' : 'cli-agent' : undefined);
-  if (!service || !capability || (actor !== 'human' && actor !== 'agent')) return null;
-  const rawRevision = read('--expected-revision'); const expectedRevision = rawRevision === undefined ? undefined : Number(rawRevision);
-  if (expectedRevision !== undefined && (!Number.isSafeInteger(expectedRevision) || expectedRevision < 0)) return null;
-  return { service, actor, capability, documentId: read('--document-id'), branchId: read('--branch-id') ?? 'main',
-    operationId: read('--operation-id'), expectedRevision, claimSecret: read('--claim-secret'),
-    commandFile: read('--command-file'), read, readAll, has };
 }
 
 async function runRead(name: string, options: Options, client: MotionServiceClient): Promise<unknown | undefined> {
@@ -246,12 +155,16 @@ async function buildCommand(name: string, options: Options, client: MotionServic
     const elementId = requireText(options.read('--element-id'));
     if (!workspace.elements.some((element) => element.elementId === elementId)) throw new Error('CLI_ELEMENT_NOT_DISCOVERED');
     return makeTrackCreateCommand({ operationId, documentId, expectedRevision, branchId: options.branchId,
-      elementId: elementId as 'el_a2849ff826f3e167' | 'el_2dbee68b1ea318c8' });
+      elementId, ...(options.has('--duration-ms') ? { durationMs: positiveInteger(options.read('--duration-ms')) } : {}),
+      ...(options.has('--delay-ms') ? { delayMs: nonnegativeInteger(options.read('--delay-ms')) } : {}),
+      ...(options.has('--start-value') ? { startValue: finiteNumber(options.read('--start-value')) } : {}),
+      ...(options.has('--end-value') ? { endValue: finiteNumber(options.read('--end-value')) } : {}) });
   }
   if (kind === 'motion.hold.insert') {
-    if (!workspace.cues.some((cue) => cue.cueId === 'cue_pair')) throw new Error('CLI_CUE_NOT_DISCOVERED');
+    const cueId = requireText(options.read('--cue-id'));
+    if (!workspace.cues.some((cue) => cue.cueId === cueId)) throw new Error('CLI_CUE_NOT_DISCOVERED');
     return envelopeOperation({ schemaVersion: 'motion.operation.v1', kind, operationId, documentId, expectedRevision,
-      payload: { cueId: 'cue_pair', durationMs: 600 } }, options.branchId, kind, operationId, documentId, expectedRevision);
+      payload: { cueId, durationMs: positiveInteger(options.read('--duration-ms')) } }, options.branchId, kind, operationId, documentId, expectedRevision);
   }
   const trackId = requireText(options.read('--track-id')); const track = workspace.tracks.find((item) => item.trackId === trackId);
   if (!track) throw new Error('CLI_TRACK_NOT_DISCOVERED');
@@ -306,7 +219,7 @@ async function prepareIntentCommand(kind: (typeof operationKinds)[number], opera
     sourceTimeMs: nonnegativeInteger(options.read('--source-time-ms')),
     settledTimeMs: nonnegativeInteger(options.read('--settled-time-ms')),
     landingTimeMs: nonnegativeInteger(options.read('--landing-time-ms')),
-    boundaryTimeMs: literal2100(options.read('--boundary-time-ms')) };
+    boundaryTimeMs: nonnegativeInteger(options.read('--boundary-time-ms')) };
   else if (kind === 'motion.cue.create') intent = { kind, creationKey: requireText(options.read('--creation-key')),
     semantic: parseCueSemantic(options) };
   else if (kind === 'motion.cue.update') intent = { kind, cueId: requireText(options.read('--cue-id')),
@@ -376,7 +289,6 @@ function parseWaypoint(value: string): { timeMs: number; xPpm: number; yPpm: num
 }
 function one(values: string[], name: string): string { if (values.length !== 1) throw new Error(`CLI_${name.slice(2).replaceAll('-', '_').toUpperCase()}_INVALID`); return values[0]!; }
 function many(values: string[], name: string): string[] { if (!values.length) throw new Error(`CLI_${name.slice(2).replaceAll('-', '_').toUpperCase()}_REQUIRED`); return values; }
-function literal2100(value: string | undefined): 2100 { if (Number(value) !== 2100) throw new Error('CLI_BOUNDARY_TIME_INVALID'); return 2100; }
 
 function envelopeOperation(operation: unknown, branchId: string, kind: string, operationId: string,
   documentId: string, expectedRevision: number): MotionCommand {
@@ -401,13 +313,15 @@ function readCommandFile(path: string | undefined): MotionCommand {
 function protocolCommandInvalid(fieldPath: string): CommandFailure { return { ok: false, code: 'VALIDATION', diagnostic: {
   schemaVersion: 'motion.diagnostic.v1', code: 'PROTOCOL_COMMAND_INVALID', category: 'protocol', retryable: false, fieldPath,
 } }; }
-function readJsonFile(path: string): unknown { return JSON.parse(readFileSync(path, 'utf8')); }
+function readJsonFile(path: string): unknown {
+  try { return JSON.parse(readFileSync(path, 'utf8')); } catch { throw new Error('CLI_COMMAND_FILE_INVALID'); }
+}
 function requireText(value: string | undefined): string { if (!value) throw new Error('CLI_OPTION_REQUIRED'); return value; }
 function requireRevision(value: number | undefined): number { if (value === undefined) throw new Error('CLI_REVISION_REQUIRED'); return value; }
 function requireScope(value: string | undefined): 'document' | 'branch' { if (value !== 'document' && value !== 'branch') throw new Error('CLI_SCOPE_INVALID'); return value; }
-function finiteNumber(value: string | undefined): number { const number = Number(value); if (!Number.isFinite(number)) throw new Error('CLI_NUMBER_INVALID'); return number; }
+function finiteNumber(value: string | undefined): number { const number = Number(value); if (value === undefined || !/^-?\d+(?:\.\d+)?$/.test(value) || !Number.isFinite(number)) throw new Error('CLI_NUMBER_INVALID'); return number; }
 function positiveNumber(value: string | undefined): number { const number = finiteNumber(value); if (number <= 0) throw new Error('CLI_NUMBER_INVALID'); return number; }
-function safeInteger(value: string | undefined): number { const number = Number(value); if (!Number.isSafeInteger(number)) throw new Error('CLI_INTEGER_INVALID'); return number; }
+function safeInteger(value: string | undefined): number { const number = Number(value); if (value === undefined || !/^-?\d+$/.test(value) || !Number.isSafeInteger(number)) throw new Error('CLI_INTEGER_INVALID'); return number; }
 function nonnegativeInteger(value: string | undefined): number { const number = safeInteger(value); if (number < 0) throw new Error('CLI_INTEGER_INVALID'); return number; }
 function positiveInteger(value: string | undefined): number { const number = safeInteger(value); if (number < 1) throw new Error('CLI_INTEGER_INVALID'); return number; }
 function integerOption(value: string | undefined, fallback: number): number { return value === undefined ? fallback : nonnegativeInteger(value); }

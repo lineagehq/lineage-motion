@@ -9,6 +9,7 @@
     "packages/*"
   ],
   "scripts": {
+    "motion": "node --import tsx packages/motion-cli/src/cli.ts",
     "dev:editor": "node --import tsx apps/editor/scripts/dev-editor.mjs",
     "build": "vite build --config apps/editor/vite.config.ts",
     "test:browser": "playwright test --config apps/editor/playwright.config.ts",
