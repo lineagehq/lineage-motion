@@ -45,7 +45,8 @@ test('migration5 preserves legacy revisions, claims and history; its backup open
     expect(store.execute(phase3Command(), human).response.ok).toBe(true);
     const before = store.snapshot() as Record<string, unknown>; const head = store.readHead(phase3Seed().documentId);
     // Model a real v4 database by retaining its unchanged tables and checksummed migration records.
-    store.database.exec('DROP TABLE shot_admissions; DROP TABLE project_shots; DROP TABLE project_catalog; DELETE FROM schema_migrations WHERE version=5');
+    store.database.exec('DROP TABLE sequence_claims; DROP TABLE sequence_operations; DROP TABLE sequence_revisions; DROP TABLE sequences; '
+      + 'DROP TABLE shot_admissions; DROP TABLE project_shots; DROP TABLE project_catalog; DELETE FROM schema_migrations WHERE version>=5');
     store.close(); store = new SqliteProjectStore(temporary.databasePath); store.initialize(phase3Seed());
     expect(store.readHead(phase3Seed().documentId)).toEqual(head);
     const after = store.snapshot() as Record<string, unknown>;
@@ -79,7 +80,8 @@ test('failed migration5 leaves no partial catalog table and preserves its v4 bac
   try {
     const store = new SqliteProjectStore(temporary.databasePath); store.initialize(phase3Seed());
     const head = store.readHead(phase3Seed().documentId);
-    store.database.exec('DROP TABLE shot_admissions; DROP TABLE project_shots; DROP TABLE project_catalog; DELETE FROM schema_migrations WHERE version=5');
+    store.database.exec('DROP TABLE sequence_claims; DROP TABLE sequence_operations; DROP TABLE sequence_revisions; DROP TABLE sequences; '
+      + 'DROP TABLE shot_admissions; DROP TABLE project_shots; DROP TABLE project_catalog; DELETE FROM schema_migrations WHERE version>=5');
     // A conflicting table makes migration fail after its first CREATE; all migration writes must roll back.
     store.database.exec('CREATE TABLE project_shots(sentinel TEXT); INSERT INTO project_shots VALUES(\'kept\')'); store.close();
     expect(() => new SqliteProjectStore(temporary.databasePath)).toThrow();
@@ -97,7 +99,8 @@ test('migration binds project identity atomically before initialization so an in
   const temporary = await temporaryStore(); let store: SqliteProjectStore | undefined;
   try {
     store = new SqliteProjectStore(temporary.databasePath); store.initialize(phase3Seed());
-    store.database.exec('DROP TABLE shot_admissions; DROP TABLE project_shots; DROP TABLE project_catalog; DELETE FROM schema_migrations WHERE version=5');
+    store.database.exec('DROP TABLE sequence_claims; DROP TABLE sequence_operations; DROP TABLE sequence_revisions; DROP TABLE sequences; '
+      + 'DROP TABLE shot_admissions; DROP TABLE project_shots; DROP TABLE project_catalog; DELETE FROM schema_migrations WHERE version>=5');
     store.close();
     const project = { projectId: 'named_project', name: 'Named animation' };
     store = new SqliteProjectStore(temporary.databasePath, undefined, project);

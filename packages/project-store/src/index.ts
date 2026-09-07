@@ -1,3 +1,4 @@
+import type { SequenceCommand, SequenceResponse, SequenceSnapshot, SequenceCatalog } from '../../motion-protocol/src/sequence.ts';
 import type { ProjectCatalog, ShotAdmissionCommand, ShotAdmissionResponse } from '../../motion-protocol/src/project.ts';
 import type { MotionDocument, OperationPreparation, OperationPreparationRequest,
   WorkspaceProjection } from '../../domain/src/index.ts';
@@ -11,6 +12,9 @@ export type CommitResult = { response: CommandSuccess; event: CommitMetadata; re
   | { response: CommandFailure };
 export type AuthContext = RequestAuth & { now: number };
 export interface ProjectStore {
+  readSequence(sequenceId: string, now: number): SequenceSnapshot | null;
+  listSequences(now: number): SequenceCatalog;
+  executeSequence(command: SequenceCommand, auth: AuthContext): SequenceResponse;
   initialize(seed: MotionDocument, project?: { projectId: string; name: string }, preserveExistingProjectIdentity?: boolean): void;
   readProjectCatalog(): ProjectCatalog;
   admitShot(command: ShotAdmissionCommand, auth: AuthContext): ShotAdmissionResponse;
