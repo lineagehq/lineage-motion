@@ -18,8 +18,10 @@ npm run motion -- sequence-clip-add --help
 
 `sequence-sources` reports each saved shot's document ID, revision, canonical
 digest, duration in milliseconds and certified viewport. An unsupported shot
-has a null viewport and a reason. Choose supported sources with the same
-viewport. A sequence holds exact source revisions, so editing a shot does not
+has a null viewport and a reason. Choose supported sources with exactly the
+same width AND height in CSS pixels as the sequence; equal aspect ratio is
+insufficient. For example, 800×450 and 640×360 shots cannot share a sequence.
+A sequence holds exact source revisions, so editing a shot does not
 silently change an assembled animation. The sequence snapshot exposes stable
 clip IDs, source pins, end holds, revision, history availability and the active
 claim's lease version and expiration.
@@ -28,6 +30,30 @@ An omitted sequence ID is accepted only when the project has exactly one
 sequence. Creation always requires an explicit new ID. Names are labels;
 commands select stable IDs. Shot selectors such as `--shot` and `--document-id`
 are rejected on sequence commands. Use `--source-document-id` for a clip's shot.
+
+## Recover from a dimension mismatch
+
+`SEQUENCE_VIEWPORT_MISMATCH` (exit 2) leaves the sequence unchanged. The CLI
+keeps the canonical service JSON on stdout and prints recovery guidance on
+stderr. Use `sequences` to discover the target ID, `sequence --sequence-id ID`
+to inspect its `sequence.viewport` and revision, and `sequence-sources` to
+compare each supported shot's `viewport.widthCssPixels` and
+`viewport.heightCssPixels`. Keep the same project context on these reads.
+
+Choose a supported source with both dimensions matching the target, then submit
+the corrected append with a **new operation ID**, its discovered source ID and
+revision, and the same explicit sequence target, expected revision and active
+claim. If the sequence changed meanwhile, inspect and reconcile before making
+a new request; do not automatically refresh expectations or acquire claims.
+If no compatible source exists, use `sequence-create --help` to explicitly
+create a **separate sequence** with the source's exact width and height and a
+new sequence ID, operation ID and claim handle. This does not combine unequal
+shots or resize them.
+
+For a lost or uncertain response, retry the original command unchanged.
+Changing a source or dimensions while reusing its operation ID is not a retry
+and is rejected. The same dimension rule applies to initial clips and explicit
+source-pin updates.
 
 ## Create and assemble two shots
 

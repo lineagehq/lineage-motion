@@ -1,5 +1,5 @@
 import { runSequence, sequenceExitCode } from './sequence-workflow.ts';
-import { sequenceOptions } from './sequence-discovery.ts';
+import { sequenceOptions, sequenceViewportRecovery } from './sequence-discovery.ts';
 import { downloadShot } from './shot-export.ts';
 import { ZodError } from 'zod';
 import { admitShot } from './shot-admission.ts';
@@ -59,6 +59,7 @@ export async function runCli(argv: string[], io: Io = {
     if (Object.hasOwn(sequenceOptions, argv[0]!)) {
       const response = await runSequence(argv[0]!, options, parseArgumentValues(argv)) as { ok?: boolean; code?: string };
       io.stdout(canonicalJson(response));
+      if (response.code === 'SEQUENCE_VIEWPORT_MISMATCH') io.stderr(`${sequenceViewportRecovery}\n`);
       return sequenceExitCode(response);
     }
     const project = await resolveProject(argv[0]!, options);
