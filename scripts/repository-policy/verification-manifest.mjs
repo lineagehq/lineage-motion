@@ -87,6 +87,9 @@ export const verificationSuites = {
     'packages/local-service/src/review-handoff-recovery.test.ts',
   ]),
   parity: vitest([
+    'packages/motion-cli/src/sequence-workflow.test.ts',
+    'packages/motion-cli/src/sequence-selection.test.ts',
+    'packages/motion-cli/src/sequence-recovery.test.ts',
     'packages/motion-cli/src/arguments.test.ts',
     'packages/motion-cli/src/managed-session.test.ts',
     'packages/motion-cli/src/managed-claims.test.ts',
@@ -135,6 +138,7 @@ export const verificationSuites = {
     'apps/editor/tests/normal-agent-smoke.spec.ts',
   ]),
   browser: playwright([
+      'apps/editor/tests/sequence-parity.spec.ts',
       'apps/editor/tests/sequence-storyboard.spec.ts',
       'apps/editor/tests/shot-export.spec.ts',
       'apps/editor/tests/normal-canvas.spec.ts',

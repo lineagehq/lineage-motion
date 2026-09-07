@@ -10,6 +10,7 @@ export type Options = {
   set(name: string, value: string): void;
 };
 const known = new Set([
+  '--sequence-id', '--clip-id', '--clip-name', '--new-clip-id', '--index', '--source-document-id', '--source-revision', '--end-hold-ms', '--end-hold-seconds',
   '--output', '--name', '--starter', '--html-file', '--project-id', '--expected-catalog-revision', '--start-value', '--end-value',
   '--actor', '--after', '--approach-ms', '--approach-seconds', '--arrive-ms', '--arrive-seconds',
   '--boundary-time-ms', '--boundary-time-seconds', '--branch-id', '--capability', '--choose-ms', '--choose-seconds',

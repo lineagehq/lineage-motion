@@ -8,7 +8,12 @@ import type { ExportBundle } from '../../motion-protocol/src/export.ts';
 export async function writeExportArtifact(outputPath: string, bundle: ExportBundle): Promise<{
   archiveDigest: string; warning?: 'EXPORT_STAGING_CLEANUP_FAILED';
 }> {
-  const bytes = createExportArchive(bundle);
+  return writeArchiveArtifact(outputPath, createExportArchive(bundle));
+}
+
+export async function writeArchiveArtifact(outputPath: string, bytes: Uint8Array): Promise<{
+  archiveDigest: string; warning?: 'EXPORT_STAGING_CLEANUP_FAILED';
+}> {
   const destination = resolve(outputPath);
   let staging: string | undefined; let failure: string | undefined; let cleanupFailed = false;
   try {

@@ -1,3 +1,5 @@
+import { runSequence, sequenceExitCode } from './sequence-workflow.ts';
+import { sequenceOptions } from './sequence-discovery.ts';
 import { downloadShot } from './shot-export.ts';
 import { ZodError } from 'zod';
 import { admitShot } from './shot-admission.ts';
@@ -53,6 +55,11 @@ export async function runCli(argv: string[], io: Io = {
       return response.ok ? 0 : response.code === 'STALE_CATALOG_REVISION' ? 3
         : response.code === 'UNAUTHORIZED_CLAIM' ? 4 : response.code === 'OPERATION_ID_CONFLICT' ? 5
           : response.code === 'STORAGE_FAILURE' ? 7 : 2;
+    }
+    if (Object.hasOwn(sequenceOptions, argv[0]!)) {
+      const response = await runSequence(argv[0]!, options, parseArgumentValues(argv)) as { ok?: boolean; code?: string };
+      io.stdout(canonicalJson(response));
+      return sequenceExitCode(response);
     }
     const project = await resolveProject(argv[0]!, options);
     if (project !== undefined) { io.stdout(canonicalJson(project)); return 0; }
