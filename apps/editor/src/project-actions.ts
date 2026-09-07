@@ -214,11 +214,13 @@ export function mountProjectActions(root: HTMLElement): void {
   pause.addEventListener('submit', async event => {
     event.preventDefault(); if (busy || stale(pause)) return;
     const returnFocus = document.activeElement as HTMLElement | null; let accepted = false; busy = true; host.dataset.operationPending = 'true'; updateValidity();
+    const cueId = cue.value;
+    const durationMs = Number((pause.elements.namedItem('duration') as HTMLInputElement).value);
+    const cueLabel = authoring.value.document.cues.find(item => item.id === cueId)?.label ?? cueId;
     try {
-      const result = await dispatch({ ...operationEnvelope(), kind: 'motion.hold.insert', payload: {
-        cueId: cue.value, durationMs: Number((pause.elements.namedItem('duration') as HTMLInputElement).value) } });
+      const result = await dispatch({ ...operationEnvelope(), kind: 'motion.hold.insert', payload: { cueId, durationMs } });
       accepted = result.ok;
-      feedback.value = result.ok ? `Whole-shot pause applied. Duration ${authoring.value.document.durationMs} ms.` : `Pause was not applied: ${result.code}.`;
+      feedback.value = result.ok ? `Whole-shot pause applied: ${durationMs} ms before ${cueLabel}. Shot duration ${authoring.value.document.durationMs} ms.` : `Pause was not applied: ${result.code}.`;
       if (result.ok) pause.dataset.projectDraft = 'false';
     } finally { busy = false; delete host.dataset.operationPending; render(); (accepted ? feedback : returnFocus?.isConnected ? returnFocus : feedback).focus({ preventScroll: true }); }
   });
