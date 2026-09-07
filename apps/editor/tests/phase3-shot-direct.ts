@@ -228,10 +228,37 @@ export async function runShotDirectControls(context: Awaited<ReturnType<typeof r
   for (const viewport of [{ width: 1440, height: 900 }, { width: 768, height: 900 }]) {
     await page.setViewportSize(viewport); await expect(page.locator('[data-trajectory-overlay]')).toHaveAttribute('aria-busy', 'false');
     await workspace.getByRole('radio', { name: 'Primary Object 2' }).check();
+    await expect.poll(() => page.evaluate(() => {
+      const pump = (window.__motionEditor.inspectShotWorkspace() as unknown as {
+        geometryPump: { running: boolean; activeSamplers: number; pendingRequestId: number | null;
+          latestRequestId: number | null; lastCommittedRequestId: number | null };
+      }).geometryPump;
+      return !pump.running && pump.activeSamplers === 0 && pump.pendingRequestId === null
+        && pump.latestRequestId !== null && pump.latestRequestId === pump.lastCommittedRequestId;
+    })).toBe(true);
+    await page.evaluate(() => new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))));
     const center = await naturalCenter(targetElementIds[1]!);
     expect(center).toMatchObject({ objectId: targetElementIds[1], waypointId: null });
     const beforeRevision = await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision);
-    await page.mouse.move(center.x, center.y); await page.mouse.down(); await page.mouse.move(center.x + 12, center.y + 6, { steps: 3 }); await page.mouse.up();
+    // A missed overlay enters the script-disabled iframe, where Playwright's drag-cleanup timer cannot run.
+    // Prove the real pointerdown reached and captured the object before sending held-button movement.
+    await page.evaluate(() => {
+      const probe = window as unknown as { __objectPointerDown: { objectId: string | null; captured: boolean } | null };
+      probe.__objectPointerDown = null;
+      window.addEventListener('pointerdown', event => {
+        const object = (event.target as Element).closest<HTMLElement>('[data-preview-object-id]');
+        probe.__objectPointerDown = { objectId: object?.dataset.previewObjectId ?? null,
+          captured: object?.hasPointerCapture(event.pointerId) ?? false };
+      }, { once: true });
+    });
+    await page.mouse.move(center.x, center.y); await page.mouse.down();
+    try {
+      expect(await page.evaluate(() => (window as unknown as {
+        __objectPointerDown: { objectId: string | null; captured: boolean } | null;
+      }).__objectPointerDown), 'The natural object center must receive and capture pointerdown after resizing')
+        .toEqual({ objectId: targetElementIds[1], captured: true });
+      await page.mouse.move(center.x + 12, center.y + 6, { steps: 3 });
+    } finally { await page.mouse.up(); }
     await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(beforeRevision + 1);
     expect((JSON.parse(commandBytes.at(-1)!) as { command: { kind: string } }).command.kind).toBe('motion.transform-pose.set');
     await page.locator('[data-undo]').click(); await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(beforeRevision + 2);
