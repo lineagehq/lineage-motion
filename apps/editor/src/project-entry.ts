@@ -18,6 +18,7 @@ export async function loadProjectEntry(capability: string, fallbackId: string) {
 export function mountProjectEntry(options: {
   root: HTMLElement; displayName?: string | null; client: ProjectServiceClient; catalog: ProjectCatalog; documentId: string;
   dirty: () => boolean; pending: () => boolean;
+  trackDraft: () => boolean; discardTrackDraft: () => void;
 }) {
   let leaving = false; let catalog = options.catalog; let admitting = false; let entryDirty = false; let pendingCommand: ShotAdmissionCommand | null = null; let pendingInput = '';
   const host = document.createElement('section'); host.className = 'project-entry'; host.setAttribute('aria-label', 'Project and shots');
@@ -29,6 +30,7 @@ export function mountProjectEntry(options: {
     <label data-import-field hidden>Self-contained HTML and CSS<textarea name="html" rows="7" maxlength="900000" placeholder="Paste a complete HTML scene with inline CSS"></textarea></label>
     <p>Supported CSS animations only. Unsupported content is rejected before saving.</p><button type="submit">Create shot</button>
     </form></details><output data-entry-status role="status" aria-live="polite"></output>
+    <button type="button" data-discard-track-draft hidden>Discard opacity track draft</button>
     <dialog data-shot-switch><h2>Keep editing this shot?</h2><p>Your unapplied changes will be discarded if you switch shots.</p>
       <button type="button" data-shot-stay>Stay here</button><button type="button" data-shot-discard>Discard changes and switch</button></dialog>`;
   options.root.prepend(host);
@@ -38,6 +40,18 @@ export function mountProjectEntry(options: {
   const html = form.elements.namedItem('html') as HTMLTextAreaElement;
   const feedback = host.querySelector<HTMLOutputElement>('output')!;
   const dialog = host.querySelector<HTMLDialogElement>('dialog')!;
+  const discardTrack = host.querySelector<HTMLButtonElement>('[data-discard-track-draft]')!;
+  discardTrack.addEventListener('click', () => {
+    if (options.pending() || admitting) { feedback.value = 'Wait for the current change to finish before discarding the track draft.'; return; }
+    const hadTrackDraft = options.trackDraft();
+    if (hadTrackDraft) options.discardTrackDraft();
+    discardTrack.hidden = true;
+    feedback.value = hadTrackDraft ? 'Opacity track draft discarded. Your saved shot is unchanged. ' : 'No opacity track draft remains. ';
+    feedback.value += options.dirty()
+      ? 'Other editing drafts remain; apply or discard them before creating a shot.'
+      : 'The new shot’s input is preserved. Create shot when ready.';
+    form.querySelector<HTMLButtonElement>('[type=submit]')!.focus();
+  });
   let destination: string | null = null;
   const render = () => { select.replaceChildren(...catalog.shots.map(shot => {
     const option = new Option(shot.name, shot.documentId); option.selected = shot.documentId === options.documentId; return option;
@@ -63,7 +77,13 @@ export function mountProjectEntry(options: {
   form.addEventListener('submit', async event => {
     event.preventDefault(); if (admitting || options.pending()) return;
     // Do not create another document while its origin has an unapplied editing draft.
-    if (options.dirty()) { feedback.value = 'Apply or discard the current shot’s editing draft before creating a shot.'; return; }
+    discardTrack.hidden = !options.trackDraft();
+    if (options.dirty()) {
+      feedback.value = options.trackDraft()
+        ? 'An opacity track draft is blocking creation. Discard it below, or finish editing the current shot.'
+        : 'Apply or discard the current shot’s editing draft before creating a shot.';
+      return;
+    }
     admitting = true; const controls = form.querySelectorAll<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | HTMLButtonElement>('input, select, textarea, button');
     controls.forEach(control => { control.disabled = true; });
     try {

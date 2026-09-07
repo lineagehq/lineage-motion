@@ -96,6 +96,17 @@ export function dirtyStaleBase(dirty: boolean): number | null {
   return dirty ? draftStaleBaseRevision.value ?? authoring.value.document.revision : null;
 }
 
+export function discardCreationDraft(): void {
+  const draft = captureDraft();
+  // Timing drafts need their selected track to remain editable until explicitly applied.
+  if (!['[data-duration]', '[data-delay]', '[data-easing]'].some(key => draft.dirtyFields[key])) {
+    selectedCreationElementId.value = null;
+    updateStructuralControls(buildTimeline(authoring.value.document).rows);
+    restoreDraft({ ...draft, creationElementId: null, creationDirty: false });
+  }
+  resolveAcceptedCreationDraft();
+}
+
 export function resolveAcceptedCreationDraft(): void {
   creationDraftDirty.value = false;
   if (captureDraft().dirty) return;
