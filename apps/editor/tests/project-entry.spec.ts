@@ -173,11 +173,13 @@ test('the advertised ephemeral port survives a config restart without another se
     const before = await page.evaluate(() => window.__motionEditor.inspectAuthoring().exportDigest);
     const config = join(checkout, 'apps/editor/vite.config.ts');
     const initial = await readFile(config, 'utf8');
+    // Vite reloads the connected page itself after its configuration restart.
+    const reloaded = page.waitForEvent('load', { timeout: 15000 });
     await writeFile(config, initial.replace('humanCapability: process.env.', 'restartProof: "port-preserved", humanCapability: process.env.'));
     await expect.poll(async () => {
       try { return (await (await fetch(`${app.url}/@id/__x00__virtual:motion-document`)).text()).includes('port-preserved'); } catch { return false; }
     }, { timeout: 15000 }).toBe(true);
-    await page.reload(); await expect(page.locator('[data-editor-ready]')).toBeVisible();
+    await reloaded; await expect(page.locator('[data-editor-ready]')).toBeVisible();
     expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().exportDigest)).toBe(before);
     await app.stop();
     await expect.poll(async () => { try { await fetch(app.url); return false; } catch { return true; } }).toBe(true);
