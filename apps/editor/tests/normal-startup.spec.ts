@@ -165,3 +165,19 @@ test('launcher stop waits for delayed command cleanup after the npm-like leader 
     await writeFile(release, 'release'); await stop(); await closed;
   }
 });
+
+test('temporary controlled upload proof', async ({ page }) => {
+  const app = await launch(); await page.goto(app.editorUrl);
+  await page.getByRole('radio', { name: /Orb/ }).check();
+  await page.locator('[data-create-track]').click();
+  await expect(page.locator('[data-operation-status]')).toContainText('Revision 1');
+  await page.route('**/diagnostic-sentinel**', route => route.fulfill({ body: 'SENTINEL_BODY_84b3af', headers: { 'x-sentinel': 'SENTINEL_HEADER_84b3af' } }));
+  await page.evaluate(async () => {
+    const element = document.createElement('div'); element.textContent = 'SENTINEL_DOM_84b3af'; document.body.append(element);
+    console.log('SENTINEL_LOG_84b3af');
+    await fetch('/diagnostic-sentinel?value=SENTINEL_URL_84b3af', { method: 'POST', headers: { 'x-sentinel': 'SENTINEL_HEADER_84b3af' }, body: 'SENTINEL_BODY_84b3af' });
+  });
+  await page.locator('[data-undo]').click();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(2);
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(999);
+});
