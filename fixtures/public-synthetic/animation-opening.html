@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Public animation opening</title>
+  <style>
+    html, body { margin: 0; width: 320px; height: 180px; overflow: hidden; background: red; }
+    .actor { width: 30px; height: 30px; background: black; animation: move 2000ms linear both; }
+    @keyframes move { from { transform: translateX(0px); } to { transform: translateX(120px); } }
+    @media (prefers-reduced-motion: reduce) { .actor { animation: none; transform: translateX(40px); } }
+  </style>
+</head>
+<body>
+  <div class="actor" aria-label="Moving tile"></div>
+  <p aria-label="Caption">Public caption</p>
+</body>
+</html>

@@ -139,6 +139,8 @@ export const verificationSuites = {
   ]),
   browser: playwright([
       'apps/editor/tests/sequence-parity.spec.ts',
+      'apps/editor/tests/animation-delivery.spec.ts',
+      'apps/editor/tests/animation-delivery-motion.spec.ts',
       'apps/editor/tests/sequence-storyboard.spec.ts',
       'apps/editor/tests/shot-export.spec.ts',
       'apps/editor/tests/normal-canvas.spec.ts',
