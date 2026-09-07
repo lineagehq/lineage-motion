@@ -167,7 +167,11 @@ export function rejectAuthoringInput(input: HTMLInputElement, code: 'AUTHORING_D
   status.dataset.kind = 'error'; status.dataset.source = 'validation';
 }
 
-export function successMessage(kind: AuthoringOperation['kind']): string {
+export function successMessage(operation: EditorPersistentOperation): string {
+  if (operation.kind === 'motion.hold.insert') {
+    const cue = authoring.value.document.cues.find(cue => cue.id === operation.payload.cueId);
+    return `${operation.payload.durationMs} ms hold inserted before ${cue?.label ?? operation.payload.cueId}.`;
+  }
   const messages: Partial<Record<AuthoringOperation['kind'], string>> = {
     'motion.track.create': 'Opacity track created.',
     'motion.keyframe.add': 'Midpoint added.',
@@ -175,11 +179,10 @@ export function successMessage(kind: AuthoringOperation['kind']): string {
     'motion.binding-delay.set': 'Delay updated.',
     'motion.slot-easing.set': 'Easing updated.',
     'motion.keyframe.remove': 'Midpoint removed.',
-    'motion.hold.insert': '600 ms hold inserted before Pair crosses.',
     'motion.history.undo': 'Undid the last change.',
     'motion.history.redo': 'Redid the change.',
   };
-  return messages[kind] ?? 'Change applied.';
+  return messages[operation.kind] ?? 'Change applied.';
 }
 
 export function updateSelection(): void {

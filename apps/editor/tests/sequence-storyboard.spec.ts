@@ -69,6 +69,25 @@ test('storyboard edits committed occurrences, preserves pins, crosses exact cuts
   } finally { await app.cleanup(); }
 });
 
+test('invalid end hold explains both constraints and preserves draft, focus, saved preview and recovery', async ({ page }) => {
+  const app = await launch();
+  try {
+    await page.goto(app.editorUrl); await shot(page, 'Red opening', 'red', 2000); await shot(page, 'Blue ending', 'blue', 3000); await create(page);
+    const hold = page.getByLabel('End hold (seconds)');
+    const savedPreview = await page.locator('[data-sequence-preview] iframe').getAttribute('srcdoc');
+    let writes = 0; page.on('request', request => { if (request.url().endsWith('/api/sequence/v1/commands')) writes++; });
+    for (const invalid of ['-1', '0.0001']) {
+      await hold.fill(invalid); await page.getByRole('button', { name: 'Apply end hold' }).press('Enter');
+      await expect(page.locator('[data-sequence-status]')).toHaveText('Hold not applied. Enter zero or more seconds with at most three decimal places.');
+      await expect(hold).toBeFocused(); await expect(hold).toHaveValue(invalid); await revision(page, 0);
+      expect(await page.locator('[data-sequence-preview] iframe').getAttribute('srcdoc')).toBe(savedPreview);
+      expect(writes).toBe(0);
+    }
+    await hold.fill('0.3'); await page.getByRole('button', { name: 'Apply end hold' }).press('Enter'); await revision(page, 1);
+    await expect(page.locator('[data-sequence-cards]')).toContainText('hold 0.3 s'); expect(writes).toBe(1);
+  } finally { await app.cleanup(); }
+});
+
 test('storyboard draft stays visible during agent updates and shot navigation requires explicit discard', async ({ page }) => {
   test.setTimeout(60000); const app = await launch();
   try {
