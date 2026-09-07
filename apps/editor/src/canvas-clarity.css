@@ -1,0 +1,45 @@
+/* UI overlays remain readable while only authored content follows the fit scale. */
+.normal-editor .preview-selection span, .normal-editor .preview-object-target::after,
+.normal-editor .cue-target-assignment::after, .normal-editor .cue-path-waypoint::after { font-size: calc(12px * var(--overlay-inverse-scale, 1)); }
+.normal-editor .trajectory-waypoint-label { font-size: calc(12px * var(--overlay-inverse-scale, 1)); }
+.normal-editor .trajectory-waypoint-time { font-size: calc(11px * var(--overlay-inverse-scale, 1)); }
+.normal-editor .preview-transform-handle::before { scale: var(--overlay-inverse-scale, 1); }
+.canvas-entry { padding: 10px 14px; border-bottom: 1px solid #30394a; }
+.canvas-entry p { margin: 6px 0; color: #aeb9cb; font-size: 12px; }
+.canvas-entry [hidden] { display: none; }
+[data-save-status] { display: block; color: #81d8c9; font-size: 13px; }
+[data-save-status][data-state="pending"], [data-save-status][data-state="draft"] { color: #facf74; }
+[data-save-status][data-state="rejected"] { color: #ffb1b1; }
+.exact-track-controls > summary { padding: 12px; cursor: pointer; font-weight: 600; }
+.exact-track-controls > .workflow-card { margin-bottom: 10px; }
+.canvas-reduced { padding: 10px 14px; border-top: 1px solid #30394a; }
+.normal-editor.shot-active .workflow { display: grid; grid-row: 2; }
+.normal-editor.shot-active .preview-panel { grid-row: 1; }
+.normal-editor.shot-active .canvas-entry { grid-row: 1; }
+.normal-editor.shot-active .preview-title { grid-row: 2; }
+.normal-editor.shot-active .shot-object-bar { grid-row: 3; }
+.normal-editor.shot-active .preview-stage { grid-row: 4; min-height: 280px; }
+.normal-editor.shot-active .preview-control-rail { grid-row: 5; }
+.normal-editor.shot-active .shot-context-dock { grid-row: 6; }
+.normal-editor.shot-active .shot-history-slot { grid-row: 7; }
+.normal-editor.shot-active .canvas-reduced { grid-row: 8; }
+.normal-editor.shot-active .preview-panel { grid-template-rows: auto auto auto auto auto auto auto auto; }
+.normal-editor.shot-active .preview-shot-toolbar { display: none !important; }
+.normal-editor.shot-active .shot-object-bar { flex-wrap: wrap; justify-content: center; }
+.normal-editor.shot-active .shot-object-bar fieldset { flex-wrap: wrap; }
+.normal-editor.shot-active .shot-history-slot .operation-status { display: block; }
+.normal-editor.shot-active .shot-history-slot .workflow-footer { flex-wrap: wrap; }
+.normal-editor .primary-layout { min-width: 0; }
+@media (max-width: 1099px) {
+  .normal-editor .preview-panel { grid-row: 1; }
+  .normal-editor .workflow { grid-row: 2; }
+}
+@media (max-width: 520px) {
+  .normal-editor .draft-conflict { flex-wrap: wrap; }
+  .normal-editor .review-handoff textarea { min-width: 0; width: 100%; }
+  .normal-editor.shot-active .preview-stage { min-height: 260px; }
+}
+.normal-editor .trajectory-waypoint-label { opacity: 0; padding: calc(3px * var(--overlay-inverse-scale, 1)) calc(5px * var(--overlay-inverse-scale, 1)); }
+.normal-editor .trajectory-waypoint[aria-pressed="true"] .trajectory-waypoint-label { opacity: 1; }
+.normal-editor.shot-active .preview-selection span { display: none; }
+.normal-editor .canvas-reduced pre { white-space: pre-wrap; overflow-wrap: anywhere; }

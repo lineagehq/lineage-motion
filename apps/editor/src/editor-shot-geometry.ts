@@ -1,3 +1,5 @@
+import { displayTime } from './editor-time.js';
+import { placeCanvasLabels } from './canvas-labels.js';
 import payload from 'virtual:motion-document';
 import { compileMotionDocument, type CompilerResult } from '../../../packages/css-compiler/src/index.js';
 import {
@@ -99,7 +101,7 @@ export function renderShotWorkspace(): void {
     const label = document.createElement('label'); const input = document.createElement('input'); input.type = 'radio'; input.name = 'shot-moment';
     input.value = String(timeMs); input.checked = timeMs === shotMomentMs.value;
     input.addEventListener('change', () => { if (input.checked) selectShotMoment(timeMs); });
-    const copy = document.createElement('span'); copy.innerHTML = `<strong>${shotMomentLabel(timeMs)}</strong><small>${timeMs} ms</small>`;
+    const copy = document.createElement('span'); copy.innerHTML = `<strong>${shotMomentLabel(timeMs)}</strong><small title="${timeMs} ms">${displayTime(timeMs)}</small>`;
     label.append(input, copy); momentSequence.append(label);
   }
   const projection = readShotProjection();
@@ -163,7 +165,7 @@ export function renderShotContextDock(inventories: NonNullable<ReturnType<typeof
   const timeOutput = required<HTMLOutputElement>('[data-shot-moment-time-output]');
   timeInput.min = String((editableTimes[selectedIndex - 1] ?? shotMomentMs.value - 1) + 1);
   timeInput.max = String((editableTimes[selectedIndex + 1] ?? shotMomentMs.value + 1) - 1);
-  timeInput.value = String(shotMomentMs.value); timeOutput.value = `${shotMomentMs.value} ms`;
+  timeInput.value = String(shotMomentMs.value); timeOutput.value = displayTime(shotMomentMs.value); timeOutput.title = `${shotMomentMs.value} ms`;
   timeInput.disabled = protectedMoment || selectedIndex < 0;
   const remove = required<HTMLButtonElement>('[data-shot-context-remove]');
   remove.hidden = timeInput.disabled;
@@ -345,7 +347,7 @@ export async function processShotGeometryRequest(request: ShotGeometryRequest): 
       handle.dataset.elementId = request.primaryElementId;
       handle.dataset.label = shotMomentLabel(waypoint.timeMs);
       handle.querySelector<HTMLElement>('.trajectory-waypoint-name')!.textContent = handle.dataset.label;
-      handle.querySelector<HTMLElement>('.trajectory-waypoint-time')!.textContent = `${waypoint.timeMs} ms`;
+      handle.querySelector<HTMLElement>('.trajectory-waypoint-time')!.textContent = displayTime(waypoint.timeMs);
       handle.setAttribute('aria-label', `${handle.dataset.label}, ${waypoint.timeMs} ms, compiler-native target bounds`);
       handle.setAttribute('aria-pressed', String(waypoint.timeMs === shotMomentMs.value));
       Object.assign(handle.style, { left: `${sample.bounds.left}px`, top: `${sample.bounds.top}px`, width: `${sample.bounds.width}px`,
@@ -373,6 +375,7 @@ export async function processShotGeometryRequest(request: ShotGeometryRequest): 
       label.style.translate = shift ? `0 ${shift}px` : '';
       placedLabels.push({ left, right: left + width, top: baseTop + shift, bottom: baseTop + shift + height });
     }
+    placeCanvasLabels(orderedHandles);
     refreshTrajectorySegments();
     const nextGeometry: typeof shotGeometry.value = [];
     for (const sample of samples) {
