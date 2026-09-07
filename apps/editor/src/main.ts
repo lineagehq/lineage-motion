@@ -1,3 +1,4 @@
+import { mountSequenceStoryboard } from './sequence-storyboard.js';
 import payload from 'virtual:motion-document';
 import { compileMotionDocument, type CompilerResult } from '../../../packages/css-compiler/src/index.js';
 import {
@@ -342,6 +343,7 @@ if (projectEntry) mountProjectActions(required<HTMLElement>('main'));
 if (projectEntry) mountProjectEntry({ root: required<HTMLElement>('main'), ...projectEntry, displayName: payload.projectName ?? null,
   dirty: () => captureDraft().dirty || Boolean(activeWaypointDraft.value) || Boolean(document.querySelector('[data-project-draft="true"]')),
   pending: () => publicationState.value !== 'settled' || pendingRevision.value !== null || Boolean(document.querySelector('[data-operation-pending="true"]')) });
+if (projectEntry && payload.humanCapability) mountSequenceStoryboard(required<HTMLElement>('main'), payload.humanCapability);
 if (projectEntry && payload.humanCapability) mountProjectExport(required<HTMLElement>('main'), projectEntry.catalog.projectId, payload.humanCapability);
 window.addEventListener('resize', () => {
   if (previewStage.clientWidth <= 0) return;
