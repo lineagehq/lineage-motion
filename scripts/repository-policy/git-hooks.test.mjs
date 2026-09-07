@@ -68,7 +68,8 @@ test('CI selection preserves complete ready-PR coverage and a bounded draft smok
   }
   assert.doesNotMatch(workflow, /private-acceptance|private\.test|private\.visual/);
   for (const name of ['smoke', 'browser']) {
-    assert.match(jobs[name], /server-diagnostics/);
+    assert.match(jobs[name], /stage-browser-diagnostics/);
+    assert.match(jobs[name], /path: artifacts\/safe-browser-diagnostics\//);
     assert.doesNotMatch(jobs[name], /trace\.zip|path: apps\/editor\/test-results\s*$/m);
   }
 });
