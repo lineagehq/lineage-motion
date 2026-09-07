@@ -1,3 +1,4 @@
+import { recordEditorDiagnostic } from './editor-diagnostics.ts';
 import { type AuthoringOperation, type StructuralAuthoringElementId } from '../../../packages/domain/src/index.js';
 import { buildTimeline } from '../../../packages/preview-runtime/src/index.js';
 import {
@@ -47,13 +48,17 @@ timeInput.addEventListener('input', () => clearValidationFeedback(timeInput));
 valueInput.addEventListener('input', () => { valueInput.dataset.draft = 'true'; });
 timeInput.addEventListener('input', () => { timeInput.dataset.draft = 'true'; });
 undoButton.addEventListener('click', () => {
-  if (serviceClient ? !durableUndoAvailable() : authoring.value.undo.length === 0) return;
+  const unavailable = serviceClient ? !durableUndoAvailable() : authoring.value.undo.length === 0;
+  recordEditorDiagnostic('handler', 'motion.history.undo', authoring.value.document.revision, !unavailable);
+  if (unavailable) return;
   void dispatch(makeHistory('motion.history.undo'), '[data-undo]', {
     viewportTop: undoButton.getBoundingClientRect().top, scrollY,
   });
 });
 redoButton.addEventListener('click', () => {
-  if (serviceClient ? !durableRedoAvailable() : authoring.value.redo.length === 0) return;
+  const unavailable = serviceClient ? !durableRedoAvailable() : authoring.value.redo.length === 0;
+  recordEditorDiagnostic('handler', 'motion.history.redo', authoring.value.document.revision, !unavailable);
+  if (unavailable) return;
   void dispatch(makeHistory('motion.history.redo'), '[data-redo]', {
     viewportTop: redoButton.getBoundingClientRect().top, scrollY,
   });

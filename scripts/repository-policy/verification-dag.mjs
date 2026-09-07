@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import { spawn as spawnProcess } from 'node:child_process';
 
 import { verificationSuites, verificationTiers } from './verification-manifest.mjs';
@@ -36,11 +37,11 @@ export function resolveVerificationTier(tier, suites, tiers) {
   return resolveSuites(selectedSuites, suites);
 }
 
-export function spawnVerificationSuite(_name, suite, repositoryRoot) {
+export function spawnVerificationSuite(name, suite, repositoryRoot, runId = randomUUID()) {
   return new Promise((resolve, reject) => {
     const child = spawnProcess(suite.command, suite.args ?? [], {
       cwd: repositoryRoot,
-      env: process.env,
+      env: { ...process.env, MOTION_DIAGNOSTIC_RUN: runId, MOTION_DIAGNOSTIC_SUITE: name },
       stdio: 'inherit',
     });
     child.once('error', reject);
@@ -63,6 +64,7 @@ export async function runVerification({
   const selected = selectedSuites?.length
     ? resolveSuites(selectedSuites, definitions.suites)
     : resolveVerificationTier(tier, definitions.suites, definitions.tiers);
+  const runId = randomUUID();
   const results = [];
   const resultsBySuite = new Map();
 
@@ -80,7 +82,7 @@ export async function runVerification({
     }
 
     const startedAt = now();
-    const exitCode = await spawn(name, suite, repositoryRoot);
+    const exitCode = await spawn(name, suite, repositoryRoot, runId);
     const result = {
       suite: name,
       status: exitCode === 0 ? 'passed' : 'failed',

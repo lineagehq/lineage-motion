@@ -1,5 +1,5 @@
 import { launcherShutdown } from './launcher-shutdown.ts';
-import { expect, test } from '@playwright/test';
+import { expect, test } from './test-fixture.ts';
 import { execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import { chmod, mkdir, mkdtemp, readdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import { createServer } from 'node:net';
