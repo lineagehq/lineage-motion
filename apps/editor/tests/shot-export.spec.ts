@@ -75,3 +75,76 @@ test('drafts and changes during export cannot download a mislabeled saved revisi
     } finally { release(); }
   } finally { await stopTestServer(app.child); await rm(directory, { recursive: true, force: true }); }
 });
+
+test('UI-only and help-driven CLI author equivalent shots, then safely hand off a saved edit', async ({ page }) => {
+  test.setTimeout(60000);
+  const directory = await mkdtemp(join(tmpdir(), 'motion-shot-parity-'));
+  const uiData = join(directory, 'ui'); const cliData = join(directory, 'cli');
+  const uiApp = await launch(uiData); const cliApp = await launch(cliData);
+  const source = '<!doctype html><html><head><style>html,body{margin:0;width:320px;height:240px}.comet{width:30px;height:30px;background:blue;animation:travel 4200ms linear both}@keyframes travel{from{transform:translateX(0px)}to{transform:translateX(120px)}}</style></head><body><div class="comet" aria-label="Comet"></div><p aria-label="Caption">Public caption</p></body></html>';
+  try {
+    await page.goto(uiApp.editorUrl); await page.locator('[data-new-shot] summary').click();
+    await page.getByLabel('Shot name', { exact: true }).fill('Equivalent shot');
+    await page.getByLabel('Starting point').selectOption('html-css');
+    await page.getByLabel('Self-contained HTML and CSS').fill(source);
+    await page.getByRole('button', { name: 'Create shot', exact: true }).click();
+    await expect(page.locator('[data-project-shot] option:checked')).toHaveText('Equivalent shot');
+    await page.locator('[data-action-target]').selectOption({ label: 'Caption' });
+    await page.getByRole('button', { name: 'Fade', exact: true }).click();
+    await page.getByRole('button', { name: 'Apply action', exact: true }).click();
+    await expect(page.locator('[data-action-status]')).toContainText('Revision 1');
+    await page.getByRole('button', { name: 'Add midpoint', exact: true }).click();
+    await expect(page.locator('[data-operation-status]')).toContainText('Revision 2');
+    await page.getByLabel('Duration draft').fill('1800'); await page.getByRole('button', { name: 'Apply duration', exact: true }).click();
+    await expect(page.locator('[data-operation-status]')).toContainText('Revision 3');
+    await page.getByLabel('Delay draft').fill('200'); await page.getByRole('button', { name: 'Apply delay', exact: true }).click();
+    await expect(page.locator('[data-operation-status]')).toContainText('Revision 4');
+    await page.getByLabel('Easing draft').selectOption('ease-in-out'); await page.getByRole('button', { name: 'Apply easing', exact: true }).click();
+    await expect(page.locator('[data-operation-status]')).toContainText('Revision 5');
+    await page.getByRole('button', { name: 'Undo', exact: true }).click(); await expect(page.locator('[data-operation-status]')).toContainText('Revision 6');
+    await page.getByRole('button', { name: 'Redo', exact: true }).click(); await expect(page.locator('[data-operation-status]')).toContainText('Revision 7');
+    const event = page.waitForEvent('download'); await page.getByRole('button', { name: 'Download animation', exact: true }).click();
+    const uiArchive = await readFile((await (await event).path())!);
+    const receipt = JSON.parse(Buffer.from(unzipSync(uiArchive)['receipt.json']!).toString('utf8'));
+    const help = (await invoke(['help'])).json;
+    expect(help.reads.some((command: {name:string}) => command.name === 'workspace')).toBe(true);
+    const catalog = (await invoke(['project', '--data-dir', cliData])).json;
+    const sourcePath = join(directory, 'public.html'); await writeFile(sourcePath, source);
+    expect((await invoke(['shot-admit', '--data-dir', cliData, '--project-id', catalog.projectId,
+      '--expected-catalog-revision', String(catalog.catalogRevision), '--document-id', receipt.documentId, '--name', 'Equivalent shot',
+      '--html-file', sourcePath, '--claim', 'equivalent', '--operation-id', 'equivalent-admit'])).code).toBe(0);
+    const common = ['--data-dir', cliData, '--document-id', receipt.documentId];
+    let workspace = (await invoke(['workspace', ...common])).json;
+    const target = workspace.elements.find((element: {label:string}) => element.label === 'Caption');
+    expect(target.actions).toEqual(expect.arrayContaining([expect.objectContaining({ action: 'fade', available: true })]));
+    const edit = async (command: string, revision: number, args: string[] = []) => {
+      expect((await invoke([command, '--help'])).code).toBe(0);
+      const result = await invoke([command, ...common, '--claim', 'equivalent', '--expected-revision', String(revision),
+        '--operation-id', `equivalent-${revision}`, ...args]);
+      expect(result.json).toMatchObject({ ok: true, resultingRevision: revision + 1 });
+    };
+    await edit('track-create', 0, ['--element-id', target.elementId, '--duration-seconds', '2.1', '--delay-seconds', '0']);
+    workspace = (await invoke(['workspace', ...common])).json;
+    const track = workspace.tracks.find((item: {elementId:string;property:string}) => item.elementId === target.elementId && item.property === 'opacity');
+    await edit('keyframe-add', 1, ['--track-id', track.trackId, '--time-seconds', '1.05', '--value', '0.5']);
+    await edit('slot-duration-set', 2, ['--track-id', track.trackId, '--duration-seconds', '1.8']);
+    await edit('binding-delay-set', 3, ['--track-id', track.trackId, '--delay-seconds', '0.2']);
+    await edit('slot-easing-set', 4, ['--track-id', track.trackId, '--easing', 'ease-in-out']);
+    await edit('undo', 5); await edit('redo', 6);
+    const cliOutput = join(directory, 'equivalent.zip');
+    const exported = await invoke(['export', ...common, '--expected-revision', '7', '--output', cliOutput]);
+    expect(exported.json.receipt.canonicalDigest).toBe(receipt.canonicalDigest);
+    expect(await readFile(cliOutput)).toEqual(uiArchive);
+    // Switch to the UI project's ordinary managed session for a mixed handoff.
+    const mixed = ['--data-dir', uiData, '--document-id', receipt.documentId, '--claim', 'handoff'];
+    expect((await invoke(['claim-acquire', ...mixed, '--expected-revision', '7', '--operation-id', 'handoff-acquire', '--scope', 'document'])).code).toBe(0);
+    expect((await invoke(['undo', ...mixed, '--expected-revision', '7', '--operation-id', 'handoff-undo'])).code).toBe(0);
+    await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(8);
+    expect((await invoke(['redo', ...mixed, '--expected-revision', '8', '--operation-id', 'handoff-redo'])).code).toBe(0);
+    await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(9);
+    expect((await invoke(['undo', ...mixed, '--expected-revision', '7', '--operation-id', 'handoff-stale'])).json.code).toBe('STALE_REVISION');
+    expect((await invoke(['claim-release', ...mixed, '--expected-revision', '9', '--operation-id', 'handoff-release', '--lease-version', '1'])).code).toBe(0);
+    await page.reload(); await expect(page.locator('[data-editor-ready]')).toBeVisible();
+    expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().exportDigest)).toBe(receipt.exportDigest);
+  } finally { await stopTestServer(uiApp.child); await stopTestServer(cliApp.child); await rm(directory, { recursive: true, force: true }); }
+});
