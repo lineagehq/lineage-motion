@@ -1,9 +1,11 @@
 # Phase status and scope
 
-This is the current scope index, updated 2026-09-06 from the merged repository
-at `d289bfc`. Use the active request and existing authorization for maintenance
-of implemented behavior. Consult this index when expanding capabilities, and
-update it with a decision and evidence link when scope or gate acceptance changes.
+This is the current scope index, updated 2026-09-06 for the approved animation
+delivery. [Final handoff PR #38](https://github.com/lineagehq/lineage-motion/pull/38)
+records the exact delivered main revision and its final verification conclusions.
+Use the active request and existing authorization for maintenance of implemented
+behavior. Consult this index when expanding capabilities, and update it with a
+decision and evidence link when scope or gate acceptance changes.
 The [incubation plan](incubation-plan.md) remains the roadmap.
 
 ## Implemented scope and evidence
@@ -24,7 +26,14 @@ and export through UI/CLI, bounded two-shot hard-cut composition, and tiered
 local/CI verification. The plan authorizes necessary sequence persistence and
 recoverable migrations, PR creation/monitoring/merging, and the specified
 required-check migration while retaining other branch protections and CodeQL.
-This records scope authorization, not implementation or acceptance-gate success.
+The shot workflow, sequence foundation/storyboard and agent sequence workflow
+are implemented, with integrated UI-only, CLI-only, mixed and keyboard journey
+acceptance. The [delivery evidence index](animation-delivery-evidence.md) records
+these boundaries and their tests. Final local smoke and full public regression
+on the actual delivered main commit form the required completion evidence gate;
+consult [PR #38](https://github.com/lineagehq/lineage-motion/pull/38) for its recorded
+outcome and merged revision. This scope index does not substitute historical
+passing results for that final verification.
 Private inputs, Lineage integration, publication and the other plan exclusions
 remain outside that authorization.
 
