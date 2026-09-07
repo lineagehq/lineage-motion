@@ -39,10 +39,11 @@ try {
     process.env.PHASE3_AGENT_CAPABILITY = randomBytes(32).toString('base64url');
     for (const key of ['PHASE4_REUSABLE_CUES', 'PHASE4_CURSOR_CLICK_REVEAL', 'LANDING_SHOT1_WORKSPACE', 'PHASE3_SERVICE_URL']) delete process.env[key];
     process.env.MOTION_PROJECT_NAME = project;
+    process.env.MOTION_PROJECT_ID = `project_${digest(root)}_${digest(project)}`;
     const { launchEditor } = await import('./editor-server.mjs');
     await launchEditor({ onReady: (addresses) => {
       const contextPath = join(directory, 'session.json');
-      writeFileSync(contextPath, JSON.stringify({ schemaVersion: 'motion.local-session.v1', project,
+      writeFileSync(contextPath, JSON.stringify({ schemaVersion: 'motion.local-session.v1', project, projectId: process.env.MOTION_PROJECT_ID,
         ...addresses, agentCapability: process.env.PHASE3_AGENT_CAPABILITY }), { mode: 0o600 });
       chmodSync(contextPath, 0o600);
       console.log(`Open ${addresses.editorUrl}\nProject: ${project}\nLocal agent session: ${contextPath}\nPress Ctrl+C to stop. Edits are saved locally.`);

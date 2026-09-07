@@ -11,7 +11,7 @@ export type CommitResult = { response: CommandSuccess; event: CommitMetadata; re
   | { response: CommandFailure };
 export type AuthContext = RequestAuth & { now: number };
 export interface ProjectStore {
-  initialize(seed: MotionDocument, project?: { projectId: string; name: string }): void;
+  initialize(seed: MotionDocument, project?: { projectId: string; name: string }, preserveExistingProjectIdentity?: boolean): void;
   readProjectCatalog(): ProjectCatalog;
   admitShot(command: ShotAdmissionCommand, auth: AuthContext): ShotAdmissionResponse;
   execute(command: MotionCommand, auth: AuthContext): CommitResult;

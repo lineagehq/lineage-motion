@@ -39,6 +39,9 @@ import { MotionPreparationError, MotionServiceClient, commandSchema, makeBranchC
   type CommitMetadata, type MotionCommand, type MotionDiagnostic } from '../../../packages/motion-protocol/src/index.ts';
 import { mountReviewHandoff } from './review-handoff.ts';
 import './styles.css';
+import { mountProjectActions } from './project-actions.js';
+import { escapeMarkup, loadProjectEntry, mountProjectEntry } from './project-entry.js';
+import { projectAuthoringTargets } from '../../../packages/domain/src/authoring-eligibility.js';
 
 export const authoring: { value: AuthoringState } = { value: createAuthoringState(payload.document) };
 export const compiled: { value: CompilerResult } = { value: payload.compiled };
@@ -64,17 +67,23 @@ export const durableActivity: { value: DurableActivity | null } = { value: null 
 export const lastServiceDiagnostic: { value: MotionDiagnostic | null } = { value: null };
 export const publicationTestGate: { value: { promise: Promise<void>; release: () => void } | null } = { value: null };
 export const failNextPublicationForTest: { value: boolean } = { value: false };
+export const projectEntry = payload.normalProject && payload.humanCapability
+  ? await loadProjectEntry(payload.humanCapability, payload.document.documentId) : null;
 if (serviceClient) {
-  const head = await serviceClient.head(payload.document.documentId);
+  const head = await serviceClient.head(projectEntry?.documentId ?? payload.document.documentId);
   authoring.value = createAuthoringState(head.document);
   compiled.value = compileMotionDocument(head.document);
 }
 export const operationClientId = crypto.randomUUID();
 export const operationSequence: { value: number } = { value: 0 };
-export const creationChoices = [
+const legacyChoices = [
   { elementId: 'el_a2849ff826f3e167', label: 'Cursor' },
   { elementId: 'el_2dbee68b1ea318c8', label: 'Orb' },
 ] as const;
+export const creationChoices = projectEntry ? projectAuthoringTargets(authoring.value.document).map(target => ({
+  elementId: target.elementId, label: (authoring.value.document.elements.find(element => element.id === target.elementId)?.label
+    ?? legacyChoices.find(choice => choice.elementId === target.elementId)?.label ?? target.label),
+})) : legacyChoices;
 export const statusCopyElementId = 'el_1f3f2908e4fd2401';
 export const selectedCreationElementId: { value: StructuralAuthoringElementId | null } = { value: null };
 export const creationDraftDirty: { value: boolean } = { value: false };
@@ -328,6 +337,10 @@ if (serviceClient) await refreshDurableContext();
 schedulePreviewSelection();
 setPublicationState('settled');
 document.querySelector('main')!.setAttribute('data-editor-ready', 'true');
+if (projectEntry) mountProjectActions(required<HTMLElement>('main'));
+if (projectEntry) mountProjectEntry({ root: required<HTMLElement>('main'), ...projectEntry, displayName: payload.projectName ?? null,
+  dirty: () => captureDraft().dirty || Boolean(activeWaypointDraft.value) || Boolean(document.querySelector('[data-project-draft="true"]')),
+  pending: () => publicationState.value !== 'settled' || pendingRevision.value !== null || Boolean(document.querySelector('[data-operation-pending="true"]')) });
 window.addEventListener('resize', () => {
   if (previewStage.clientWidth <= 0) return;
   configurePreviewCanvas(); schedulePreviewSelection(); scheduleCueCanvas(); if (shotConfig.value) renderShotWorkspace();
