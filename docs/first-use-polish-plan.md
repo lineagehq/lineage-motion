@@ -19,6 +19,27 @@ Keep this tranche small: observe first, select at most three material friction
 problems, and correct them using existing product capabilities. No speculative
 redesign, new animation features or CI migration.
 
+### Approved recovery exception
+
+During independent acceptance, selecting an available exact opacity target
+blocked creation of another shot. The offered action-draft discard did not
+clear that selection, so the operator committed an unwanted track to proceed.
+On 2026-09-07 the owner explicitly approved one fourth correction for this
+reproduced recovery failure. The original three-fix limit otherwise remains;
+this exception does not authorize additional features or waive any gate.
+
+The correction must expose a discoverable, keyboard-accessible way to discard
+the blocking exact-track draft while preserving the entered new-shot name.
+Cancellation must leave the current shot's tracks, revision and compiled
+preview unchanged, and subsequent shot creation must succeed. It must neither
+discard other unapplied timing/action drafts nor bypass a pending save. Focus
+and feedback must make the remaining state and next action clear. An independent
+operator must challenge this recovery through the public UI, including the
+responsive and zoom checks in UX3–UX4. Focused regression tests must falsify
+unintended mutation, lost input, and bypass of other draft/pending-write guards.
+The correction receives its own branch and PR, independent review, local hooks,
+full ready-PR CI and affected integrated acceptance before delivery.
+
 ## Dependencies and parallel work
 
 ```mermaid
