@@ -392,3 +392,70 @@ for (const pending of [false, true]) test(`delayed shot admission preserves a su
     expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(pending ? 1 : 0);
   } finally { releaseAdmission(); releaseOperation(); }
 });
+
+test('discarding a blocking opacity track draft preserves the shot and new-shot input with keyboard recovery', async ({ page }) => {
+  const app = await launch(); await page.goto(app.url);
+  await expect(page.locator('[data-editor-ready]')).toBeVisible();
+  const first = await page.locator('[data-project-shot]').inputValue();
+  const before = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  await page.getByRole('radio', { name: /Orb/ }).check();
+  await page.locator('[data-new-shot] summary').click();
+  await page.getByLabel('Shot name', { exact: true }).fill('Preserved opening');
+  await page.getByRole('button', { name: 'Create shot', exact: true }).press('Enter');
+  await expect(page.locator('[data-entry-status]')).toContainText('An opacity track draft is blocking creation');
+  await expect(page.locator('[data-project-shot] option')).toHaveCount(1);
+  // The next focusable control after Create shot is the contextual recovery.
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Discard opacity track draft', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('radio', { name: /Orb/ })).not.toBeChecked();
+  await expect(page.getByLabel('Shot name', { exact: true })).toHaveValue('Preserved opening');
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toEqual(before);
+  await expect(page.getByRole('button', { name: 'Create shot', exact: true })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('[data-project-shot] option:checked')).toHaveText('Preserved opening');
+  await page.locator('[data-project-shot]').selectOption(first);
+  await expect(page.locator('[data-project-shot]')).toHaveValue(first);
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().exportDigest)).toBe(before.exportDigest);
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(before.revision);
+});
+
+test('track draft recovery preserves timing and action drafts and refuses to discard during a pending save', async ({ page }) => {
+  const app = await launch(); await page.goto(app.url);
+  await expect(page.locator('[data-editor-ready]')).toBeVisible();
+  await page.getByRole('radio', { name: /Orb/ }).check(); await page.locator('[data-create-track]').click();
+  await expect.poll(() => page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
+  await page.getByRole('radio', { name: /Cursor/ }).check();
+  await page.getByRole('radio', { name: /Orb/ }).check();
+  await page.getByLabel('Duration draft').fill('2345');
+  await page.getByRole('button', { name: 'Move', exact: true }).click();
+  await page.locator('[data-action-form] input[name=end]').fill('2400');
+  await page.locator('[data-new-shot] summary').click(); await page.getByLabel('Shot name', { exact: true }).fill('Still pending');
+  await page.getByRole('button', { name: 'Create shot', exact: true }).click();
+  const before = await page.evaluate(() => window.__motionEditor.inspectAuthoring());
+  await expect(page.getByLabel(/Duration draft/)).toHaveValue('2345');
+  await page.getByRole('button', { name: 'Discard opacity track draft', exact: true }).click();
+  await expect(page.getByLabel(/Duration draft/)).toHaveValue('2345');
+  await expect(page.getByRole('button', { name: 'Apply duration', exact: true })).toBeEnabled();
+  await expect(page.locator('.timing-control').filter({ has: page.locator('[data-duration]') })).toHaveAttribute('data-draft', 'true');
+  await expect(page.locator('[data-action-form] input[name=end]')).toHaveValue('2400');
+  await expect(page.locator('[data-entry-status]')).toContainText('Other editing drafts remain');
+  await page.getByRole('button', { name: 'Create shot', exact: true }).click();
+  await expect(page.locator('[data-project-shot] option')).toHaveCount(1);
+  expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring())).toEqual(before);
+  await page.getByRole('radio', { name: /Cursor/ }).check();
+  await page.getByRole('button', { name: 'Create shot', exact: true }).click();
+  let release!: () => void; let reached!: () => void;
+  const gate = new Promise<void>(done => { release = done; }); const intercepted = new Promise<void>(done => { reached = done; });
+  await page.route('**/operations/prepare', async route => { reached(); await gate; await route.continue(); });
+  try {
+    await page.getByRole('button', { name: 'Apply action', exact: true }).click(); await intercepted;
+    await page.getByRole('button', { name: 'Discard opacity track draft', exact: true }).click();
+    await expect(page.locator('[data-entry-status]')).toContainText('Wait for the current change');
+    await expect(page.getByRole('radio', { name: /Cursor/ })).toBeChecked();
+    await expect(page.getByLabel('Shot name', { exact: true })).toHaveValue('Still pending');
+    expect(await page.evaluate(() => window.__motionEditor.inspectAuthoring().revision)).toBe(1);
+    release(); await expect(page.locator('[data-action-status]')).toContainText('Move applied. Revision 2');
+    await expect(page.locator('[data-project-shot] option')).toHaveCount(1);
+  } finally { release(); }
+});

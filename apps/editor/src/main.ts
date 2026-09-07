@@ -341,6 +341,7 @@ setPublicationState('settled');
 document.querySelector('main')!.setAttribute('data-editor-ready', 'true');
 if (projectEntry) mountProjectActions(required<HTMLElement>('main'));
 if (projectEntry) mountProjectEntry({ root: required<HTMLElement>('main'), ...projectEntry, displayName: payload.projectName ?? null,
+  trackDraft: () => creationDraftDirty.value, discardTrackDraft: discardCreationDraft,
   dirty: () => captureDraft().dirty || Boolean(activeWaypointDraft.value) || Boolean(document.querySelector('[data-project-draft="true"]')),
   pending: () => publicationState.value !== 'settled' || pendingRevision.value !== null || Boolean(document.querySelector('[data-operation-pending="true"]')) });
 if (projectEntry && payload.humanCapability) mountSequenceStoryboard(required<HTMLElement>('main'), payload.humanCapability);
@@ -461,7 +462,7 @@ import type { ImmutableHead } from './editor-collaboration.js';
 export type DraftSnapshot = { dirty: boolean; values: Record<string, string>; dirtyFields: Record<string, boolean>;
   creationElementId: StructuralAuthoringElementId | null; creationDirty: boolean; staleBaseRevision: number | null };
 export * from './editor-drafts.js';
-import { captureDraft, restoreDraft, resolveDraftConflict, dirtyStaleBase, resolveAcceptedCreationDraft, resolveAcceptedOperationDraft, operationEnvelope, withCreatedTrack, makeEdit, makeHistory, nextOperationId } from './editor-drafts.js';
+import { captureDraft, restoreDraft, discardCreationDraft, resolveDraftConflict, dirtyStaleBase, resolveAcceptedCreationDraft, resolveAcceptedOperationDraft, operationEnvelope, withCreatedTrack, makeEdit, makeHistory, nextOperationId } from './editor-drafts.js';
 export * from './editor-render.js';
 import { renderProjection } from './editor-render.js';
 
