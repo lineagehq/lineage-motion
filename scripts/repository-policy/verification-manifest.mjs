@@ -87,6 +87,8 @@ export const verificationSuites = {
     'packages/local-service/src/review-handoff-recovery.test.ts',
   ]),
   parity: vitest([
+    'packages/motion-cli/src/sequence-workflow.test.ts',
+    'packages/motion-cli/src/sequence-recovery.test.ts',
     'packages/motion-cli/src/arguments.test.ts',
     'packages/motion-cli/src/managed-session.test.ts',
     'packages/motion-cli/src/managed-claims.test.ts',

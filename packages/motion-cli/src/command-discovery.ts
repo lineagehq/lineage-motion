@@ -1,3 +1,4 @@
+import { sequenceOptions, sequenceDetail } from './sequence-discovery.ts';
 import { workflowExamples, recoveryHelp } from './command-examples.ts';
 export const operationKinds = [
   'motion.track.create', 'motion.keyframe-value.set', 'motion.keyframe-time.set', 'motion.keyframe.add',
@@ -28,6 +29,8 @@ export const mutationNames: Record<string, (typeof operationKinds)[number]> = {
 const readNames = ['project', 'shots', 'context', 'workspace', 'head', 'branches', 'claims', 'activity', 'history', 'export-proof', 'export'] as const;
 const baseOptions = ['--shot or --document-id when multiple shots exist', '--branch-id when not main'] as const;
 export const commandDiscovery = {
+  sequences: Object.keys(sequenceOptions),
+  sequenceGuide: 'docs/agent-sequence-guide.md',
   schemaVersion: 'motion.cli-command-list.v1',
   reads: readNames.map((name) => ({ name, requiredOptions: baseOptions })),
   context: { default: 'managed agent session in this checkout', optionalOptions: ['--project', '--data-dir', '--shot', '--document-id', '--branch-id'],
@@ -98,6 +101,7 @@ function mutationRequiredOptions(kind: (typeof operationKinds)[number]): string[
 }
 
 export function commandDetail(name: string): unknown | null {
+  const sequence = sequenceDetail(name); if (sequence) return sequence;
   if (name === 'export') return { schemaVersion: 'motion.cli-command.v1', name, category: 'read',
     requiredOptions: [...baseOptions, '--expected-revision', '--output FILE.zip'], optionalOptions: ['--project-id'],
     output: 'Standalone animation.html, animation.css and receipt.json in a deterministic ZIP; stdout contains only the receipt and archive digest.',
