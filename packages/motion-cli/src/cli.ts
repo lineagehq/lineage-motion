@@ -1,3 +1,4 @@
+import { downloadShot } from './shot-export.ts';
 import { ZodError } from 'zod';
 import { admitShot } from './shot-admission.ts';
 import { openManagedClaim, type ManagedClaim } from './managed-claims.ts';
@@ -55,6 +56,10 @@ export async function runCli(argv: string[], io: Io = {
     }
     const project = await resolveProject(argv[0]!, options);
     if (project !== undefined) { io.stdout(canonicalJson(project)); return 0; }
+    if (argv[0] === 'export') {
+      const response = await downloadShot(options) as { ok: boolean; code?: string }; io.stdout(canonicalJson(response));
+      return response.ok ? 0 : response.code === 'EXPORT_STALE_REVISION' ? 3 : 2;
+    }
     managed = await openManagedClaim(argv[0]!, options);
     const client = new MotionServiceClient(options.service, options.session ? sessionFetch : (...args) => fetch(...args), {
       actor: options.actor, capability: options.capability, ...(options.claimSecret ? { claimSecret: options.claimSecret } : {}),

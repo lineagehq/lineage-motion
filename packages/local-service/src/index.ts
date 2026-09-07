@@ -1,4 +1,5 @@
 import { parseShotAdmissionCommand } from '../../motion-protocol/src/project.ts';
+import { exportShot } from './shot-export.ts';
 import { createServer, type Server, type ServerResponse } from 'node:http';
 
 import { canonicalJson, sha256Hex, type MotionDocument } from '../../domain/src/index.ts';
@@ -38,6 +39,17 @@ export async function startLocalMotionService(options: { databasePath: string; s
     const url = new URL(request.url ?? '/', 'http://127.0.0.1');
     try {
       if (request.method === 'GET' && url.pathname === '/health') return json(response, 200, { ok: true });
+      if (request.method === 'POST' && url.pathname === '/api/export/v1/shot') {
+        if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'EXPORT_UNAUTHORIZED' });
+        let input;
+        try { input = await readJson(request); }
+        catch { return json(response, 422, { ok: false, code: 'EXPORT_REQUEST_INVALID' }); }
+        let result;
+        try { result = exportShot(store!, input); }
+        catch { return json(response, 500, { ok: false, code: 'EXPORT_FAILED' }); }
+        return json(response, result.ok ? 200 : result.code === 'EXPORT_STALE_REVISION' ? 409
+          : result.code === 'EXPORT_SHOT_NOT_FOUND' ? 404 : 422, result);
+      }
       if (url.pathname === '/api/project/v1/catalog' && request.method === 'GET') {
         if (!authenticate(request, capabilities)) return json(response, 403, { ok: false, code: 'UNAUTHORIZED_CLAIM' });
         return json(response, 200, store!.readProjectCatalog());
