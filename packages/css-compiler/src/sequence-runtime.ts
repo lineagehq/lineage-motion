@@ -9,8 +9,11 @@ export const SEQUENCE_RUNTIME = String.raw`(() => {
   let ready = false, playing = false, frameRequest = null, anchorTime = 0, anchorClock = 0;
   function inventory() {
     sampledReducedMotion = media.matches;
-    animations = frames.map(frame => {
-      const found = frame.contentDocument.getAnimations();
+    animations = frames.map((frame, index) => {
+      const current = frame.contentDocument.getAnimations();
+      // Enumeration omits finished non-filling effects. Retain their seekable handles,
+      // but discard CSS-canceled effects after getAnimations has flushed style changes.
+      const found = Array.from(new Set([...current, ...(animations[index] || []).filter(animation => animation.playState !== 'idle')]));
       for (const animation of found) {
         if (!(animation instanceof frame.contentWindow.CSSAnimation)
           || animation.timeline !== frame.contentDocument.timeline

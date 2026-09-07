@@ -114,6 +114,7 @@ export const verificationSuites = {
     'packages/css-compiler/src/determinism.test.ts',
   ]),
   'public-visual': vitest([
+    'packages/motion-protocol/src/sequence-client.browser.test.ts',
     'packages/css-compiler/src/sequence-runtime.test.ts',
     'packages/visual-proof/src/sequence-composition.visual.test.ts',
     'packages/browser-resolved-preprocessor/src/acquisition.visual.test.ts',

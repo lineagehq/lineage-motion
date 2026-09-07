@@ -123,3 +123,34 @@ test('embedded image decode failure rejects readiness without autoplay or a visi
     expect(await page.locator('iframe').evaluate(frame => getComputedStyle(frame).visibility)).toBe('hidden');
   } finally { await browser.close(); }
 }, 15000);
+
+test.each(['partial', 'none'] as const)('backward seeks preserve finished non-filling animations across %s reduced-motion changes', async mode => {
+  const imported = importMotionHtml(`<!doctype html><html><head><style>
+html,body{margin:0;width:320px;height:180px;overflow:hidden}
+.actor{width:30px;height:30px;background:red;transform:translateX(7px);animation:move 1000ms linear none}
+.pulse{width:30px;height:30px;background:blue;animation:pulse 3000ms linear both}
+@keyframes move{from{transform:translateX(0px)}to{transform:translateX(120px)}}
+@keyframes pulse{from{opacity:0}to{opacity:1}}
+${mode === 'partial' ? '@media(prefers-reduced-motion:reduce){.pulse{animation:none}}' : ''}
+</style></head><body><div class="actor"></div><div class="pulse"></div></body></html>`);
+  expect(imported.inventory.unsupportedCount).toBe(0); expect(imported.inventory.missingCount).toBe(0);
+  const original = imported.document!; const compiled = compileSequence(sequence([original]), [original]);
+  const browser = await chromium.launch();
+  try {
+    const page = await browser.newPage(); await page.setContent(compiled.html);
+    await page.evaluate(() => (window as unknown as { __motionSequence: Runtime }).__motionSequence.ready);
+    expect((await seek(page, 500)).x).toBeCloseTo(60, 2);
+    expect((await seek(page, 2000)).x).toBe(7);
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const reference = await browser.newPage({ reducedMotion: 'reduce' });
+    await reference.setContent(compileMotionDocument(original).html);
+    const expected = await reference.evaluate(() => {
+      for (const animation of document.getAnimations()) { animation.pause(); animation.currentTime = 500; }
+      return new DOMMatrix(getComputedStyle(document.querySelector('.actor')!).transform).m41;
+    });
+    expect(expected).toBe(60);
+    expect((await seek(page, 500)).x).toBe(expected);
+    await seek(page, 2000); await page.emulateMedia({ reducedMotion: 'no-preference' });
+    expect((await seek(page, 500)).x).toBe(expected);
+  } finally { await browser.close(); }
+}, 15000);

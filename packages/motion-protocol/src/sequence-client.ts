@@ -7,7 +7,7 @@ import type { RequestAuth } from './index.ts';
 
 export class SequenceServiceClient {
   constructor(private readonly baseUrl: string, private readonly auth: RequestAuth,
-    private readonly request: typeof fetch = fetch) {}
+    private readonly request: typeof fetch = (...args) => fetch(...args)) {}
   private async send(path: string, body?: unknown): Promise<{ status: number; value: unknown }> {
     const response = await this.request(`${this.baseUrl}/api/sequence/v1/${path}`, {
       method: body === undefined ? 'GET' : 'POST', redirect: 'error', cache: 'no-store',
