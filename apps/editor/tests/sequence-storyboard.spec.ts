@@ -17,9 +17,9 @@ async function launch() {
   catch (error) { await stopTestServer(child); await rm(directory, { recursive: true, force: true }); throw error; }
 }
 const source = (color: string, duration: number) => `<!doctype html><html><head><style>html,body{margin:0;width:320px;height:180px;overflow:hidden;background:${color}}.actor{width:30px;height:30px;background:black;animation:move ${duration}ms linear both}@keyframes move{from{transform:translateX(0px)}to{transform:translateX(120px)}}@media(prefers-reduced-motion:reduce){.actor{animation:none;transform:translateX(40px)}}</style></head><body><div class="actor"></div><span></span></body></html>`;
-async function shot(page: Page, name: string, color: string, duration: number) {
+async function shot(page: Page, name: string, color: string, duration: number, html = source(color, duration)) {
   await page.locator('[data-new-shot] summary').click(); await page.getByLabel('Shot name', { exact: true }).fill(name);
-  await page.getByLabel('Starting point').selectOption('html-css'); await page.getByLabel('Self-contained HTML and CSS').fill(source(color, duration));
+  await page.getByLabel('Starting point').selectOption('html-css'); await page.getByLabel('Self-contained HTML and CSS').fill(html);
   await page.getByRole('button', { name: 'Create shot', exact: true }).click(); await expect(page.locator('[data-project-shot] option:checked')).toHaveText(name);
 }
 async function revision(page: Page, number: number, settled = true) { await expect(page.locator('[data-sequence-summary]')).toContainText(`Saved revision ${number}`); if (settled) await expect(page.locator('[data-sequence-pending]')).toHaveAttribute('data-sequence-pending','false'); }
@@ -260,5 +260,46 @@ test('agent-admitted source opens through the existing shot draft guard without 
     await page.locator('[data-sequence-cards] > li').last().getByRole('button',{name:'Edit source shot'}).click(); await page.locator('[data-shot-discard]').click();
     await expect(page.locator('[data-project-shot] option:checked')).toHaveText('Agent green'); await expect(page.getByRole('heading',{name:'Shape your shot'})).toBeVisible();
     expect(new URL(page.url()).searchParams.get('shot')).toBe('agent_green'); await revision(page,1);
+  } finally { await app.cleanup(); }
+});
+
+test('normal full preview pauses actual native transform and opacity identically to the downloaded artifact', async ({ page, context }) => {
+  test.setTimeout(60000); const app = await launch();
+  try {
+    const html = source('red',3000).replace('animation:move 3000ms linear both','animation:move 3000ms linear both,fade 3000ms linear both').replace('@media(', '@keyframes fade{from{opacity:0}to{opacity:1}}@media(');
+    await page.goto(app.editorUrl); await shot(page,'Red opening','red',3000,html); await shot(page,'Blue ending','blue',3000); await create(page);
+    await page.locator('[data-sequence-scrub]').evaluate((input:HTMLInputElement) => { input.value='1500'; input.dispatchEvent(new Event('input',{bubbles:true})); });
+    const sample = () => page.locator('[data-sequence-preview] iframe').evaluate((frame:HTMLIFrameElement) => {
+      const child = [...frame.contentDocument!.querySelectorAll('iframe')].find(frame=>frame.style.visibility==='visible')!;
+      const style=child.contentWindow!.getComputedStyle(child.contentDocument!.querySelector('.actor')!);
+      return {transform:style.transform,opacity:style.opacity,animations:child.contentDocument!.getAnimations().map(a=>({state:a.playState,time:a.currentTime}))};
+    });
+    const before = await sample(); expect(before).toEqual({transform:'matrix(1, 0, 0, 1, 60, 0)',opacity:'0.5',animations:[{state:'paused',time:1500},{state:'paused',time:1500}]});
+    await page.waitForTimeout(180); expect(await sample()).toEqual(before);
+    const event = page.waitForEvent('download'); await page.getByRole('button',{name:'Download full animation'}).click();
+    const archive=join(app.directory,'native-proof.zip'); await (await event).saveAs(archive);
+    const exportedHtml=execFileSync('unzip',['-p',archive,'animation.html'],{encoding:'utf8'});
+    const standalone=await context.newPage(); await standalone.setContent(exportedHtml);
+    const exported=await standalone.evaluate(async()=>{
+      const runtime=(window as any).__motionSequence; await runtime.ready; runtime.pause(); runtime.seek(1500);
+      const child=[...document.querySelectorAll('iframe')].find(frame=>frame.style.visibility==='visible')!;
+      const style=child.contentWindow!.getComputedStyle(child.contentDocument!.querySelector('.actor')!);
+      return {transform:style.transform,opacity:style.opacity,animations:child.contentDocument!.getAnimations().map(a=>({state:a.playState,time:a.currentTime}))};
+    }); expect(exported).toEqual(before); await standalone.close();
+  } finally { await app.cleanup(); }
+});
+
+test('unavailable storyboard catalog does not block independent shot creation or navigation', async ({ page }) => {
+  test.setTimeout(60000); const app = await launch();
+  try {
+    await page.route('**/api/sequence/v1/catalog',route=>route.fulfill({status:503,contentType:'application/json',body:'{}'}));
+    await page.goto(app.editorUrl); await expect(page.locator('[data-sequence-status]')).toContainText('Could not refresh');
+    await page.getByRole('button',{name:'Create or import a shot',exact:true}).click(); await expect(page.getByLabel('Shot name',{exact:true})).toBeFocused();
+    await page.locator('[data-new-shot] summary').click();
+    await shot(page,'Red opening','red',2000); await expect(page.locator('[data-sequence-status]')).toContainText('Could not refresh');
+    await shot(page,'Blue ending','blue',3000); await expect(page.locator('[data-sequence-status]')).toContainText('Could not refresh');
+    await page.locator('[data-project-shot]').selectOption({label:'Red opening'});
+    await expect(page.locator('[data-project-shot] option:checked')).toHaveText('Red opening');
+    await expect(page.getByRole('heading',{name:'Shape your shot'})).toBeVisible();
   } finally { await app.cleanup(); }
 });
