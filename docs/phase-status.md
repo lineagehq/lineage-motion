@@ -1,8 +1,8 @@
 # Phase status and scope
 
 This is the current scope index, updated 2026-09-06 from the merged repository
-at `d289bfc`. Use the active request and existing authorization for maintenance
-of implemented behavior. Consult this index when expanding capabilities, and
+at `864b027` (storyboard and drag-harness repair merged). Use the active request
+and existing authorization for maintenance of implemented behavior. Consult this index when expanding capabilities, and
 update it with a decision and evidence link when scope or gate acceptance changes.
 The [incubation plan](incubation-plan.md) remains the roadmap.
 
@@ -24,7 +24,13 @@ and export through UI/CLI, bounded two-shot hard-cut composition, and tiered
 local/CI verification. The plan authorizes necessary sequence persistence and
 recoverable migrations, PR creation/monitoring/merging, and the specified
 required-check migration while retaining other branch protections and CodeQL.
-This records scope authorization, not implementation or acceptance-gate success.
+The shot workflow and sequence foundation/storyboard are merged. The agent
+sequence workflow (PR #34) and complete journeys (PR #37) are implemented and
+locally accepted, with final integration checks still pending at this snapshot.
+The [delivery evidence index](animation-delivery-evidence.md) records these
+boundaries and their tests. Node M remains in progress: final local smoke and
+full public regression must be recorded for the actual delivered main commit
+in the final handoff PR before overall completion can be claimed.
 Private inputs, Lineage integration, publication and the other plan exclusions
 remain outside that authorization.
 

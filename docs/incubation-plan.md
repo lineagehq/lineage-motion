@@ -1,5 +1,13 @@
 # Standalone Incubation Plan
 
+The first-slice requirements and phase exit gates below are historical roadmap
+contracts. For the approved shot-to-sequence delivery, use
+[phase status](phase-status.md), the [Animation Delivery Plan](animation-delivery-plan.md)
+and its [evidence index](animation-delivery-evidence.md). In particular, current
+sequence export includes a generated clock controlling native CSS animations;
+the original pure-HTML/CSS first-slice gate below is preserved rather than
+retroactively rewritten.
+
 ## Decision
 
 Build Lineage Motion as a separate experimental product first. It owns its app
