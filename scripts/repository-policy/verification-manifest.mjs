@@ -88,6 +88,7 @@ export const verificationSuites = {
   ]),
   parity: vitest([
     'packages/motion-cli/src/sequence-workflow.test.ts',
+    'packages/motion-cli/src/sequence-selection.test.ts',
     'packages/motion-cli/src/sequence-recovery.test.ts',
     'packages/motion-cli/src/arguments.test.ts',
     'packages/motion-cli/src/managed-session.test.ts',
