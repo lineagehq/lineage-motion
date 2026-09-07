@@ -65,6 +65,7 @@ export const verificationSuites = {
   ]),
   'service-integration': vitest([
     'packages/local-service/src/sequence-store.test.ts',
+    'packages/motion-protocol/src/sequence-export.test.ts',
     'packages/local-service/src/sequence-http.test.ts',
     'packages/local-service/src/sequence-export.test.ts',
     'packages/local-service/src/sequence-discovery.test.ts',
