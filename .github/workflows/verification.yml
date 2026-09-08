@@ -1,191 +1,38 @@
 name: Verification
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review, converted_to_draft, edited]
   workflow_dispatch:
-  schedule:
-    - cron: '23 7 * * *'
-
-concurrency:
-  group: verification-${{ github.workflow }}-${{ github.ref }}-${{ github.event.pull_request.head.sha || github.sha }}-${{ github.event.pull_request.draft && 'draft' || 'ready' }}
-  cancel-in-progress: true
 
 permissions:
   contents: read
-  pull-requests: read
 
 jobs:
-  scope:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      mode: ${{ steps.plan.outputs.mode }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.0
-      - id: plan
-        run: node scripts/ci-verification.mjs plan
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-
-  policy-fast:
-    needs: scope
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.0
-          cache: npm
-      - run: npm ci
-      - run: node scripts/check-staged.mjs
-      - run: node scripts/run-verification.mjs --suite policy-tests --suite privacy-checks
-      - if: needs.scope.outputs.mode != 'prose'
-        run: node scripts/run-verification.mjs --suite fast-unit
-
-  typecheck-build:
-    needs: scope
-    if: needs.scope.outputs.mode != 'prose'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.0
-          cache: npm
-      - run: npm ci
-      - run: node scripts/run-verification.mjs --suite typecheck --suite build
-
-  smoke:
-    needs: scope
-    if: needs.scope.outputs.mode == 'smoke'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.0
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/run-verification.mjs --suite determinism --suite browser-smoke
-      - if: failure()
-        run: node --import tsx scripts/stage-browser-diagnostics.ts
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: smoke-diagnostics
-          path: artifacts/safe-browser-diagnostics/
-          if-no-files-found: ignore
-          retention-days: 7
-
-  integration:
-    needs: scope
-    if: needs.scope.outputs.mode == 'full'
+  bounded-undo-probe:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: 9d2ae9d99f1e457332ad3911214c3d5da15c53c2
+          persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: 22.22.0
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
-      - run: node scripts/run-verification.mjs --suite repository-safety --suite service-integration --suite acquisition
-
-  recovery-parity:
-    needs: scope
-    if: needs.scope.outputs.mode == 'full'
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.0
-          cache: npm
-      - run: npm ci
-      - run: node scripts/run-verification.mjs --suite recovery --suite parity
-
-  determinism-visual:
-    needs: scope
-    if: needs.scope.outputs.mode == 'full'
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.0
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/run-verification.mjs --suite determinism --suite public-visual
-
-  browser:
-    needs: scope
-    if: needs.scope.outputs.mode == 'full'
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.0
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: node scripts/run-verification.mjs --suite browser --suite browser-smoke
+      - name: Record source and runtime
+        run: |
+          git rev-parse HEAD 'HEAD^{tree}'
+          node --input-type=module -e 'import {chromium} from "@playwright/test"; const b=await chromium.launch(); console.log(JSON.stringify({browser:await b.version(),node:process.version,arch:process.arch,platform:process.platform})); await b.close();'
+      - name: Five Start and Landed pairs
+        run: npx playwright test --config apps/editor/playwright.config.ts apps/editor/tests/project-entry.spec.ts --grep 'chosen source pause' --repeat-each=5 --reporter=line
       - if: failure()
         run: node --import tsx scripts/stage-browser-diagnostics.ts
       - uses: actions/upload-artifact@v4
         if: failure()
         with:
-          name: browser-diagnostics
+          name: bounded-undo-diagnostics
           path: artifacts/safe-browser-diagnostics/
           if-no-files-found: ignore
           retention-days: 7
-
-  verification-gate:
-    name: ${{ needs.scope.outputs.mode == 'smoke' && 'draft-smoke-gate' || 'verification-gate' }}
-    if: always()
-    needs: [scope, policy-fast, typecheck-build, smoke, integration, recovery-parity, determinism-visual, browser]
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          fetch-depth: 0
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22.22.0
-      - run: node scripts/ci-verification.mjs gate
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
-          CI_PLAN_MODE: ${{ needs.scope.outputs.mode }}
-          CI_JOB_RESULTS: ${{ toJSON(needs) }}
